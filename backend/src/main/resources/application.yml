@@ -1,0 +1,24 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: NeighborPlates Backend API
+  data:
+    mongodb:
+      uri: mongodb+srv://neighborplates277_db_user:mySecurePassword123@cluster0.syvacep.mongodb.net/neighborplates?appName=Cluster0
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+
+# JWT Secret: Base64 encoded string representing at least a 256-bit key
+# neighborplatesSecretKeyForHMACSHA256SignatureAuthenticationProtocolVerySecretKeyMustBeStrong
+jwt:
+  secret: bmVpZ2hib3JwbGF0ZXNTZWNyZXRLZXlGb3JITUFDU0hBMjU2U2lnbmF0dXJlQXV0aGVudGljYXRpb25Qcm90b2NvbFZlcnlTZWNyZXRLZXlNdXN0QmVTdHJvbmc=
+  expiration: 86400000 # 24 hours in ms
+  refreshExpiration: 2592000000 # 30 days in ms

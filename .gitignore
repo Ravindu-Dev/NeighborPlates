@@ -1,0 +1,35 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.expo/
+dist/
+web-build/
+
+# Maven build outputs
+target/
+*.class
+*.war
+*.ear
+*.jar
+
+# IDEs and editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# Mobile local files
+mobile/android/.gradle
+mobile/android/app/build
+mobile/android/local.properties
+mobile/ios/.xcode.env.local
+
+# Temporary log files
+*.log
+.system_generated/

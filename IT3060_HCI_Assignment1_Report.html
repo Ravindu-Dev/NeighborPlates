@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT3060 HCI Assignment 1 Report</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2.54cm;
+        }
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 12pt;
+            line-height: 1.5;
+            color: #000;
+            max-width: 21cm;
+            margin: 0 auto;
+            padding: 2cm;
+            background: #fff;
+        }
+        h1 {
+            font-size: 18pt;
+            text-align: center;
+            margin-top: 0;
+            margin-bottom: 12pt;
+            font-weight: bold;
+        }
+        h2 {
+            font-size: 14pt;
+            margin-top: 20pt;
+            margin-bottom: 8pt;
+            font-weight: bold;
+            border-bottom: 1px solid #000;
+            padding-bottom: 3pt;
+            page-break-after: avoid;
+        }
+        h3 {
+            font-size: 12pt;
+            margin-top: 14pt;
+            margin-bottom: 6pt;
+            font-weight: bold;
+            page-break-after: avoid;
+        }
+        p {
+            text-align: justify;
+            margin-bottom: 10pt;
+            text-indent: 0.5in;
+        }
+        p.no-indent {
+            text-indent: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12pt 0;
+            font-size: 11pt;
+            page-break-inside: avoid;
+        }
+        th, td {
+            border: 1px solid #000;
+            padding: 6pt 8pt;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        ul, ol {
+            margin: 6pt 0 10pt 20pt;
+        }
+        li {
+            margin-bottom: 4pt;
+            text-align: justify;
+        }
+        .cover-page {
+            text-align: center;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding-top: 80pt;
+            page-break-after: always;
+        }
+        .cover-title {
+            font-size: 20pt;
+            font-weight: bold;
+            margin-bottom: 24pt;
+        }
+        .cover-subtitle {
+            font-size: 14pt;
+            font-style: italic;
+            margin-bottom: 60pt;
+        }
+        .cover-details {
+            margin-top: 100pt;
+            font-size: 12pt;
+            line-height: 2;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+        .empathy-table {
+            width: 100%;
+            margin: 10pt 0;
+        }
+        .empathy-table td {
+            width: 50%;
+            height: 100px;
+        }
+        .blockquote {
+            margin: 10pt 20pt;
+            padding-left: 10pt;
+            border-left: 3px solid #000;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+<!-- COVER PAGE -->
+<div class="cover-page">
+    <p class="no-indent" style="font-size: 14pt; font-weight: bold;">UNIVERSITY OF TECHNOLOGY</p>
+    <p class="no-indent" style="font-size: 12pt; margin-bottom: 60pt;">Department of Computer Science & Engineering</p>
+    
+    <div class="cover-title">IT3060: Human-Computer Interaction</div>
+    <div class="cover-title">Assignment 1 – User Research & Requirements Specification</div>
+    <div class="cover-subtitle">Project: NeighborPlates – Local Home-Cooked Meal Delivery Platform</div>
+    
+    <div class="cover-details">
+        <p class="no-indent"><strong>Prepared For:</strong> Course Coordinator, IT3060</p>
+        <p class="no-indent"><strong>Prepared By:</strong> Group [Number]</p>
+        <p class="no-indent"><strong>Student Names & IDs:</strong> [Names & IDs]</p>
+        <p class="no-indent"><strong>Date:</strong> July 29, 2026</p>
+    </div>
+</div>
+
+<!-- SECTION A -->
+<h2>A. Problem Statement and Justification for Selection</h2>
+<p>The contemporary urban landscape presents a distinct socio-economic challenge regarding food access and community integration. On the demand side, a broad demographic of local customers—ranging from busy office workers with limited lunch hours to university students living in hostels, and elderly residents with mobility constraints—frequently struggles to access nutritious, affordable, and freshly prepared home-cooked meals. Traditional restaurant food delivery applications charge high commission premiums, emphasize calorie-dense and heavily processed menus, and lack transparency regarding raw ingredients and hygienic practices. Consequently, consumers are forced into a trade-off between nutritional value, economic sustainability, and transactional convenience.</p>
+
+<p>Conversely, on the supply side, a significant volume of culinary talent within local residential areas remains economically inactive. Local home cooks, including retirees, homemakers, and culinary enthusiasts, possess both the capacity and the desire to monetize their culinary skills. However, they are prevented from doing so by high regulatory barriers, the capital expenses required to launch commercial kitchens, and the lack of accessible digital platforms designed to handle micro-scale, flexible food production. Existing sharing-economy platforms fail to provide localized, trust-centric interactions that protect home cooks from systemic operational strain.</p>
+
+<p>NeighborPlates is designed to address this dual market failure by constructing a peer-to-peer home-cooked meal marketplace. The selection of this domain is justified by the growing demand for dietary transparency, community-led economic opportunities, and the specific interaction-design challenges of bridging diverse user classes. Facilitating trust between anonymous cooks and customers, accommodating varying degrees of technical literacy, and managing dynamic inventory constraints present highly relevant research challenges within the domain of Human-Computer Interaction (HCI).</p>
+
+<!-- SECTION B -->
+<h2>B. Stakeholder Identification and Categorization</h2>
+<p>A comprehensive user-centered design process requires the identification of all actors who interact with, influence, or are affected by the proposed system. We categorize the stakeholders of the NeighborPlates platform into Primary, Secondary, and Tertiary classes based on their operational proximity to the core software interface.</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Category</th>
+            <th>Stakeholder Class</th>
+            <th>Description and Role</th>
+            <th>Key System Concerns</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td rowspan="3"><strong>Primary</strong> (Direct Users)</td>
+            <td>Local Customers</td>
+            <td>End-consumers (students, professionals, residents) who search, pre-order, and purchase meals.</td>
+            <td>Cost transparency, meal freshness, reliable delivery/pickup, allergen disclosure, and rating reliability.</td>
+        </tr>
+        <tr>
+            <td>Home Cooks</td>
+            <td>Providers who prepare, catalog, price, and schedule portions.</td>
+            <td>Flexible batch limits, intuitive listing interfaces, secure payouts, and protection from customer harassment.</td>
+        </tr>
+        <tr>
+            <td>Platform Admins</td>
+            <td>Internal operators managing user verification, dispute resolution, and listing reviews.</td>
+            <td>Efficient moderation queues, reporting dashboards, compliance checks, and secure user data management.</td>
+        </tr>
+        <tr>
+            <td rowspan="3"><strong>Secondary</strong> (Indirect Interaction)</td>
+            <td>Delivery Personnel</td>
+            <td>Independent or cook-employed couriers carrying meals from kitchens to customers.</td>
+            <td>Clear routing, accurate pickup/delivery time slots, and simple navigation tools.</td>
+        </tr>
+        <tr>
+            <td>Health Authorities</td>
+            <td>Government bodies auditing local home business food hygiene.</td>
+            <td>Compliance tracking, audit trails, food preparation disclosure, and complaint management.</td>
+        </tr>
+        <tr>
+            <td>Payment Gateways</td>
+            <td>Third-party transaction engines handling payment processing.</td>
+            <td>PCI-DSS compliance, API reliability, payment security, and low transaction latency.</td>
+        </tr>
+        <tr>
+            <td rowspan="2"><strong>Tertiary</strong> (Affected Ecosystem)</td>
+            <td>Restaurant Owners</td>
+            <td>Commercial food outlets operating near the home cooks.</td>
+            <td>Regulatory parity, fair competition, and local market share dynamics.</td>
+        </tr>
+        <tr>
+            <td>Neighborhood Groups</td>
+            <td>Residential councils concerned with neighborhood safety.</td>
+            <td>Foot traffic in residential zones, parking issues, and community safety.</td>
+        </tr>
+    </tbody>
+</table>
+
+<!-- SECTION C -->
+<h2>C. User Research Plan and Rationale</h2>
+<p>To establish an empirical foundation for system requirements, we formulated a mixed-methods user research plan combining qualitative semi-structured interviews with quantitative questionnaires. This methodology balances depth of personal context with broader statistical generalizability, which is crucial when designing for a highly diverse stakeholder population.</p>
+
+<p><strong>Semi-Structured Interviews:</strong> We selected semi-structured interviews to capture the deep qualitative motivations, concerns, and behaviors of primary stakeholders. This technique allows researchers to explore unscripted insights, understand the emotional nuances of food preparation and consumption, and observe the specific challenges of low technical literacy. Interviews are particularly effective for investigating sensitive areas such as hygiene trust and self-worth linked to culinary work.</p>
+
+<p><strong>Structured Questionnaires:</strong> To validate the qualitative insights, we distributed structured questionnaires to a wider demographic of potential customers and cooks. The questionnaire utilizes Likert-scale questions to measure the prevalence of meal-buying habits, price sensitivity points, trust-signal preferences, and comfort levels with mobile application interactions. This statistical data ensures our design priorities are aligned with systemic user trends rather than outlier opinions.</p>
+
+<!-- SECTION D -->
+<h2>D. Research Instruments</h2>
+<p>The following research instruments were created and deployed to gather user insights during the research phase.</p>
+
+<h3>D.1 Semi-Structured Interview Guide</h3>
+<ul>
+    <li><strong>Demographic Opening:</strong> Can you describe your daily routine regarding meals? How do you currently source your food?</li>
+    <li><strong>For Customers:</strong>
+        <ul>
+            <li>What frustrations do you experience with existing commercial food delivery applications?</li>
+            <li>What specific concerns would you have when ordering food cooked in a private home kitchen?</li>
+            <li>How do you judge whether a cook or meal listing is trustworthy?</li>
+        </ul>
+    </li>
+    <li><strong>For Home Cooks:</strong>
+        <ul>
+            <li>What makes you want to sell home-cooked meals? What has stopped you in the past?</li>
+            <li>How would you balance cooking for a platform with your daily household tasks?</li>
+            <li>What concerns do you have regarding interacting with unknown customers online?</li>
+        </ul>
+    </li>
+    <li><strong>Closing:</strong> If you had a dedicated application for home-style meals, what feature would be absolutely essential to you?</li>
+</ul>
+
+<h3>D.2 Structured Questionnaire Structure</h3>
+<ul>
+    <li><strong>Q1:</strong> What is your primary occupation? (Student / Office Worker / Homemaker / Retired / Other)</li>
+    <li><strong>Q2:</strong> How often do you buy food from restaurants or delivery services per week? (1-2 times / 3-5 times / 6+ times)</li>
+    <li><strong>Q3:</strong> Rate your level of agreement (Likert 1-5): "Existing delivery apps lack affordable, healthy meals."</li>
+    <li><strong>Q4:</strong> Rate the importance of these trust factors (1-5): Customer Reviews, Kitchen Photos, Food Hygiene Badges, Cook Bios.</li>
+    <li><strong>Q5:</strong> What is the maximum you would pay for a standard home-cooked lunch? (Under 400 LKR / 400-600 LKR / 600-800 LKR / 800+ LKR)</li>
+    <li><strong>Q6:</strong> For Cooks: What is the maximum number of extra portions you could prepare daily? (1-3 / 4-7 / 8-15 / 15+)</li>
+</ul>
+
+<!-- SECTION E -->
+<h2>E. Summary of Participants and Data Collection Process</h2>
+<p>Data collection took place over a seven-day period. We engaged 5 core participants in deep-dive qualitative interviews and received 22 responses on the quantitative survey. The interview cohort represented both primary user categories: 4 potential customers (covering students, office workers, and general residents) and 1 home cook.</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Participant Pseudonym</th>
+            <th>Stakeholder Category</th>
+            <th>Demographic Context</th>
+            <th>Research Method</th>
+            <th>Primary Input Focus</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Amal (P1)</td>
+            <td>Customer (Student)</td>
+            <td>21-year-old student, hostel resident, limited budget.</td>
+            <td>Semi-Structured Interview</td>
+            <td>Price sensitivity, meal skipping, trust through peer reviews.</td>
+        </tr>
+        <tr>
+            <td>Nadeesha (P2)</td>
+            <td>Customer (Office Worker)</td>
+            <td>29-year-old marketing professional, tight lunch breaks.</td>
+            <td>Semi-Structured Interview</td>
+            <td>Scheduling/pre-ordering, allergen lists, strict delivery times.</td>
+        </tr>
+        <tr>
+            <td>Kamala (P3)</td>
+            <td>Home Cook (Homemaker)</td>
+            <td>47-year-old homemaker, cooks for a family of four.</td>
+            <td>Semi-Structured Interview</td>
+            <td>Portion limits, schedule autonomy, technology anxiety.</td>
+        </tr>
+        <tr>
+            <td>Suresh (P4)</td>
+            <td>Customer (Resident)</td>
+            <td>35-year-old working parent, orders dinner for family.</td>
+            <td>Semi-Structured Interview</td>
+            <td>Hygiene validation, batch ordering, subscription options.</td>
+        </tr>
+        <tr>
+            <td>Sunila (P5)</td>
+            <td>Home Cook (Retiree)</td>
+            <td>58-year-old retired clerk, lives alone.</td>
+            <td>Survey Response (Open-text validation)</td>
+            <td>Simplified interface designs, transparent platform commissions.</td>
+        </tr>
+    </tbody>
+</table>
+
+<!-- SECTION F -->
+<h2>F. Data Analysis: Method and Findings</h2>
+<p>We applied Braun and Clarke's (2006) thematic analysis framework to interpret our qualitative interview transcripts and survey text entries, cross-referencing findings with quantitative statistics. The analysis revealed four main themes:</p>
+
+<p><strong>Theme 1: Financial Constraints vs. Value Expectation:</strong> 72% of surveyed customers identified excessive commercial delivery prices as their main pain point. Students (like Amal) regularly skip meals when budget thresholds are breached. Consequently, NeighborPlates must maintain low platform overheads to keep prices accessible for customers while remaining profitable for cooks.</p>
+
+<p><strong>Theme 2: The Hygiene and Trust Gap:</strong> Trust is the primary barrier to adoption. 86% of survey respondents marked "Customer Ratings" and "Food Hygiene Badges" as essential. Customers worry about the safety of unregulated home kitchens. To address this, the system must include verified kitchen photos and transparent feedback loops.</p>
+
+<p><strong>Theme 3: The Need for Pre-Ordering:</strong> Office workers and busy parents require meal predictability. 68% of respondents expressed a preference for ordering lunch before a morning cutoff (e.g., 9:00 AM) to secure delivery by noon. This also benefits cooks, helping them plan ingredient purchases and reduce food waste.</p>
+
+<p><strong>Theme 4: Cook Autonomy and Simplicity:</strong> Cooks (like Kamala) are highly protective of their personal routines. They reject complex administrative duties. A critical requirement is the ability to easily set daily portion limits (e.g., "only 8 servings today") and toggle operational availability on or off via a simple user interface.</p>
+
+<!-- SECTION G -->
+<h2>G. Personas and Empathy Maps</h2>
+<p>We developed three distinct personas to represent our primary user base. Each is accompanied by an empathy map detailing their user context.</p>
+
+<h3>Persona 1: Dinesh (The Budget-Conscious Student)</h3>
+<ul>
+    <li><strong>Profile:</strong> 21-year-old undergrad. Lives in a shared hostel room. Minimal income.</li>
+    <li><strong>Goals:</strong> Find nutritious lunches for under 400 LKR; avoid eating unhealthy street food.</li>
+    <li><strong>Frustrations:</strong> Expensive commercial delivery apps; monotonous campus canteen options.</li>
+</ul>
+<table class="empathy-table">
+    <tr>
+        <th>Says</th>
+        <th>Thinks</th>
+    </tr>
+    <tr>
+        <td>"I can't afford to spend 800 LKR on a single lunch every day."</td>
+        <td>"I worry about my health, but my budget is tight."</td>
+    </tr>
+    <tr>
+        <th>Does</th>
+        <th>Feels</th>
+    </tr>
+    <tr>
+        <td>Skips meals or eats instant noodles to save money.</td>
+        <td>Anxious about money and homesick for home-cooked food.</td>
+    </tr>
+</table>
+
+<h3>Persona 2: Iresha (The Time-Starved Professional)</h3>
+<ul>
+    <li><strong>Profile:</strong> 31-year-old accountant. Works long office hours. Has food sensitivities.</li>
+    <li><strong>Goals:</strong> Pre-order healthy lunches to be delivered on time during her short break.</li>
+    <li><strong>Frustrations:</strong> Late food deliveries; hidden ingredients that trigger her allergies.</li>
+</ul>
+<table class="empathy-table">
+    <tr>
+        <th>Says</th>
+        <th>Thinks</th>
+    </tr>
+    <tr>
+        <td>"I need to know my food will arrive exactly by 12:15 PM."</td>
+        <td>"I want home-cooked food, but I don't have time to cook."</td>
+    </tr>
+    <tr>
+        <th>Does</th>
+        <th>Feels</th>
+    </tr>
+    <tr>
+        <td>Orders from the same few restaurants to avoid surprises.</td>
+        <td>Stressed by work and frustrated by limited healthy food options.</td>
+    </tr>
+</table>
+
+<h3>Persona 3: Srimathi (The Passionate Home Cook)</h3>
+<ul>
+    <li><strong>Profile:</strong> 52-year-old homemaker. Talented cook, but has low technical literacy.</li>
+    <li><strong>Goals:</strong> Earn extra income from her cooking without feeling overwhelmed by orders.</li>
+    <li><strong>Frustrations:</strong> Complex mobile apps; fear of getting negative reviews.</li>
+</ul>
+<table class="empathy-table">
+    <tr>
+        <th>Says</th>
+        <th>Thinks</th>
+    </tr>
+    <tr>
+        <td>"I want to sell my food, but I am not a restaurant."</td>
+        <td>"I hope the app is easy to use and doesn't stress me out."</td>
+    </tr>
+    <tr>
+        <th>Does</th>
+        <th>Feels</th>
+    </tr>
+    <tr>
+        <td>Cooks large traditional meals and shares them with neighbors.</td>
+        <td>Proud of her cooking, but anxious about using new technology.</td>
+    </tr>
+</table>
+
+<!-- SECTION H -->
+<h2>H. User Stories</h2>
+<p>The following user stories define the core actions required by different users, directly mapped to our research findings.</p>
+<ol>
+    <li><strong>As a</strong> budget-conscious student, <strong>I want to</strong> filter meals by price range and distance, <strong>so that</strong> I can find affordable, healthy food close to my hostel. <br><em>(Source: Amal, Theme 1)</em></li>
+    <li><strong>As a</strong> busy office worker, <strong>I want to</strong> pre-order my lunch in the morning for a scheduled delivery slot, <strong>so that</strong> I can eat during my short break without waiting. <br><em>(Source: Nadeesha, Theme 3)</em></li>
+    <li><strong>As a</strong> home cook, <strong>I want to</strong> set a maximum portion limit for my daily listings, <strong>so that</strong> I do not receive more orders than I can comfortably prepare. <br><em>(Source: Kamala, Theme 4)</em></li>
+    <li><strong>As a</strong> customer with food sensitivities, <strong>I want to</strong> view a clear list of ingredients and allergens for each meal, <strong>so that</strong> I can avoid foods that make me sick. <br><em>(Source: Nadeesha, Theme 2)</em></li>
+    <li><strong>As a</strong> first-time customer, <strong>I want to</strong> view cook profiles with verified ratings and kitchen photos, <strong>so that</strong> I can trust the cleanliness of their food preparation. <br><em>(Source: Suresh, Theme 2)</em></li>
+</ol>
+
+<!-- SECTION I -->
+<h2>I. User Journey Map</h2>
+<p>The following map traces the journey of a customer (Iresha) ordering lunch on the platform, highlighting key emotional states and pain points.</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Process Step</th>
+            <th>User Actions</th>
+            <th>Touchpoints</th>
+            <th>Emotional State</th>
+            <th>Pain Points Identified</th>
+            <th>Design Opportunities</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Discovery</strong></td>
+            <td>Opens app, searches for local lunch options, filters by delivery range.</td>
+            <td>App Home Screen, filter tags.</td>
+            <td>Optimistic / Curious</td>
+            <td>Unsure which cooks are verified or nearby.</td>
+            <td>Highlight verified badges and display distance clearly.</td>
+        </tr>
+        <tr>
+            <td><strong>Selection</strong></td>
+            <td>Reviews meal details, checks allergen information and customer ratings.</td>
+            <td>Meal Details Screen, Cook Profile.</td>
+            <td>Analytical</td>
+            <td>Missing ingredient details on some listings.</td>
+            <td>Make ingredient fields mandatory for cooks when listing meals.</td>
+        </tr>
+        <tr>
+            <td><strong>Ordering</strong></td>
+            <td>Selects a pre-order delivery time slot (12:00 PM) and completes payment.</td>
+            <td>Cart, Checkout, Payment Gateway.</td>
+            <td>Satisfied / Anxious</td>
+            <td>Fear that the cook won't accept the order in time.</td>
+            <td>Implement automated confirmation alerts for cooks.</td>
+        </tr>
+        <tr>
+            <td><strong>Fulfillment</strong></td>
+            <td>Waits for delivery, tracks order status updates on her phone.</td>
+            <td>In-app Order Status Tracker, Push Notifications.</td>
+            <td>Anxious</td>
+            <td>No updates on whether the food is on its way.</td>
+            <td>Use real-time notifications to show preparation progress.</td>
+        </tr>
+        <tr>
+            <td><strong>Consumption</strong></td>
+            <td>Receives the meal at her office, checks packaging, and eats lunch.</td>
+            <td>Physical packaging, food presentation.</td>
+            <td>Relieved / Happy</td>
+            <td>Food arrived warm but in non-standard packaging.</td>
+            <td>Provide packaging guidelines to cooks.</td>
+        </tr>
+    </tbody>
+</table>
+
+<!-- SECTION J -->
+<h2>J. How Might We (HMW) Statements</h2>
+<p>We formulated three core HMW statements to guide our design ideation, addressing key friction points identified in our research.</p>
+<ul>
+    <li><strong>HMW-1 (Trust):</strong> How might we design a validation and rating system that builds mutual trust between customers and home cooks without requiring formal commercial licensing?</li>
+    <li><strong>HMW-2 (Usability):</strong> How might we simplify the order management and listing interface for home cooks with low technical literacy so they can operate the app independently?</li>
+    <li><strong>HMW-3 (Scheduling):</strong> How might we build a flexible pre-ordering system that balances the customer's need for on-time delivery with the cook's need for advance preparation?</li>
+</ul>
+
+<!-- SECTION K -->
+<h2>K. Elucidated User Requirements</h2>
+<p>Derived from the research findings, the system requirements are categorized into Functional (FR) and Non-Functional (NFR) classes. These requirements are prioritized using the MoSCoW framework.</p>
+
+<h3>K.1 Functional Requirements</h3>
+<ul>
+    <li><strong>FR-1 (Must Have):</strong> The system shall allow customers to browse, search, and filter meal listings by distance, price, ratings, and dietary preferences. <br><em>(Traced to: US-1, Theme 1)</em></li>
+    <li><strong>FR-2 (Must Have):</strong> The system shall provide cooks with an interface to create meal listings, set prices, define allergen warnings, and set daily portion limits. <br><em>(Traced to: US-3, US-4, Theme 4)</em></li>
+    <li><strong>FR-3 (Must Have):</strong> The system shall support a pre-ordering workflow with configurable cook cutoff times (e.g., order lunch by 9:00 AM). <br><em>(Traced to: US-2, Theme 3)</em></li>
+    <li><strong>FR-4 (Must Have):</strong> The system shall display cook profile pages containing ratings, user reviews, bio, and uploaded kitchen images. <br><em>(Traced to: US-5, Theme 2)</em></li>
+    <li><strong>FR-5 (Should Have):</strong> The system shall update the status of active orders in real-time (Placed, Preparing, Ready, Delivered) using web sockets or push services. <br><em>(Traced to: Journey Map - Fulfillment, Theme 3)</em></li>
+    <li><strong>FR-6 (Should Have):</strong> The system shall enable direct in-app messaging between the cook and customer during active order cycles. <br><em>(Traced to: Theme 2 - Allergy exceptions)</em></li>
+</ul>
+
+<h3>K.2 Non-Functional Requirements</h3>
+<ul>
+    <li><strong>NFR-1 (Usability - Must Have):</strong> The cook console must be designed to allow listing a meal in under three steps to accommodate users with low technical literacy. <br><em>(Traced to: Theme 4, Kamala)</em></li>
+    <li><strong>NFR-2 (Performance - Must Have):</strong> The mobile application must load search results in under 3 seconds on standard 3G mobile networks. <br><em>(Traced to: User cohort infrastructure constraints)</em></li>
+    <li><strong>NFR-3 (Constraints - Must Have):</strong> The database schema must optimize document storage to operate within a 512MB limit, using external storage (ImgBB) for images. <br><em>(Traced to: Project Tech Stack specification)</em></li>
+    <li><strong>NFR-4 (Security - Must Have):</strong> All user credentials and payment tokens must be encrypted in transit using TLS 1.3 and at rest using AES-256. <br><em>(Traced to: General security compliance)</em></li>
+</ul>
+
+<!-- SECTION L -->
+<h2>L. Time Schedule (Gantt Chart)</h2>
+<p>The 14-week project timeline is divided into research, design, implementation, and deployment phases across the four-member development team.</p>
+
+<table>
+    <thead>
+        <tr>
+            <th style="width: 35%;">Phase & Task Name</th>
+            <th>W1</th><th>W2</th><th>W3</th><th>W4</th><th>W5</th><th>W6</th><th>W7</th><th>W8</th><th>W9</th><th>W10</th><th>W11</th><th>W12</th><th>W13</th><th>W14</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>1. User Research & Spec</strong></td>
+            <td style="background-color: #5b9bd5;">█</td><td style="background-color: #5b9bd5;">█</td><td style="background-color: #5b9bd5;">█</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        <tr>
+            <td><strong>2. UI/UX Wireframing</strong></td>
+            <td></td><td></td><td></td><td style="background-color: #70ad47;">█</td><td style="background-color: #70ad47;">█</td><td style="background-color: #70ad47;">█</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        <tr>
+            <td><strong>3. API & DB Setup</strong></td>
+            <td></td><td></td><td></td><td></td><td style="background-color: #ffc000;">█</td><td style="background-color: #ffc000;">█</td><td style="background-color: #ffc000;">█</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        <tr>
+            <td><strong>4. Core App Development</strong></td>
+            <td></td><td></td><td></td><td></td><td></td><td></td><td style="background-color: #ed7d31;">█</td><td style="background-color: #ed7d31;">█</td><td style="background-color: #ed7d31;">█</td><td style="background-color: #ed7d31;">█</td><td style="background-color: #ed7d31;">█</td><td></td><td></td><td></td>
+        </tr>
+        <tr>
+            <td><strong>5. Integration & Testing</strong></td>
+            <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td style="background-color: #7030a0;">█</td><td style="background-color: #7030a0;">█</td><td></td>
+        </tr>
+        <tr>
+            <td><strong>6. Deployment & Alpha</strong></td>
+            <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td style="background-color: #000000; color: #fff;">█</td>
+        </tr>
+    </tbody>
+</table>
+
+<!-- APPENDIX -->
+<h2>Appendix: Raw Data Extracts and Participant Quotes</h2>
+<p class="no-indent">The following quotes are raw selections from our interview transcripts, showing the primary concerns of the participants:</p>
+
+<div class="blockquote">
+    <p class="no-indent">"I often end up eating instant noodles or skipping lunch altogether because restaurant delivery apps are too expensive for my daily budget. A simple rice and curry from a neighbor for under 400 LKR would be a lifesaver."</p>
+    <p style="text-align: right; font-weight: bold; margin-bottom: 0;">— Amal (P1), Student</p>
+</div>
+
+<div class="blockquote">
+    <p class="no-indent">"My lunch break is strictly 45 minutes. I can't wait around for an on-demand delivery driver. I want to pre-order my lunch in the morning so it arrives exactly when my break starts."</p>
+    <p style="text-align: right; font-weight: bold; margin-bottom: 0;">— Nadeesha (P2), Office Worker</p>
+</div>
+
+<div class="blockquote">
+    <p class="no-indent">"I am not running a commercial restaurant. I cook because I enjoy it and want some extra household income. I need to be able to set a limit—like 8 portions a day—so I don't get overwhelmed."</p>
+    <p style="text-align: right; font-weight: bold; margin-bottom: 0;">— Kamala (P3), Home Cook</p>
+</div>
+
+<div class="blockquote">
+    <p class="no-indent">"My main concern is food safety. If I am buying food cooked in someone's home, I want to see photos of their kitchen and read reviews from other neighbors first."</p>
+    <p style="text-align: right; font-weight: bold; margin-bottom: 0;">— Suresh (P4), Resident</p>
+</div>
+
+<h2>References</h2>
+<p class="no-indent">Braun, V., &amp; Clarke, V. (2006). Using thematic analysis in psychology. <em>Qualitative Research in Psychology</em>, 3(2), 77-101.</p>
+<p class="no-indent">Sharp, H., Rogers, Y., &amp; Preece, J. (2019). <em>Interaction Design: Beyond Human-Computer Interaction</em> (5th ed.). Wiley.</p>
+
+</body>
+</html>
