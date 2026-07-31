@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Image, RefreshControl } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
 import { api } from '../../services/api';
@@ -15,12 +15,12 @@ interface HomeScreenProps {
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [meals, setMeals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
 
-  const categories = ['ALL', 'BREAKFAST', 'LUNCH', 'DINNER', 'SNACKS'];
+  const categories = ['ALL', 'BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'];
 
   const fetchMeals = async (category: string) => {
-    setLoading(true);
     try {
       const categoryParam = category && category !== 'ALL' ? `?category=${category}` : '';
       const response = await api.get(`/api/meals${categoryParam}`);
@@ -32,9 +32,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchMeals(selectedCategory);
+    setRefreshing(false);
+  }, [selectedCategory]);
+
   useEffect(() => {
     fetchMeals(selectedCategory);
-  }, [selectedCategory]);
+
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchMeals(selectedCategory);
+    });
+    return unsubscribe;
+  }, [navigation, selectedCategory]);
 
   return (
     <View className="flex-1 bg-surface-elevated px-4 pt-4">
@@ -95,6 +106,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           data={meals}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF6B35" colors={['#FF6B35']} />
+          }
           renderItem={({ item }) => (
             <Card
               onPress={() => navigation.navigate('MealDetail', { mealId: item.id })}

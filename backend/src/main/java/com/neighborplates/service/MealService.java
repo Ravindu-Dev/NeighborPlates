@@ -164,16 +164,19 @@ public class MealService {
             // Geospatial Haversine validation filter
             if (customerLon != null && customerLat != null && maxDistanceKm != null) {
                 User.UserProfile cookProfile = cook.getProfile();
-                if (cookProfile.getLocation() != null && cookProfile.getLocation().getCoordinates().size() == 2) {
+                if (cookProfile != null && cookProfile.getLocation() != null 
+                        && cookProfile.getLocation().getCoordinates() != null 
+                        && cookProfile.getLocation().getCoordinates().size() == 2) {
                     double cookLon = cookProfile.getLocation().getCoordinates().get(0);
                     double cookLat = cookProfile.getLocation().getCoordinates().get(1);
 
-                    double distance = GeoUtils.calculateDistance(customerLon, customerLat, cookLon, cookLat);
-                    if (distance > maxDistanceKm) {
-                        continue; // Skip: outside target filter range
+                    // Only filter out if cook HAS coordinates and distance exceeds maxDistanceKm
+                    if (cookLon != 0.0 || cookLat != 0.0) {
+                        double distance = GeoUtils.calculateDistance(customerLon, customerLat, cookLon, cookLat);
+                        if (distance > maxDistanceKm) {
+                            continue; // Skip: outside target filter range
+                        }
                     }
-                } else {
-                    continue; // Skip: location details missing
                 }
             }
 

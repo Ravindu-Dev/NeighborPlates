@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Image, Alert } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Image, Alert, TouchableOpacity } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
 import { api } from '../../services/api';
