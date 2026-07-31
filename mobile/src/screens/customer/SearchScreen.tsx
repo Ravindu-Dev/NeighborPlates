@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, ActivityIndicator, Image, TouchableOpacity } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
@@ -40,6 +40,14 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    handleSearch();
+    const unsubscribe = navigation.addListener('focus', () => {
+      handleSearch();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   return (
     <View className="flex-1 bg-surface-elevated px-4 pt-4">
