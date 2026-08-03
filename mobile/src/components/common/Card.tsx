@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TouchableOpacity, ViewProps } from 'react-native';
+import { View, Pressable, ViewProps } from 'react-native';
 
 interface CardProps extends ViewProps {
   onPress?: () => void;
@@ -24,14 +24,14 @@ export const Card: React.FC<CardProps> = ({
 
   if (onPress) {
     return (
-      <TouchableOpacity 
-        onPress={onPress} 
-        activeOpacity={0.9} 
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
         className={containerClass}
         {...(props as any)}
       >
         {children}
-      </TouchableOpacity>
+      </Pressable>
     );
   }
 
