@@ -43,7 +43,7 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
 
   return (
     <Animated.View
-      style={[{ width, height, borderRadius, backgroundColor: '#E5E7EB' }, animatedStyle]}
+      style={[{ width: width as any, height, borderRadius, backgroundColor: '#E5E7EB' }, animatedStyle]}
       className={className}
     />
   );
