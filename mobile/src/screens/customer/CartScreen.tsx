@@ -1,16 +1,25 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
+import { useCartStore } from '../../store/cartStore';
 
 type CartNavProp = NativeStackNavigationProp<CustomerStackParamList, 'HomeTabs'>;
 
 export const CartScreen: React.FC = () => {
   const navigation = useNavigation<CartNavProp>();
+  
+  const { 
+    items: cartItems, 
+    updateQuantity, 
+    removeItem, 
+    getCartTotal 
+  } = useCartStore();
 
-  // Future: connect to a global cart store (Zustand)
-  const cartItems: any[] = [];
+  const subtotal = getCartTotal();
+  const deliveryFee = cartItems.length > 0 ? 150 : 0;
+  const total = subtotal + deliveryFee;
 
   return (
     <View className="flex-1 relative bg-surface-elevated">
@@ -29,7 +38,7 @@ export const CartScreen: React.FC = () => {
           <Text className="text-sm mt-1 text-textSecondary">
             {cartItems.length === 0
               ? 'No items added yet'
-              : `${cartItems.length} item${cartItems.length > 1 ? 's' : ''} ready to order`}
+              : `${cartItems.length} unique item${cartItems.length > 1 ? 's' : ''} ready to order`}
           </Text>
         </View>
 
@@ -45,7 +54,6 @@ export const CartScreen: React.FC = () => {
             </Text>
             <TouchableOpacity
               onPress={() => {
-                // Navigate back to Home tab
                 navigation.navigate('HomeTabs');
               }}
               className="bg-primary rounded-2xl px-10 py-4 items-center shadow-md"
@@ -55,42 +63,100 @@ export const CartScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         ) : (
-          /* ── Cart Items (future) ─────────────────── */
+          /* ── Cart Items ─────────────────── */
           <>
+            <View className="mb-4">
+              <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider mb-2">
+                Ordering from Chef: {cartItems[0].cookName}
+              </Text>
+            </View>
+
             {cartItems.map((item, i) => (
               <View
-                key={i}
+                key={item.mealId}
                 className="bg-white/60 border border-white/80 rounded-2xl p-4 mb-3 shadow-md flex-row items-center"
               >
-                <View className="flex-1">
-                  <Text className="text-textPrimary font-bold text-sm">{item.name}</Text>
-                  <Text className="text-textMuted text-xs mt-0.5">Qty: {item.quantity}</Text>
+                {/* Meal image indicator */}
+                <View className="w-16 h-16 rounded-xl bg-primary/10 items-center justify-center mr-3 overflow-hidden border border-gray-150 shadow-inner">
+                  {item.photos && item.photos.length > 0 ? (
+                    <Image source={{ uri: item.photos[0] }} className="w-full h-full" />
+                  ) : (
+                    <Text className="text-primary text-xl">🍛</Text>
+                  )}
                 </View>
-                <Text className="text-primary font-black text-sm">LKR {item.price}</Text>
+
+                {/* Details */}
+                <View className="flex-1 mr-2">
+                  <Text className="text-textPrimary font-extrabold text-sm leading-4" numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <Text className="text-primary font-black text-xs mt-1">LKR {item.price}</Text>
+
+                  {/* Quantity Adjuster */}
+                  <View className="flex-row items-center mt-2.5 bg-white border border-gray-100 rounded-lg self-start py-0.5 px-2">
+                    <TouchableOpacity 
+                      onPress={() => {
+                        if (item.quantity > 1) {
+                          updateQuantity(item.mealId, item.quantity - 1);
+                        } else {
+                          removeItem(item.mealId);
+                        }
+                      }}
+                      className="px-2 py-0.5"
+                    >
+                      <Text className="font-extrabold text-textPrimary text-xs">-</Text>
+                    </TouchableOpacity>
+                    <Text className="font-bold text-textPrimary text-xs px-2.5">{item.quantity}</Text>
+                    <TouchableOpacity 
+                      onPress={() => updateQuantity(item.mealId, item.quantity + 1)}
+                      className="px-2 py-0.5"
+                    >
+                      <Text className="font-extrabold text-textPrimary text-xs">+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Action Right */}
+                <View className="items-end justify-between h-16 py-1">
+                  <TouchableOpacity 
+                    onPress={() => removeItem(item.mealId)}
+                    className="p-1 rounded-full bg-red-50 border border-red-100"
+                  >
+                    <Text className="text-red-500 font-extrabold text-[10px]">✕</Text>
+                  </TouchableOpacity>
+                  <Text className="text-textPrimary font-black text-sm">
+                    LKR {item.price * item.quantity}
+                  </Text>
+                </View>
               </View>
             ))}
 
-            {/* Checkout button */}
+            {/* Price Details Card */}
             <View className="mt-4">
               <View className="bg-white/60 border border-white/80 rounded-2xl p-5 mb-4 shadow-md">
                 <View className="flex-row justify-between items-center mb-2">
                   <Text className="text-textSecondary text-sm">Subtotal</Text>
-                  <Text className="text-textPrimary font-bold text-sm">LKR 0</Text>
+                  <Text className="text-textPrimary font-bold text-sm">LKR {subtotal}</Text>
                 </View>
                 <View className="flex-row justify-between items-center mb-2">
                   <Text className="text-textSecondary text-sm">Delivery Fee</Text>
-                  <Text className="text-textPrimary font-bold text-sm">LKR 150</Text>
+                  <Text className="text-textPrimary font-bold text-sm">LKR {deliveryFee}</Text>
                 </View>
-                <View className="flex-row justify-between items-center border-t border-gray-100 pt-3 mt-2">
+                <View className="flex-row justify-between items-center border-t border-gray-150 pt-3 mt-2">
                   <Text className="text-textPrimary font-black text-base">Total</Text>
-                  <Text className="text-primary font-black text-base">LKR 150</Text>
+                  <Text className="text-primary font-black text-base">LKR {total}</Text>
                 </View>
               </View>
+
               <TouchableOpacity
-                className="bg-primary rounded-2xl py-4 items-center shadow-md"
+                onPress={() => {
+                  navigation.navigate('Checkout');
+                }}
+                className="bg-primary rounded-2xl py-4 items-center shadow-md flex-row justify-center"
                 activeOpacity={0.8}
               >
-                <Text className="text-white font-extrabold text-sm tracking-wide">Proceed to Checkout →</Text>
+                <Text className="text-white font-extrabold text-sm tracking-wide mr-2">Proceed to Checkout</Text>
+                <Text className="text-white font-bold text-sm">→</Text>
               </TouchableOpacity>
             </View>
           </>

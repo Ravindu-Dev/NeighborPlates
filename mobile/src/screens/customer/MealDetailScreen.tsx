@@ -5,6 +5,7 @@ import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
 import { api } from '../../services/api';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
+import { useCartStore } from '../../store/cartStore';
 
 type MealDetailScreenProps = NativeStackScreenProps<CustomerStackParamList, 'MealDetail'>;
 
@@ -51,7 +52,44 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
       Alert.alert('Sold Out', 'Sorry, no portions remaining for this meal today.');
       return;
     }
-    navigation.navigate('Checkout', { mealId, quantity });
+
+    const res = useCartStore.getState().addItem(meal, quantity);
+    if (res.success) {
+      Alert.alert(
+        'Added to Cart',
+        `Successfully added ${quantity} portion(s) of "${meal.name}" to your cart.`,
+        [
+          {
+            text: 'Keep Browsing',
+            style: 'cancel',
+          },
+          {
+            text: 'Go to Cart',
+            onPress: () => navigation.navigate('HomeTabs', { screen: 'Cart' }),
+          },
+        ]
+      );
+    } else if (res.reason === 'diff_cook') {
+      const existingCookName = useCartStore.getState().getCookName();
+      Alert.alert(
+        'Start a new cart?',
+        `You already have items in your cart from Cook "${existingCookName}". Adding items from Cook "${meal.cookName}" will clear your existing cart. Do you want to proceed?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Clear & Add',
+            style: 'destructive',
+            onPress: () => {
+              useCartStore.getState().clearCart();
+              useCartStore.getState().addItem(meal, quantity);
+              Alert.alert('Success', 'Cart cleared and item added!');
+            },
+          },
+        ]
+      );
+    } else if (res.reason === 'no_portions') {
+      Alert.alert('Limit Exceeded', `Cannot add more than ${meal.portionsRemaining} portions of this meal.`);
+    }
   };
 
   return (
@@ -147,7 +185,7 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
         )}
 
         <Button
-          title={meal.portionsRemaining > 0 ? "ORDER PORTION" : "SOLD OUT"}
+          title={meal.portionsRemaining > 0 ? "ADD TO CART 🛒" : "SOLD OUT"}
           onPress={handleOrder}
           disabled={meal.portionsRemaining <= 0}
           variant="primary"
