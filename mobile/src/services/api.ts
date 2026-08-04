@@ -45,6 +45,12 @@ api.interceptors.request.use(
   }
 );
 
+let onUnauthorizedCallback: (() => void) | null = null;
+
+export const setUnauthorizedCallback = (callback: () => void) => {
+  onUnauthorizedCallback = callback;
+};
+
 // Response interceptor to handle token refresh on 401
 api.interceptors.response.use(
   (response) => response,
@@ -63,9 +69,13 @@ api.interceptors.response.use(
             return api(originalRequest);
           }
         }
+        throw new Error('No refresh token found');
       } catch (refreshError) {
         // Clear storage and logout if refresh token expired
         await AsyncStorage.multiRemove(['token', 'refreshToken', 'user']);
+        if (onUnauthorizedCallback) {
+          onUnauthorizedCallback();
+        }
       }
     }
     return Promise.reject(error);

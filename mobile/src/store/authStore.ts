@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '../services/api';
+import { api, setUnauthorizedCallback } from '../services/api';
 
 interface User {
   id: string;
@@ -123,3 +123,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 }));
+
+// Register callback to sync Zustand state when token refresh fails
+setUnauthorizedCallback(() => {
+  useAuthStore.getState().logout();
+});
