@@ -13,6 +13,7 @@ target/
 *.war
 *.ear
 *.jar
+backend/src/main/resources/application.yml
 
 # IDEs and editors
 .idea/

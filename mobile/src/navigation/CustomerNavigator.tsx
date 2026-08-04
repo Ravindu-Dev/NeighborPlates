@@ -8,12 +8,20 @@ import { CartScreen } from '../screens/customer/CartScreen';
 import { ProfileScreen } from '../screens/customer/ProfileScreen';
 import { MealDetailScreen } from '../screens/customer/MealDetailScreen';
 import { CheckoutScreen } from '../screens/customer/CheckoutScreen';
+import { PaymentScreen } from '../screens/customer/PaymentScreen';
 import { OrderTrackingScreen } from '../screens/customer/OrderTrackingScreen';
+import { useCartStore } from '../store/cartStore';
 
 export type CustomerStackParamList = {
-  HomeTabs: undefined;
+  HomeTabs: { screen?: string } | undefined;
   MealDetail: { mealId: string };
-  Checkout: { mealId: string; quantity: number };
+  Checkout: undefined;
+  Payment: {
+    address: string;
+    deliveryMethod: string;
+    specialInstructions: string;
+    scheduledFor: string;
+  };
   OrderTracking: { orderId: string };
 };
 
@@ -28,6 +36,8 @@ const Tab = createBottomTabNavigator<CustomerTabParamList>();
 const Stack = createNativeStackNavigator<CustomerStackParamList>();
 
 const HomeTabNavigator = () => {
+  const cartItemCount = useCartStore((state) => state.getItemCount());
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -56,7 +66,7 @@ const HomeTabNavigator = () => {
     >
       <Tab.Screen name="Home"    component={HomeScreen}    options={{ title: 'Home' }} />
       <Tab.Screen name="Search"  component={SearchScreen}  options={{ title: 'Search' }} />
-      <Tab.Screen name="Cart"    component={CartScreen}    options={{ title: 'Cart' }} />
+      <Tab.Screen name="Cart"    component={CartScreen}    options={{ title: 'Cart', tabBarBadge: cartItemCount > 0 ? cartItemCount : undefined }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );
@@ -67,7 +77,8 @@ export const CustomerNavigator = () => {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HomeTabs"      component={HomeTabNavigator} />
       <Stack.Screen name="MealDetail"    component={MealDetailScreen}    options={{ headerShown: true, title: 'Meal Details' }} />
-      <Stack.Screen name="Checkout"      component={CheckoutScreen}       options={{ headerShown: true, title: 'Checkout' }} />
+      <Stack.Screen name="Checkout"      component={CheckoutScreen}       options={{ headerShown: true, title: 'Checkout Details' }} />
+      <Stack.Screen name="Payment"       component={PaymentScreen}        options={{ headerShown: true, title: 'Payment' }} />
       <Stack.Screen name="OrderTracking" component={OrderTrackingScreen}  options={{ headerShown: true, title: 'Track Order' }} />
     </Stack.Navigator>
   );

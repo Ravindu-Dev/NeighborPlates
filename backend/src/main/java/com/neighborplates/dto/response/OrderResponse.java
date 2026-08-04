@@ -28,6 +28,7 @@ public class OrderResponse {
     private Order.DeliveryAddress address;
     private Instant scheduledFor;
     private String specialInstructions;
+    private String paymentTransactionId;
     private Instant createdAt;
     private Instant updatedAt;
 }

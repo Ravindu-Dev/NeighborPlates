@@ -114,6 +114,7 @@ public class OrderService {
 
         order.setScheduledFor(request.getScheduledFor() != null ? request.getScheduledFor() : Instant.now().plusSeconds(3600)); // Default 1 hour delay if not set
         order.setSpecialInstructions(request.getSpecialInstructions());
+        order.setPaymentTransactionId(request.getPaymentTransactionId());
         order.setCreatedAt(Instant.now());
         order.setUpdatedAt(Instant.now());
 
@@ -281,6 +282,7 @@ public class OrderService {
                 order.getAddress(),
                 order.getScheduledFor(),
                 order.getSpecialInstructions(),
+                order.getPaymentTransactionId(),
                 order.getCreatedAt(),
                 order.getUpdatedAt()
         );

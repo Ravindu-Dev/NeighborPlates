@@ -32,6 +32,8 @@ public class PlaceOrderRequest {
 
     private String specialInstructions;
 
+    private String paymentTransactionId;
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

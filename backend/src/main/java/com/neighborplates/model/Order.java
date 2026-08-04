@@ -52,6 +52,8 @@ public class Order {
 
     private Instant updatedAt = Instant.now();
 
+    private String paymentTransactionId;
+
     @Indexed(expireAfterSeconds = 7776000) // TTL index: auto-delete after 90 days (90 * 24 * 3600 seconds)
     private Instant ttlExpiryDate;
 
