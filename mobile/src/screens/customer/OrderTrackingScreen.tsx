@@ -5,6 +5,7 @@ import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
 import { api } from '../../services/api';
 import { Button } from '../../components/common/Button';
 import { TextInput } from '../../components/common/TextInput';
+import { Feather } from '@expo/vector-icons';
 
 type OrderTrackingScreenProps = NativeStackScreenProps<CustomerStackParamList, 'OrderTracking'>;
 
@@ -83,101 +84,116 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
   };
 
   return (
-    <ScrollView className="flex-1 bg-surface-elevated p-6">
-      {order?.status === 'CANCELLED' ? (
-        <View className="bg-red-50 border border-red-200 rounded-3xl p-5 mb-6 items-center">
-          <Text className="text-red-700 font-extrabold text-lg">ORDER CANCELLED</Text>
-          <Text className="text-red-600 text-xs mt-1 text-center">
-            This order has been cancelled and portion balances have been returned to the cook.
-          </Text>
+    <View className="flex-1 bg-surface-elevated">
+      {/* Premium Header */}
+      <View className="bg-white px-6 pt-12 pb-4 border-b border-gray-100 shadow-sm z-10 flex-row justify-between items-center">
+        <View className="flex-row items-center flex-1 mr-2">
+          <TouchableOpacity onPress={() => navigation.goBack()} className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center mr-3 border border-gray-150">
+            <Feather name="chevron-left" size={18} color="#1A1A2E" />
+          </TouchableOpacity>
+          <Text className="font-black text-xl text-textPrimary">Track Order</Text>
         </View>
-      ) : (
-        /* Timeline Step Tracker (Phase 9 Animation targets this) */
-        <View className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm mb-6">
-          <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider mb-4">ORDER TRACKING</Text>
-          {steps.map((step, idx) => {
-            const isCompleted = idx <= currentStepIndex;
-            const isActive = idx === currentStepIndex;
-            return (
-              <View key={step} className="flex-row items-start mb-4 relative">
-                <View className="items-center mr-4">
-                  <View 
-                    className={`w-6 h-6 rounded-full items-center justify-center border
-                      ${isCompleted ? 'bg-primary border-primary' : 'bg-white border-gray-200'}
-                    `}
-                  >
-                    <Text className="text-[10px] font-bold text-white">
-                      {isCompleted ? "✓" : ""}
-                    </Text>
-                  </View>
-                  {idx < steps.length - 1 && (
-                    <View className={`w-0.5 h-8 ${isCompleted ? 'bg-primary' : 'bg-gray-200'}`} />
-                  )}
-                </View>
-                <View className="flex-1 pt-0.5">
-                  <Text className={`text-sm font-extrabold ${isActive ? 'text-primary' : isCompleted ? 'text-textPrimary' : 'text-textMuted'}`}>
-                    {step}
-                  </Text>
-                  <Text className="text-textSecondary text-[10px] mt-0.5">
-                    {isActive ? "ACTIVE STEP" : isCompleted ? "COMPLETED" : "PENDING"}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      )}
-
-      {/* Pricing / Items Detail */}
-      <View className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm mb-6">
-        <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider mb-2">ORDER DETAIL</Text>
-        <Text className="text-textPrimary font-extrabold text-sm">{order?.orderNumber}</Text>
-        <Text className="text-textSecondary text-xs mt-1">Cook: {order?.cookName}</Text>
-        <View className="border-t border-gray-50 mt-3 pt-3">
-          <Text className="text-textPrimary font-black text-sm">
-            Total Price: LKR {order?.totalAmount}
-          </Text>
+        <View className="bg-primary/10 border border-primary/20 rounded-full px-2.5 py-1">
+          <Text className="text-primary font-black text-[9px] uppercase tracking-wider">Live Tracker</Text>
         </View>
       </View>
 
-      {/* Cancellation / Review Forms */}
-      {order?.status === 'PLACED' ? (
-        <Button
-          title="CANCEL ORDER"
-          onPress={handleCancel}
-          variant="outline"
-          className="w-full mb-10 border-red-500 text-red-500"
-        />
-      ) : order?.status === 'DELIVERED' && !reviewed ? (
-        <View className="bg-white p-5 rounded-3xl border border-gray-150 shadow-sm mb-12">
-          <Text className="text-textPrimary font-bold text-base mb-1">Rate Your Meal</Text>
-          <Text className="text-textMuted text-xs mb-4">Share your feedback to support local home cooks!</Text>
-          
-          {/* Star Selector */}
-          <View className="flex-row justify-center mb-6">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <TouchableOpacity key={star} onPress={() => setRating(star)} className="px-2">
-                <Text className="text-3xl">{star <= rating ? "★" : "☆"}</Text>
-              </TouchableOpacity>
-            ))}
+      <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }} showsVerticalScrollIndicator={false}>
+        {order?.status === 'CANCELLED' ? (
+          <View className="bg-red-50 border border-red-200 rounded-3xl p-5 mb-6 items-center">
+            <Text className="text-red-700 font-extrabold text-lg">ORDER CANCELLED</Text>
+            <Text className="text-red-600 text-xs mt-1 text-center">
+              This order has been cancelled and portion balances have been returned to the cook.
+            </Text>
           </View>
+        ) : (
+          /* Timeline Step Tracker (Phase 9 Animation targets this) */
+          <View className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm mb-6">
+            <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider mb-4">ORDER TRACKING</Text>
+            {steps.map((step, idx) => {
+              const isCompleted = idx <= currentStepIndex;
+              const isActive = idx === currentStepIndex;
+              return (
+                <View key={step} className="flex-row items-start mb-4 relative">
+                  <View className="items-center mr-4">
+                    <View 
+                      className={`w-6 h-6 rounded-full items-center justify-center border
+                        ${isCompleted ? 'bg-primary border-primary' : 'bg-white border-gray-200'}
+                      `}
+                    >
+                      <Text className="text-[10px] font-bold text-white">
+                        {isCompleted ? "✓" : ""}
+                      </Text>
+                    </View>
+                    {idx < steps.length - 1 && (
+                      <View className={`w-0.5 h-8 ${isCompleted ? 'bg-primary' : 'bg-gray-200'}`} />
+                    )}
+                  </View>
+                  <View className="flex-1 pt-0.5">
+                    <Text className={`text-sm font-extrabold ${isActive ? 'text-primary' : isCompleted ? 'text-textPrimary' : 'text-textMuted'}`}>
+                      {step}
+                    </Text>
+                    <Text className="text-textSecondary text-[10px] mt-0.5">
+                      {isActive ? "ACTIVE STEP" : isCompleted ? "COMPLETED" : "PENDING"}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
-          <TextInput
-            placeholder="Write a brief comment about food taste, portion sizes, packaging..."
-            value={comment}
-            onChangeText={setComment}
-            multiline
-            numberOfLines={3}
-          />
-          <Button
-            title="SUBMIT REVIEW"
-            onPress={submitReview}
-            loading={reviewSubmitting}
-            variant="primary"
-            className="w-full mt-2"
-          />
+        {/* Pricing / Items Detail */}
+        <View className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm mb-6">
+          <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider mb-2">ORDER DETAIL</Text>
+          <Text className="text-textPrimary font-extrabold text-sm">{order?.orderNumber}</Text>
+          <Text className="text-textSecondary text-xs mt-1">Cook: {order?.cookName}</Text>
+          <View className="border-t border-gray-50 mt-3 pt-3">
+            <Text className="text-textPrimary font-black text-sm">
+              Total Price: LKR {order?.totalAmount}
+            </Text>
+          </View>
         </View>
-      ) : null}
-    </ScrollView>
+
+        {/* Cancellation / Review Forms */}
+        {order?.status === 'PLACED' ? (
+          <Button
+            title="CANCEL ORDER"
+            onPress={handleCancel}
+            variant="outline"
+            className="w-full mb-10 border-red-500 text-red-500"
+          />
+        ) : order?.status === 'DELIVERED' && !reviewed ? (
+          <View className="bg-white p-5 rounded-3xl border border-gray-150 shadow-sm mb-12">
+            <Text className="text-textPrimary font-bold text-base mb-1">Rate Your Meal</Text>
+            <Text className="text-textMuted text-xs mb-4">Share your feedback to support local home cooks!</Text>
+            
+            {/* Star Selector */}
+            <View className="flex-row justify-center mb-6">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setRating(star)} className="px-2">
+                  <Text className="text-3xl">{star <= rating ? "★" : "☆"}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TextInput
+              placeholder="Write a brief comment about food taste, portion sizes, packaging..."
+              value={comment}
+              onChangeText={setComment}
+              multiline
+              numberOfLines={3}
+            />
+            <Button
+              title="SUBMIT REVIEW"
+              onPress={submitReview}
+              loading={reviewSubmitting}
+              variant="primary"
+              className="w-full mt-2"
+            />
+          </View>
+        ) : null}
+      </ScrollView>
+    </View>
   );
 };

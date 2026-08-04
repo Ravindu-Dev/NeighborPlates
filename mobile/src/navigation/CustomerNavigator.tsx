@@ -12,6 +12,8 @@ import { PaymentScreen } from '../screens/customer/PaymentScreen';
 import { OrderTrackingScreen } from '../screens/customer/OrderTrackingScreen';
 import { useCartStore } from '../store/cartStore';
 
+import { Feather } from '@expo/vector-icons';
+
 export type CustomerStackParamList = {
   HomeTabs: { screen?: string } | undefined;
   MealDetail: { mealId: string };
@@ -41,6 +43,7 @@ const HomeTabNavigator = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
+        headerShown: false,
         tabBarActiveTintColor: '#FF6B35',
         tabBarInactiveTintColor: '#9CA3AF',
         tabBarStyle: {
@@ -53,14 +56,15 @@ const HomeTabNavigator = () => {
           fontSize: 10,
           fontWeight: '700',
         },
-        tabBarIcon: ({ color }) => {
-          const icons: Record<string, string> = {
-            Home: '🏠',
-            Search: '🔍',
-            Cart: '🛒',
-            Profile: '👤',
+        tabBarIcon: ({ color, size }) => {
+          const icons: Record<string, keyof typeof Feather.glyphMap> = {
+            Home: 'home',
+            Search: 'search',
+            Cart: 'shopping-cart',
+            Profile: 'user',
           };
-          return <Text style={{ fontSize: 20 }}>{icons[route.name]}</Text>;
+          const iconName = icons[route.name] || 'home';
+          return <Feather name={iconName} size={size || 20} color={color} />;
         },
       })}
     >
@@ -76,10 +80,10 @@ export const CustomerNavigator = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HomeTabs"      component={HomeTabNavigator} />
-      <Stack.Screen name="MealDetail"    component={MealDetailScreen}    options={{ headerShown: true, title: 'Meal Details' }} />
-      <Stack.Screen name="Checkout"      component={CheckoutScreen}       options={{ headerShown: true, title: 'Checkout Details' }} />
-      <Stack.Screen name="Payment"       component={PaymentScreen}        options={{ headerShown: true, title: 'Payment' }} />
-      <Stack.Screen name="OrderTracking" component={OrderTrackingScreen}  options={{ headerShown: true, title: 'Track Order' }} />
+      <Stack.Screen name="MealDetail"    component={MealDetailScreen} />
+      <Stack.Screen name="Checkout"      component={CheckoutScreen} />
+      <Stack.Screen name="Payment"       component={PaymentScreen} />
+      <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
     </Stack.Navigator>
   );
 };
