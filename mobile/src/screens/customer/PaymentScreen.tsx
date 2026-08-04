@@ -6,6 +6,7 @@ import { useCartStore } from '../../store/cartStore';
 import { api } from '../../services/api';
 import { Button } from '../../components/common/Button';
 import { TextInput } from '../../components/common/TextInput';
+import { Feather, Ionicons } from '@expo/vector-icons';
 
 type PaymentScreenProps = NativeStackScreenProps<CustomerStackParamList, 'Payment'>;
 
@@ -25,22 +26,24 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
   const [newTransactionId, setNewTransactionId] = useState('');
 
   const subtotal = getCartTotal();
-  const deliveryFee = deliveryMethod === 'COOK_DELIVERY' ? 150.0 : 0.0;
+  // Free delivery for orders LKR 1000+
+  const isFreeDelivery = subtotal >= 1000;
+  const deliveryFee = deliveryMethod === 'COOK_DELIVERY' ? (isFreeDelivery ? 0.0 : 150.0) : 0.0;
   const total = subtotal + deliveryFee;
 
   // Detect card brand/emoji based on first digit
   const getCardBrandDetails = (num: string) => {
     const cleanNum = num.replace(/\s+/g, '');
     if (cleanNum.startsWith('4')) {
-      return { name: 'Visa', emoji: '💳', color: 'text-blue-600' };
+      return { name: 'Visa', emoji: '💳', color: 'text-blue-600', gradient: ['from-blue-600', 'to-indigo-800'] };
     }
     if (cleanNum.startsWith('5')) {
-      return { name: 'Mastercard', emoji: '💳', color: 'text-red-500' };
+      return { name: 'Mastercard', emoji: '💳', color: 'text-red-500', gradient: ['from-red-600', 'to-orange-700'] };
     }
     if (cleanNum.startsWith('3')) {
-      return { name: 'American Express', emoji: '💳', color: 'text-cyan-600' };
+      return { name: 'Amex', emoji: '💳', color: 'text-cyan-600', gradient: ['from-teal-600', 'to-cyan-800'] };
     }
-    return { name: 'Card', emoji: '💳', color: 'text-gray-400' };
+    return { name: 'Card', emoji: '💳', color: 'text-gray-450', gradient: ['from-gray-800', 'to-slate-900'] };
   };
 
   const cardDetails = getCardBrandDetails(cardNumber);
@@ -173,37 +176,58 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
 
   return (
     <View className="flex-1 bg-surface-elevated">
+      {/* Visual Stepper Header */}
+      <View className="bg-white px-6 pt-12 pb-4 border-b border-gray-100 shadow-sm z-10 flex-row justify-between items-center">
+        <View className="flex-row items-center flex-1 mr-2">
+          <TouchableOpacity onPress={() => navigation.goBack()} className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center mr-3 border border-gray-150">
+            <Feather name="chevron-left" size={18} color="#1A1A2E" />
+          </TouchableOpacity>
+          <Text className="font-black text-xl text-textPrimary">Order Payment</Text>
+        </View>
+        <View className="flex-row items-center gap-0.5 bg-gray-50 border border-gray-150 rounded-full px-3 py-1">
+          <Text className="text-[10px] font-black text-primary">STEP 3</Text>
+          <Text className="text-[10px] font-black text-textMuted">/ 3</Text>
+        </View>
+      </View>
+
       <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
         {/* Stripe Branding & Summary */}
-        <View className="bg-white p-5 rounded-3xl border border-gray-150 shadow-sm mb-6 items-center">
-          <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider mb-1">STRIPE SECURE CHECKOUT</Text>
+        <View className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm mb-6 items-center">
+          <View className="flex-row items-center gap-1 mb-2">
+            <Ionicons name="shield-checkmark" size={12} color="#FF6B35" />
+            <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider">STRIPE SECURE PAYMENT</Text>
+          </View>
           <Text className="text-primary font-black text-2xl mb-4">LKR {total}</Text>
-          <View className="flex-row items-center justify-center bg-gray-100 rounded-full px-3 py-1">
-            <Text className="text-gray-600 text-xs font-bold mr-1">🔐</Text>
-            <Text className="text-gray-500 text-[10px] font-extrabold uppercase tracking-wide">256-Bit SSL Encrypted</Text>
+          <View className="flex-row items-center justify-center bg-gray-100 rounded-full px-3.5 py-1">
+            <Feather name="lock" size={10} color="#6B7280" className="mr-1" />
+            <Text className="text-gray-500 text-[9px] font-extrabold uppercase tracking-wide">256-Bit SSL Encryption</Text>
           </View>
         </View>
 
-        {/* Mock card preview */}
-        <View className="bg-gradient-to-tr from-gray-900 to-slate-800 rounded-3xl p-6 mb-6 shadow-lg border border-gray-800 relative overflow-hidden">
+        {/* Mock card preview - Dynamic Gradients */}
+        <View className={`bg-gradient-to-tr ${cardDetails.gradient.join(' ')} rounded-3xl p-6 mb-6 shadow-lg relative overflow-hidden`}>
           <View className="absolute w-64 h-64 rounded-full bg-white/5 -bottom-20 -right-20" />
+          <View className="absolute w-40 h-40 rounded-full bg-white/5 -top-20 -left-20" />
+          
           <View className="flex-row justify-between items-start mb-6">
             <Text className="text-white/60 font-black text-[10px] uppercase tracking-widest">NeighborPlates Card</Text>
-            <Text className="text-2xl">{cardDetails.emoji}</Text>
+            <View className="bg-white/10 px-2 py-0.5 rounded border border-white/20">
+              <Text className="text-white font-extrabold text-[9px] uppercase tracking-wide">{cardDetails.name}</Text>
+            </View>
           </View>
           <Text className="text-white font-extrabold text-lg tracking-widest mb-6 h-6">
             {cardNumber || '•••• •••• •••• ••••'}
           </Text>
           <View className="flex-row justify-between items-end">
-            <View>
+            <View className="flex-1 mr-4">
               <Text className="text-white/40 text-[9px] font-bold uppercase mb-0.5">CARDHOLDER</Text>
-              <Text className="text-white/80 font-bold text-xs uppercase h-4" numberOfLines={1}>
+              <Text className="text-white font-bold text-xs uppercase h-4" numberOfLines={1}>
                 {cardholderName || 'Cardholder Name'}
               </Text>
             </View>
             <View className="items-end">
-              <Text className="text-white/40 text-[9px] font-bold uppercase mb-0.5">EXPIRS</Text>
-              <Text className="text-white/80 font-bold text-xs h-4">
+              <Text className="text-white/40 text-[9px] font-bold uppercase mb-0.5">EXPIRES</Text>
+              <Text className="text-white font-bold text-xs h-4">
                 {expiry || 'MM/YY'}
               </Text>
             </View>
@@ -259,8 +283,8 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
           </View>
         </View>
 
-        <Text className="text-textMuted text-[10px] text-center px-4 leading-relaxed mb-6">
-          NeighborPlates processes payments securely via Stripe test mode. Use standard Stripe test cards (e.g. card number <Text className="font-extrabold">4242 4242 4242 4242</Text>) to complete the transaction.
+        <Text className="text-textMuted text-[9px] text-center px-4 leading-relaxed mb-6 font-medium">
+          NeighborPlates processes payments securely via Stripe test mode. Use standard Stripe test cards (e.g. card number <Text className="font-extrabold text-textPrimary">4242 4242 4242 4242</Text>) to complete the transaction.
         </Text>
 
         <Button
@@ -276,13 +300,13 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
       <Modal visible={showSuccessModal} transparent animationType="fade">
         <View className="flex-1 bg-black/60 items-center justify-center p-6">
           <View className="bg-white rounded-3xl p-6 w-full max-w-sm items-center shadow-2xl border border-gray-100">
-            <View className="w-16 h-16 rounded-full bg-green-50 items-center justify-center mb-4 border border-green-150 shadow-inner animate-bounce">
+            <View className="w-16 h-16 rounded-full bg-green-50 items-center justify-center mb-4 border border-green-150 shadow-inner">
               <Text className="text-3xl">🎉</Text>
             </View>
             <Text className="font-extrabold text-xl text-textPrimary text-center mb-2">
               Payment Successful!
             </Text>
-            <Text className="text-textSecondary text-xs text-center leading-relaxed mb-6 px-2">
+            <Text className="text-textSecondary text-xs text-center leading-relaxed mb-6 px-2 font-medium">
               Your order has been placed successfully.{"\n"}Transaction Reference:{"\n"}
               <Text className="font-bold text-textPrimary">{newTransactionId}</Text>
             </Text>

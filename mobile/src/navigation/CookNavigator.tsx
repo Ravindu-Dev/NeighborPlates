@@ -15,11 +15,25 @@ export type CookTabParamList = {
 
 const Tab = createBottomTabNavigator<CookTabParamList>();
 
-const TabIcon = ({ icon, label, focused }: { icon: string; label: string; focused: boolean }) => (
+import { Feather } from '@expo/vector-icons';
+
+const TabIcon = ({ 
+  iconName, 
+  label, 
+  focused 
+}: { 
+  iconName: keyof typeof Feather.glyphMap; 
+  label: string; 
+  focused: boolean; 
+}) => (
   <View className="items-center justify-center pt-1.5">
-    <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>{icon}</Text>
+    <Feather 
+      name={iconName} 
+      size={20} 
+      color={focused ? '#2D6A4F' : '#9CA3AF'} 
+    />
     <Text
-      className={`text-[10px] mt-0.5 font-semibold ${focused ? 'text-secondary' : 'text-textMuted'}`}
+      className={`text-[10px] mt-1 font-bold ${focused ? 'text-secondary' : 'text-textMuted'}`}
     >
       {label}
     </Text>
@@ -52,28 +66,28 @@ export const CookNavigator = () => {
         name="Dashboard"
         component={CookDashboardScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="🏠" label="Dashboard" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon iconName="home" label="Dashboard" focused={focused} />,
         }}
       />
       <Tab.Screen
         name="AddListing"
         component={CreateListingScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="📝" label="Add Meal" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon iconName="edit-3" label="Add Meal" focused={focused} />,
         }}
       />
       <Tab.Screen
         name="Orders"
         component={CookOrdersScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="📦" label="Orders" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon iconName="package" label="Orders" focused={focused} />,
         }}
       />
       <Tab.Screen
         name="Profile"
         component={CookProfileScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="👤" label="Profile" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon iconName="user" label="Profile" focused={focused} />,
         }}
       />
     </Tab.Navigator>
