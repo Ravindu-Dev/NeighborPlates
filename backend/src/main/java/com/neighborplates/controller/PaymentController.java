@@ -39,6 +39,19 @@ public class PaymentController {
             return ResponseEntity.badRequest().body(new PaymentResponse(false, null, "Invalid expiration date format. Use MM/YY."));
         }
 
+        // Validate expiration date is in the future
+        String[] expiryParts = request.getExpiry().split("/");
+        int expiryMonth = Integer.parseInt(expiryParts[0]);
+        int expiryYear = 2000 + Integer.parseInt(expiryParts[1]);
+
+        java.time.LocalDate now = java.time.LocalDate.now();
+        int curYear = now.getYear();
+        int curMonth = now.getMonthValue();
+
+        if (expiryYear < curYear || (expiryYear == curYear && expiryMonth < curMonth)) {
+            return ResponseEntity.ok(new PaymentResponse(false, null, "The credit card has expired. Please enter a valid expiration date."));
+        }
+
         // Simulate Stripe processing network delay
         try {
             Thread.sleep(1200);

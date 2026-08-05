@@ -11,8 +11,8 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 type PaymentScreenProps = NativeStackScreenProps<CustomerStackParamList, 'Payment'>;
 
 export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation }) => {
-  const { address, deliveryMethod, specialInstructions, scheduledFor } = route.params;
-  const { items: cartItems, getCartTotal, clearCart } = useCartStore();
+  const { address, deliveryMethod, specialInstructions, scheduledFor, subtotal, promoDiscount, deliveryFee, total } = route.params;
+  const { items: cartItems, clearCart } = useCartStore();
 
   const [cardNumber, setCardNumber] = useState('');
   const [expiry, setExpiry] = useState('');
@@ -24,12 +24,7 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [newOrderId, setNewOrderId] = useState('');
   const [newTransactionId, setNewTransactionId] = useState('');
-
-  const subtotal = getCartTotal();
-  // Free delivery for orders LKR 1000+
-  const isFreeDelivery = subtotal >= 1000;
-  const deliveryFee = deliveryMethod === 'COOK_DELIVERY' ? (isFreeDelivery ? 0.0 : 150.0) : 0.0;
-  const total = subtotal + deliveryFee;
+  const [errorText, setErrorText] = useState<string | null>(null);
 
   // Detect card brand/emoji based on first digit
   const getCardBrandDetails = (num: string) => {
@@ -81,26 +76,42 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
 
   const handlePayment = async () => {
     console.log("[PaymentFlow] Pay button clicked");
+    setErrorText(null);
     const cleanCard = cardNumber.replace(/\s+/g, '');
     
     if (cleanCard.length < 13 || cleanCard.length > 16) {
       console.log("[PaymentFlow] Validation Failed: Card length " + cleanCard.length);
-      Alert.alert('Validation Error', 'Please enter a valid 16-digit card number.');
+      setErrorText('Please enter a valid 16-digit card number.');
       return;
     }
     if (!expiry.match(/^(0[1-9]|1[0-2])\/\d{2}$/)) {
       console.log("[PaymentFlow] Validation Failed: Expiry format: " + expiry);
-      Alert.alert('Validation Error', 'Please enter a valid expiration date (MM/YY).');
+      setErrorText('Please enter a valid expiration date (MM/YY).');
+      return;
+    }
+
+    // Parse month and year to check if card has already expired
+    const [expiryMonthStr, expiryYearStr] = expiry.split('/');
+    const expiryMonth = parseInt(expiryMonthStr, 10);
+    const expiryYear = 2000 + parseInt(expiryYearStr, 10);
+
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth() + 1; // getMonth() is 0-indexed
+
+    if (expiryYear < curYear || (expiryYear === curYear && expiryMonth < curMonth)) {
+      console.log("[PaymentFlow] Validation Failed: Card is expired: " + expiry);
+      setErrorText('The credit card has expired. Please enter a valid expiration date.');
       return;
     }
     if (cvv.length < 3 || cvv.length > 4) {
       console.log("[PaymentFlow] Validation Failed: CVV length: " + cvv.length);
-      Alert.alert('Validation Error', 'Please enter a valid 3 or 4 digit CVV.');
+      setErrorText('Please enter a valid 3 or 4 digit CVV.');
       return;
     }
     if (!cardholderName.trim()) {
       console.log("[PaymentFlow] Validation Failed: Empty cardholder name");
-      Alert.alert('Validation Error', 'Please enter the cardholder name.');
+      setErrorText('Please enter the cardholder name.');
       return;
     }
 
@@ -159,13 +170,12 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
 
       } else {
         console.log("[PaymentFlow] Charge failed or declined:", paymentRes.data.message);
-        Alert.alert('Payment Declined', paymentRes.data.message || 'Verification failed. Try again.');
+        setErrorText(paymentRes.data.message || 'Payment failed. Please verify your inputs.');
       }
     } catch (error: any) {
       console.error("[PaymentFlow] Error encountered:", error);
       console.error("[PaymentFlow] Error response data:", error.response?.data);
-      Alert.alert(
-        'Transaction Error',
+      setErrorText(
         error.response?.data?.message || 'Unable to process payment. Please verify your inputs.'
       );
     } finally {
@@ -179,7 +189,16 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
       {/* Visual Stepper Header */}
       <View className="bg-white px-6 pt-12 pb-4 border-b border-gray-100 shadow-sm z-10 flex-row justify-between items-center">
         <View className="flex-row items-center flex-1 mr-2">
-          <TouchableOpacity onPress={() => navigation.goBack()} className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center mr-3 border border-gray-150">
+          <TouchableOpacity 
+            onPress={() => {
+              if (newOrderId || showSuccessModal) {
+                navigation.navigate('HomeTabs');
+              } else {
+                navigation.goBack();
+              }
+            }} 
+            className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center mr-3 border border-gray-150"
+          >
             <Feather name="chevron-left" size={18} color="#1A1A2E" />
           </TouchableOpacity>
           <Text className="font-black text-xl text-textPrimary">Order Payment</Text>
@@ -191,6 +210,18 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
       </View>
 
       <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+        {errorText && (
+          <View className="bg-red-50 border border-red-200 rounded-3xl p-4 mb-5 flex-row items-center gap-3">
+            <Ionicons name="alert-circle-sharp" size={20} color="#EF4444" />
+            <View className="flex-1">
+              <Text className="text-red-700 font-extrabold text-xs">Payment Error</Text>
+              <Text className="text-red-600 text-[10px] font-semibold mt-0.5 leading-relaxed">{errorText}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setErrorText(null)}>
+              <Feather name="x" size={14} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
+        )}
         {/* Stripe Branding & Summary */}
         <View className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm mb-6 items-center">
           <View className="flex-row items-center gap-1 mb-2">
@@ -314,7 +345,13 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
             <TouchableOpacity
               onPress={() => {
                 setShowSuccessModal(false);
-                navigation.navigate('OrderTracking', { orderId: newOrderId });
+                navigation.reset({
+                  index: 1,
+                  routes: [
+                    { name: 'HomeTabs' },
+                    { name: 'OrderTracking', params: { orderId: newOrderId } },
+                  ],
+                });
               }}
               className="bg-primary rounded-xl py-3 w-full items-center shadow-md mb-2.5"
               activeOpacity={0.8}
@@ -325,7 +362,10 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
             <TouchableOpacity
               onPress={() => {
                 setShowSuccessModal(false);
-                navigation.navigate('HomeTabs');
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'HomeTabs' }],
+                });
               }}
               className="bg-gray-100 rounded-xl py-3 w-full items-center border border-gray-200"
               activeOpacity={0.8}

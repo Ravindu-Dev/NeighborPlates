@@ -33,17 +33,32 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
 
   if (cartItems.length === 0) {
     return (
-      <View className="flex-1 justify-center items-center bg-surface-elevated p-6">
-        <Text className="text-textMuted text-base font-bold text-center">Cart is empty</Text>
+      <View className="flex-1 bg-surface-elevated">
+        {/* Sticky Header */}
+        <View className="bg-white px-6 pt-12 pb-4 border-b border-gray-100 shadow-sm z-10 flex-row items-center">
+          <TouchableOpacity onPress={() => navigation.goBack()} className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center mr-3 border border-gray-150">
+            <Feather name="chevron-left" size={18} color="#1A1A2E" />
+          </TouchableOpacity>
+          <Text className="font-black text-xl text-textPrimary">Checkout Info</Text>
+        </View>
+        <View className="flex-1 justify-center items-center p-6">
+          <Text className="text-5xl mb-4">🛒</Text>
+          <Text className="text-textPrimary font-extrabold text-sm mb-1 text-center">Your basket is empty</Text>
+          <Text className="text-textSecondary text-xs text-center leading-relaxed">
+            Please add items from neighboring home kitchens to proceed with checkout.
+          </Text>
+        </View>
       </View>
     );
   }
 
   const subtotal = getCartTotal();
+  // Apply LKR 150 discount if subtotal >= 300 (to prevent Stripe amount_too_small failures)
+  const promoDiscount = (cartItems.length > 0 && subtotal >= 300) ? 150.0 : 0.0;
   // Free delivery for orders LKR 1000+
   const isFreeDelivery = subtotal >= 1000;
   const deliveryFee = deliveryMethod === 'COOK_DELIVERY' ? (isFreeDelivery ? 0.0 : 150.0) : 0.0;
-  const total = subtotal + deliveryFee;
+  const total = subtotal - promoDiscount + deliveryFee;
 
   const handleContinueToPayment = () => {
     if (deliveryMethod === 'COOK_DELIVERY' && !address.trim()) {
@@ -58,6 +73,10 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
       deliveryMethod,
       specialInstructions: instructions,
       scheduledFor: scheduledDate,
+      subtotal,
+      promoDiscount,
+      deliveryFee,
+      total,
     });
   };
 
@@ -218,6 +237,12 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
               <Text className="text-textSecondary text-xs font-semibold">Subtotal</Text>
               <Text className="text-textSecondary text-xs font-extrabold">LKR {subtotal}</Text>
             </View>
+            {promoDiscount > 0 && (
+              <View className="flex-row justify-between items-center mb-2">
+                <Text className="text-emerald-600 text-xs font-bold">Promo Discount</Text>
+                <Text className="text-emerald-600 text-xs font-black">- LKR {promoDiscount}</Text>
+              </View>
+            )}
             <View className="flex-row justify-between items-center mb-2">
               <Text className="text-textSecondary text-xs font-semibold">Delivery Fee</Text>
               <Text className="text-textSecondary text-xs font-extrabold">LKR {deliveryFee}</Text>

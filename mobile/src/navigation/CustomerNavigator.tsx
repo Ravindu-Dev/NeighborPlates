@@ -23,6 +23,10 @@ export type CustomerStackParamList = {
     deliveryMethod: string;
     specialInstructions: string;
     scheduledFor: string;
+    subtotal: number;
+    promoDiscount: number;
+    deliveryFee: number;
+    total: number;
   };
   OrderTracking: { orderId: string };
 };
