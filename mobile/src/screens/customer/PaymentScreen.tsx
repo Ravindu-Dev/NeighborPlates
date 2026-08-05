@@ -355,6 +355,7 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
                 }}
                 keyboardType="number-pad"
                 secureTextEntry
+                showPasswordToggle={false}
                 error={cvvError}
               />
             </View>

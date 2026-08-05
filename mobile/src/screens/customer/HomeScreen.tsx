@@ -110,11 +110,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <View className="bg-white border-b border-gray-100 px-6 pt-12 pb-4 shadow-sm z-10">
         <View className="flex-row justify-between items-center mb-3">
           <View>
-            <View className="flex-row items-center gap-1">
-              <Ionicons name="location-sharp" size={14} color="#FF6B35" />
-              <Text className="text-textSecondary text-[10px] font-black uppercase tracking-wider">Deliver to</Text>
-            </View>
-            <Text className="text-textPrimary font-extrabold text-sm mt-0.5">Colombo, Sri Lanka ▾</Text>
+            <Text className="text-textPrimary font-black text-lg">NeighborPlates</Text>
           </View>
           <View className="border border-primary/20 bg-primary/10 rounded-full px-3.5 py-1.5 flex-row items-center gap-1">
             <Ionicons name="sparkles" size={10} color="#FF6B35" />
