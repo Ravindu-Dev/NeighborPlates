@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Alert, TouchableOpacity, Platform } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
 import { api } from '../../services/api';
@@ -7,16 +7,120 @@ import { Button } from '../../components/common/Button';
 import { TextInput } from '../../components/common/TextInput';
 import { Feather } from '@expo/vector-icons';
 
+let WebView: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    WebView = require('react-native-webview').WebView;
+  } catch (e) {
+    console.warn("react-native-webview not loaded", e);
+  }
+}
+
+const getTrackingMapHtml = (cookCoords: number[], customerCoords: number[], status: string) => {
+  // Fallbacks scattered slightly around Colombo center if coords are 0/empty
+  const cookLon = cookCoords[0] && cookCoords[0] !== 0 ? cookCoords[0] : 79.865;
+  const cookLat = cookCoords[1] && cookCoords[1] !== 0 ? cookCoords[1] : 6.932;
+  const custLon = customerCoords[0] && customerCoords[0] !== 0 ? customerCoords[0] : 79.861;
+  const custLat = customerCoords[1] && customerCoords[1] !== 0 ? customerCoords[1] : 6.927;
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>NeighborPlates Live Tracking</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+      <style>
+        html, body, #map {
+          height: 100%;
+          margin: 0;
+          padding: 0;
+          background: #F3F4F6;
+        }
+      </style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <script>
+        var map = L.map('map', { zoomControl: false }).setView([${(cookLat + custLat)/2}, ${(cookLon + custLon)/2}], 14);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        // Cook Kitchen location marker
+        L.marker([${cookLat}, ${cookLon}], {
+          icon: L.divIcon({
+            html: '<div style="background-color: #FF6B35; width: 14px; height: 14px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 8px rgba(255, 107, 53, 0.8);"></div>',
+            className: 'm',
+            iconSize: [14, 14]
+          })
+        }).addTo(map).bindPopup('<div style="font-family: sans-serif; font-size: 11px; font-weight: 700;">👨‍🍳 Cook Kitchen</div>');
+
+        // Customer Home location marker
+        L.marker([${custLat}, ${custLon}], {
+          icon: L.divIcon({
+            html: '<div style="background-color: #3B82F6; width: 14px; height: 14px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 8px rgba(59, 130, 246, 0.8);"></div>',
+            className: 'm',
+            iconSize: [14, 14]
+          })
+        }).addTo(map).bindPopup('<div style="font-family: sans-serif; font-size: 11px; font-weight: 700;">📍 Your Delivery Location</div>');
+
+        // Route path line
+        L.polyline([[${cookLat}, ${cookLon}], [${custLat}, ${custLon}]], {
+          color: '#FF6B35',
+          dashArray: '5, 8',
+          weight: 3
+        }).addTo(map);
+
+        // Moving delivery rider marker
+        var rider = L.marker([${cookLat}, ${cookLon}], {
+          icon: L.divIcon({
+            html: '<div style="background-color: #10B981; width: 22px; height: 22px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(16, 185, 129, 0.8); display: flex; align-items: center; justify-content: center; font-size: 11px; color: white;">🛵</div>',
+            className: 'm',
+            iconSize: [22, 22]
+          })
+        }).addTo(map);
+
+        var status = "${status}";
+        if (status === 'READY') {
+          // Animate rider path progression loop
+          var startTime = Date.now();
+          var duration = 25000; // 25 seconds loop
+          function animate() {
+            var elapsed = (Date.now() - startTime) % duration;
+            var fraction = elapsed / duration;
+            var curLat = ${cookLat} + (${custLat} - ${cookLat}) * fraction;
+            var curLng = ${cookLon} + (${custLon} - ${cookLon}) * fraction;
+            rider.setLatLng([curLat, curLng]);
+            requestAnimationFrame(animate);
+          }
+          animate();
+        } else if (status === 'DELIVERED') {
+          rider.setLatLng([${custLat}, ${custLon}]);
+        } else {
+          rider.setLatLng([${cookLat}, ${cookLon}]);
+        }
+      </script>
+    </body>
+    </html>
+  `;
+};
+
 type OrderTrackingScreenProps = NativeStackScreenProps<CustomerStackParamList, 'OrderTracking'>;
 
 export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route, navigation }) => {
   const { orderId } = route.params;
   const [order, setOrder] = useState<any>(null);
+  const [cookCoords, setCookCoords] = useState<number[] | null>(null);
   const [loading, setLoading] = useState(true);
   
   // Review inputs
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
+  const [commentError, setCommentError] = useState('');
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewed, setReviewed] = useState(false);
 
@@ -25,6 +129,19 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
       const response = await api.get('/api/orders/my');
       const target = response.data.find((o: any) => o.id === orderId);
       setOrder(target);
+
+      if (target && target.cookId && !cookCoords) {
+        try {
+          const cookRes = await api.get(`/api/users/cooks/${target.cookId}`);
+          if (cookRes.data && cookRes.data.profile && cookRes.data.profile.location) {
+            setCookCoords(cookRes.data.profile.location.coordinates);
+          }
+        } catch (e) {
+          console.warn("Failed fetching cook coordinates:", e);
+          // Scatter fallback coordinates for demo
+          setCookCoords([79.865, 6.932]);
+        }
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -62,9 +179,11 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
   };
 
   const submitReview = async () => {
-    if (!comment) {
-      Alert.alert('Validation Error', 'Please write a brief comment.');
+    if (!comment.trim()) {
+      setCommentError('Comment is required to submit a review.');
       return;
+    } else {
+      setCommentError('');
     }
     setReviewSubmitting(true);
     try {
@@ -107,39 +226,64 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
             </Text>
           </View>
         ) : (
-          /* Timeline Step Tracker (Phase 9 Animation targets this) */
-          <View className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm mb-6">
-            <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider mb-4">ORDER TRACKING</Text>
-            {steps.map((step, idx) => {
-              const isCompleted = idx <= currentStepIndex;
-              const isActive = idx === currentStepIndex;
-              return (
-                <View key={step} className="flex-row items-start mb-4 relative">
-                  <View className="items-center mr-4">
-                    <View 
-                      className={`w-6 h-6 rounded-full items-center justify-center border
-                        ${isCompleted ? 'bg-primary border-primary' : 'bg-white border-gray-200'}
-                      `}
-                    >
-                      <Text className="text-[10px] font-bold text-white">
-                        {isCompleted ? "✓" : ""}
+          <View>
+            {/* Live Tracking Map using Leaflet & OpenStreetMap */}
+            {cookCoords && (
+              <View className="bg-white rounded-3xl overflow-hidden border border-gray-150 shadow-sm mb-6 h-60">
+                {Platform.OS === 'web' ? (
+                  <iframe
+                    srcDoc={getTrackingMapHtml(cookCoords, order.address?.coordinates || [79.8612, 6.9271], order.status)}
+                    style={{ width: '100%', height: '100%', border: 'none' }}
+                    title="Live Delivery Map"
+                  />
+                ) : (
+                  WebView && (
+                    <WebView
+                      originWhitelist={['*']}
+                      source={{ html: getTrackingMapHtml(cookCoords, order.address?.coordinates || [79.8612, 6.9271], order.status) }}
+                      style={{ flex: 1 }}
+                      javaScriptEnabled
+                      domStorageEnabled
+                    />
+                  )
+                )}
+              </View>
+            )}
+
+            {/* Timeline Step Tracker */}
+            <View className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm mb-6">
+              <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider mb-4">ORDER TRACKING</Text>
+              {steps.map((step, idx) => {
+                const isCompleted = idx <= currentStepIndex;
+                const isActive = idx === currentStepIndex;
+                return (
+                  <View key={step} className="flex-row items-start mb-4 relative">
+                    <View className="items-center mr-4">
+                      <View 
+                        className={`w-6 h-6 rounded-full items-center justify-center border
+                          ${isCompleted ? 'bg-primary border-primary' : 'bg-white border-gray-200'}
+                        `}
+                      >
+                        <Text className="text-[10px] font-bold text-white">
+                          {isCompleted ? "✓" : ""}
+                        </Text>
+                      </View>
+                      {idx < steps.length - 1 && (
+                        <View className={`w-0.5 h-8 ${isCompleted ? 'bg-primary' : 'bg-gray-200'}`} />
+                      )}
+                    </View>
+                    <View className="flex-1 pt-0.5">
+                      <Text className={`text-sm font-extrabold ${isActive ? 'text-primary' : isCompleted ? 'text-textPrimary' : 'text-textMuted'}`}>
+                        {step}
+                      </Text>
+                      <Text className="text-textSecondary text-[10px] mt-0.5">
+                        {isActive ? "ACTIVE STEP" : isCompleted ? "COMPLETED" : "PENDING"}
                       </Text>
                     </View>
-                    {idx < steps.length - 1 && (
-                      <View className={`w-0.5 h-8 ${isCompleted ? 'bg-primary' : 'bg-gray-200'}`} />
-                    )}
                   </View>
-                  <View className="flex-1 pt-0.5">
-                    <Text className={`text-sm font-extrabold ${isActive ? 'text-primary' : isCompleted ? 'text-textPrimary' : 'text-textMuted'}`}>
-                      {step}
-                    </Text>
-                    <Text className="text-textSecondary text-[10px] mt-0.5">
-                      {isActive ? "ACTIVE STEP" : isCompleted ? "COMPLETED" : "PENDING"}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
+                );
+              })}
+            </View>
           </View>
         )}
 
@@ -178,9 +322,14 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
             </View>
 
             <TextInput
+              label="REVIEW COMMENT *"
               placeholder="Write a brief comment about food taste, portion sizes, packaging..."
               value={comment}
-              onChangeText={setComment}
+              onChangeText={(text) => {
+                setComment(text);
+                if (text.trim()) setCommentError('');
+              }}
+              error={commentError}
               multiline
               numberOfLines={3}
             />

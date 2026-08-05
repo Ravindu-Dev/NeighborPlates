@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, Alert, TouchableOpacity, Platform, Modal } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
 import { useCartStore } from '../../store/cartStore';
@@ -7,16 +7,162 @@ import { Button } from '../../components/common/Button';
 import { TextInput } from '../../components/common/TextInput';
 import { Feather, Ionicons } from '@expo/vector-icons';
 
+let WebView: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    WebView = require('react-native-webview').WebView;
+  } catch (e) {
+    console.warn("react-native-webview not loaded", e);
+  }
+}
+
+const getPickerMapHtml = (initLat: number, initLon: number) => {
+  const lat = initLat && initLat !== 0 ? initLat : 6.9271;
+  const lon = initLon && initLon !== 0 ? initLon : 79.8612;
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Select Delivery Location</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+      <style>
+        html, body, #map {
+          height: 100%;
+          margin: 0;
+          padding: 0;
+          background: #F3F4F6;
+        }
+        .info-box {
+          position: absolute;
+          bottom: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: white;
+          padding: 8px 16px;
+          border-radius: 20px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          font-family: sans-serif;
+          font-size: 10px;
+          font-weight: 700;
+          color: #374151;
+          z-index: 1000;
+          pointer-events: none;
+          text-align: center;
+          white-space: nowrap;
+        }
+      </style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <div class="info-box">Tap map to place delivery pin 📍</div>
+      <script>
+        var map = L.map('map', { zoomControl: false }).setView([${lat}, ${lon}], 13);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        var marker = L.marker([${lat}, ${lon}], {
+          icon: L.divIcon({
+            html: '<div style="background-color: #3B82F6; width: 14px; height: 14px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);"></div>',
+            className: 'm',
+            iconSize: [14, 14]
+          }),
+          draggable: true
+        }).addTo(map);
+
+        function onMapClick(e) {
+          marker.setLatLng(e.latlng);
+          sendCoords(e.latlng.lat, e.latlng.lng);
+        }
+
+        marker.on('dragend', function(e) {
+          var position = marker.getLatLng();
+          sendCoords(position.lat, position.lng);
+        });
+
+        map.on('click', onMapClick);
+
+        function sendCoords(lat, lng) {
+          var data = { type: 'SELECT_LOCATION', lat: lat, lng: lng };
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify(data));
+          } else {
+            window.parent.postMessage(JSON.stringify(data), '*');
+          }
+        }
+      </script>
+    </body>
+    </html>
+  `;
+};
+
 type CheckoutScreenProps = NativeStackScreenProps<CustomerStackParamList, 'Checkout'>;
 
 export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) => {
   const { items: cartItems, getCartTotal } = useCartStore();
 
   const [deliveryMethod, setDeliveryMethod] = useState<'COOK_DELIVERY' | 'PICKUP'>('COOK_DELIVERY');
-  const [address, setAddress] = useState('Home – 45/B, Flower Road, Colombo 3');
+  const [streetAddress, setStreetAddress] = useState('');
   const [instructions, setInstructions] = useState('');
   const [timeSlot, setTimeSlot] = useState<'ASAP' | 'SCHEDULED'>('ASAP');
+
+  // Dynamic Geolocation states
+  const [latitude, setLatitude] = useState('6.9271');
+  const [longitude, setLongitude] = useState('79.8612');
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [mapCenter, setMapCenter] = useState({ lat: 6.9271, lng: 79.8612 });
   
+  // Validation error states
+  const [addressError, setAddressError] = useState('');
+  const [scheduleError, setScheduleError] = useState('');
+
+  const updateAddressFromCoords = async (latVal: number, lonVal: number) => {
+    setStreetAddress("Fetching address details...");
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latVal}&lon=${lonVal}`, {
+        headers: {
+          'User-Agent': 'NeighborPlates-Mobile/1.0'
+        }
+      });
+      const data = await res.json();
+      if (data && data.display_name) {
+        setStreetAddress(data.display_name);
+        return;
+      }
+    } catch (err) {
+      console.warn("Geocoding failed", err);
+    }
+    setStreetAddress(`Pinned Location (Lat: ${latVal.toFixed(6)}, Lng: ${lonVal.toFixed(6)})`);
+  };
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const handleWebMessage = (e: MessageEvent) => {
+        try {
+          let data = e.data;
+          if (typeof data === 'string') {
+            data = JSON.parse(data);
+          }
+          if (data && data.type === 'SELECT_LOCATION') {
+            const latVal = parseFloat(data.lat.toFixed(6));
+            const lonVal = parseFloat(data.lng.toFixed(6));
+            setLatitude(data.lat.toFixed(6));
+            setLongitude(data.lng.toFixed(6));
+            updateAddressFromCoords(latVal, lonVal);
+            setAddressError(''); // Clear error if filled
+          }
+        } catch (err) {
+          // Ignore
+        }
+      };
+      window.addEventListener('message', handleWebMessage);
+      return () => window.removeEventListener('message', handleWebMessage);
+    }
+  }, []);
+
   // Default to 1 hour from now
   const [scheduledFor, setScheduledFor] = useState(() => {
     const d = new Date(Date.now() + 3600 * 1000);
@@ -61,15 +207,31 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
   const total = subtotal - promoDiscount + deliveryFee;
 
   const handleContinueToPayment = () => {
-    if (deliveryMethod === 'COOK_DELIVERY' && !address.trim()) {
-      Alert.alert('Validation Error', 'Please specify a delivery address.');
+    let isValid = true;
+
+    if (deliveryMethod === 'COOK_DELIVERY' && !streetAddress.trim()) {
+      setAddressError('Street address is required for delivery.');
+      isValid = false;
+    } else {
+      setAddressError('');
+    }
+
+    if (timeSlot === 'SCHEDULED' && !scheduledFor.trim()) {
+      setScheduleError('Please specify target delivery time.');
+      isValid = false;
+    } else {
+      setScheduleError('');
+    }
+
+    if (!isValid) {
+      Alert.alert('Incomplete Fields', 'Please fill in all required fields (marked with *).');
       return;
     }
 
     const scheduledDate = new Date(Date.now() + (timeSlot === 'ASAP' ? 1800 : 3600) * 1000).toISOString(); // ISO timestamp for backend
 
     navigation.navigate('Payment', {
-      address: deliveryMethod === 'PICKUP' ? 'Self Pickup at Kitchen' : address,
+      streetAddress: deliveryMethod === 'PICKUP' ? 'Self Pickup at Kitchen' : streetAddress,
       deliveryMethod,
       specialInstructions: instructions,
       scheduledFor: scheduledDate,
@@ -77,6 +239,8 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
       promoDiscount,
       deliveryFee,
       total,
+      latitude: deliveryMethod === 'PICKUP' ? 6.9271 : parseFloat(latitude) || 6.9271,
+      longitude: deliveryMethod === 'PICKUP' ? 79.8612 : parseFloat(longitude) || 79.8612,
     });
   };
 
@@ -133,30 +297,68 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
           </View>
         </View>
 
-        {/* Address Mock Map Interface */}
+        {/* Address Map Picker Interface */}
         {deliveryMethod === 'COOK_DELIVERY' && (
           <View className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm mb-5">
             <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider mb-3.5">DELIVERY LOCATION</Text>
             
-            {/* Mock map graphical container */}
-            <View className="bg-gray-100 rounded-2xl h-28 mb-4 border border-gray-250 items-center justify-center overflow-hidden relative">
-              <View className="absolute inset-0 bg-sky-50 items-center justify-center opacity-70">
-                <Text className="text-xs text-slate-400 font-semibold tracking-wider">🗺️ Colombo 03 Map Grid</Text>
-              </View>
-              {/* Central Map Pin */}
-              <View className="w-8 h-8 rounded-full bg-primary/20 items-center justify-center border border-primary z-10 shadow-md">
-                <Ionicons name="location-sharp" size={16} color="#FF6B35" />
-              </View>
-              <View className="absolute bottom-2 left-2 bg-white/90 border border-gray-200 rounded-md px-1.5 py-0.5 z-10">
-                <Text className="text-[8px] text-textSecondary font-black">79.8612°E, 6.9271°N</Text>
-              </View>
+            {/* Visual Pick Buttons */}
+            <View className="flex-row gap-3 mb-4">
+              <TouchableOpacity
+                onPress={() => {
+                  setMapCenter({
+                    lat: parseFloat(latitude) || 6.9271,
+                    lng: parseFloat(longitude) || 79.8612
+                  });
+                  setShowMapModal(true);
+                }}
+                className="flex-1 bg-primary/10 border border-primary/20 rounded-2xl py-3 items-center justify-center flex-row gap-1.5"
+                activeOpacity={0.8}
+              >
+                <Feather name="map" size={14} color="#FF6B35" />
+                <Text className="text-primary font-black text-[10px] uppercase tracking-wider">Select on Map 📍</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                      (position) => {
+                        const { latitude: latVal, longitude: lonVal } = position.coords;
+                        setLatitude(latVal.toFixed(6));
+                        setLongitude(lonVal.toFixed(6));
+                        updateAddressFromCoords(latVal, lonVal);
+                        setAddressError('');
+                        Alert.alert("GPS Success", `Location auto-filled: ${latVal.toFixed(4)}, ${lonVal.toFixed(4)}`);
+                      },
+                      (error) => {
+                        console.warn("GPS failed", error);
+                        Alert.alert("GPS Error", "Unable to detect location. Please select on the map manually.");
+                      },
+                      { enableHighAccuracy: true, timeout: 8000 }
+                    );
+                  } else {
+                    Alert.alert("Not Supported", "GPS Auto-Detection is not supported on this device.");
+                  }
+                }}
+                className="flex-1 bg-secondary/10 border border-secondary/20 rounded-2xl py-3 items-center justify-center flex-row gap-1.5"
+                activeOpacity={0.8}
+              >
+                <Feather name="navigation" size={14} color="#2D6A4F" />
+                <Text className="text-secondary font-black text-[10px] uppercase tracking-wider">Auto GPS 🛰️</Text>
+              </TouchableOpacity>
             </View>
 
             <TextInput
-              label="STREET ADDRESS"
-              placeholder="Enter complete delivery address"
-              value={address}
-              onChangeText={setAddress}
+              label="STREET ADDRESS *"
+              placeholder="Enter complete delivery address details..."
+              value={streetAddress}
+              onChangeText={(text) => {
+                setStreetAddress(text);
+                if (text.trim()) setAddressError('');
+              }}
+              error={addressError}
+              helperText="Please select your location on the map or type your street address."
               multiline
             />
           </View>
@@ -204,10 +406,14 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
 
           {timeSlot === 'SCHEDULED' && (
             <TextInput
-              label="TARGET DELIVERY TIME"
+              label="TARGET DELIVERY TIME *"
               placeholder="e.g. 12:30 PM, 7:00 PM"
               value={scheduledFor}
-              onChangeText={setScheduledFor}
+              onChangeText={(text) => {
+                setScheduledFor(text);
+                if (text.trim()) setScheduleError('');
+              }}
+              error={scheduleError}
             />
           )}
 
@@ -262,6 +468,73 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
           className="w-full mb-12"
         />
       </ScrollView>
+
+      {/* Select Location Modal Map */}
+      <Modal visible={showMapModal} transparent animationType="slide">
+        <View className="flex-grow flex bg-black/60 justify-end h-full">
+          <View className="bg-white rounded-t-[32px] w-full h-[80%] border-t border-gray-150 flex-col">
+            {/* Modal Header */}
+            <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-100">
+              <View>
+                <Text className="text-textPrimary font-black text-lg">Pick Delivery Location</Text>
+                <Text className="text-textSecondary text-[10px] font-bold uppercase mt-0.5">TAP ON MAP TO SELECT DELIVERY PIN</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowMapModal(false)}
+                className="bg-gray-100 rounded-full w-8 h-8 items-center justify-center border border-gray-150"
+              >
+                <Feather name="x" size={14} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Map Container */}
+            <View className="flex-1">
+              {Platform.OS === 'web' ? (
+                <iframe
+                  srcDoc={getPickerMapHtml(mapCenter.lat, mapCenter.lng)}
+                  style={{ width: '100%', height: '100%', border: 'none' }}
+                  title="Location Picker Map"
+                />
+              ) : (
+                WebView && (
+                  <WebView
+                    originWhitelist={['*']}
+                    source={{ html: getPickerMapHtml(mapCenter.lat, mapCenter.lng) }}
+                    style={{ flex: 1 }}
+                    javaScriptEnabled
+                    domStorageEnabled
+                    onMessage={(event: any) => {
+                      try {
+                        const data = JSON.parse(event.nativeEvent.data);
+                        if (data.type === 'SELECT_LOCATION') {
+                          const latVal = parseFloat(data.lat.toFixed(6));
+                          const lonVal = parseFloat(data.lng.toFixed(6));
+                          setLatitude(data.lat.toFixed(6));
+                          setLongitude(data.lng.toFixed(6));
+                          updateAddressFromCoords(latVal, lonVal);
+                          setAddressError('');
+                        }
+                      } catch (err) {
+                        console.error(err);
+                      }
+                    }}
+                  />
+                )
+              )}
+            </View>
+
+            {/* Confirm Actions bar */}
+            <View className="p-6 bg-gray-50 border-t border-gray-100">
+              <Button
+                title="🎯 CONFIRM DELIVERY PIN"
+                onPress={() => setShowMapModal(false)}
+                variant="secondary"
+                className="w-full"
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

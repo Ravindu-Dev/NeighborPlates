@@ -64,7 +64,7 @@ public class MealService {
         meal.setUpdatedAt(Instant.now());
 
         Meal savedMeal = mealRepository.save(meal);
-        return mapToMealResponse(savedMeal, cook.getProfile().getName());
+        return mapToMealResponse(savedMeal, cook);
     }
 
     public MealResponse updateMeal(String cookEmail, String mealId, CreateMealRequest request) {
@@ -103,7 +103,7 @@ public class MealService {
         meal.setUpdatedAt(Instant.now());
 
         Meal updatedMeal = mealRepository.save(meal);
-        return mapToMealResponse(updatedMeal, cook.getProfile().getName());
+        return mapToMealResponse(updatedMeal, cook);
     }
 
     public void deactivateMeal(String cookEmail, String mealId) {
@@ -124,12 +124,12 @@ public class MealService {
 
     public MealResponse getMealById(String id) {
         Meal meal = mealRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Meal not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Meal listing not found"));
 
         User cook = userRepository.findById(meal.getCookId())
                 .orElseThrow(() -> new ResourceNotFoundException("Cook associated with this meal not found"));
 
-        return mapToMealResponse(meal, cook.getProfile().getName());
+        return mapToMealResponse(meal, cook);
     }
 
     public List<MealResponse> getMealsByCook(String cookId) {
@@ -137,7 +137,7 @@ public class MealService {
                 .orElseThrow(() -> new ResourceNotFoundException("Cook not found"));
 
         return mealRepository.findByCookId(cookId).stream()
-                .map(meal -> mapToMealResponse(meal, cook.getProfile().getName()))
+                .map(meal -> mapToMealResponse(meal, cook))
                 .collect(Collectors.toList());
     }
 
@@ -180,13 +180,22 @@ public class MealService {
                 }
             }
 
-            responses.add(mapToMealResponse(meal, cook.getProfile().getName()));
+            responses.add(mapToMealResponse(meal, cook));
         }
 
         return responses;
     }
 
-    private MealResponse mapToMealResponse(Meal meal, String cookName) {
+    private MealResponse mapToMealResponse(Meal meal, User cook) {
+        String cookName = (cook != null && cook.getProfile() != null) ? cook.getProfile().getName() : "Unknown Cook";
+        Double cookLon = null;
+        Double cookLat = null;
+        if (cook != null && cook.getProfile() != null && cook.getProfile().getLocation() != null && 
+            cook.getProfile().getLocation().getCoordinates() != null && 
+            cook.getProfile().getLocation().getCoordinates().size() == 2) {
+            cookLon = cook.getProfile().getLocation().getCoordinates().get(0);
+            cookLat = cook.getProfile().getLocation().getCoordinates().get(1);
+        }
         return new MealResponse(
                 meal.getId(),
                 meal.getCookId(),
@@ -206,7 +215,9 @@ public class MealService {
                 meal.getAvgRating(),
                 meal.getTotalOrders(),
                 meal.isActive(),
-                meal.getCreatedAt()
+                meal.getCreatedAt(),
+                cookLon,
+                cookLat
         );
     }
 }

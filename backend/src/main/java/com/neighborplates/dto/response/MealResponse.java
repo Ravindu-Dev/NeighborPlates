@@ -31,4 +31,6 @@ public class MealResponse {
     private int totalOrders;
     private boolean active;
     private Instant createdAt;
+    private Double cookLongitude;
+    private Double cookLatitude;
 }

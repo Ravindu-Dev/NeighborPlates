@@ -3,6 +3,7 @@ import {
   View, Text, ActivityIndicator, ScrollView,
   TouchableOpacity, Modal, Alert, TextInput,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -33,6 +34,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }>
 };
 
 export const ProfileScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const { logout } = useAuthStore();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +83,14 @@ export const ProfileScreen: React.FC = () => {
 
   useEffect(() => {
     fetchProfile();
-  }, []);
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchProfile();
+      if (activeModal === 'orders') {
+        fetchOrders();
+      }
+    });
+    return unsubscribe;
+  }, [navigation, activeModal, fetchOrders]);
 
   const openModal = (modal: ActiveModal) => {
     setActiveModal(modal);
@@ -94,7 +103,10 @@ export const ProfileScreen: React.FC = () => {
     );
 
   const addAddress = () => {
-    if (!newAddress.trim()) return;
+    if (!newAddress.trim()) {
+      Alert.alert('Required Field', 'Please enter a valid address to save.');
+      return;
+    }
     setSavedAddresses(prev => [...prev, newAddress.trim()]);
     setNewAddress('');
   };
@@ -203,7 +215,15 @@ export const ProfileScreen: React.FC = () => {
           {orders.map((order) => {
             const statusInfo = STATUS_STYLES[order.status] ?? STATUS_STYLES['PLACED'];
             return (
-              <View key={order.id} className="bg-white rounded-3xl border border-gray-150 p-4 mb-3.5 shadow-sm">
+              <TouchableOpacity 
+                key={order.id} 
+                onPress={() => {
+                  setActiveModal(null);
+                  navigation.navigate('OrderTracking', { orderId: order.id });
+                }}
+                className="bg-white rounded-3xl border border-gray-150 p-4 mb-3.5 shadow-sm active:opacity-80"
+                activeOpacity={0.7}
+              >
                 <View className="flex-row items-center justify-between mb-2 pb-2 border-b border-gray-50">
                   <Text className="text-textPrimary font-black text-xs">#{order.orderNumber || order.id.slice(-6).toUpperCase()}</Text>
                   <View className={`rounded-full px-2.5 py-0.5 ${statusInfo.bg}`}>
@@ -221,7 +241,7 @@ export const ProfileScreen: React.FC = () => {
                   </Text>
                   <Text className="text-primary font-black text-sm">LKR {order.totalAmount}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })}
         </>

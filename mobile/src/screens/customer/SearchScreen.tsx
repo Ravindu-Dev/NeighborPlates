@@ -1,10 +1,103 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, ActivityIndicator, Image, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, Image, TouchableOpacity, ScrollView, TextInput, Platform, Modal } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
 import { api } from '../../services/api';
 import { MealCard } from '../../components/customer/MealCard';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { KitchenDiscoveryMap } from '../../components/customer/KitchenDiscoveryMap';
+
+let WebView: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    WebView = require('react-native-webview').WebView;
+  } catch (e) {
+    console.warn("react-native-webview not loaded", e);
+  }
+}
+
+const getPickerMapHtml = (initLat: number, initLon: number) => {
+  const lat = initLat && initLat !== 0 ? initLat : 6.9271;
+  const lon = initLon && initLon !== 0 ? initLon : 79.8612;
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Select Delivery Location</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+      <style>
+        html, body, #map {
+          height: 100%;
+          margin: 0;
+          padding: 0;
+          background: #F3F4F6;
+        }
+        .info-box {
+          position: absolute;
+          bottom: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: white;
+          padding: 8px 16px;
+          border-radius: 20px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          font-family: sans-serif;
+          font-size: 10px;
+          font-weight: 700;
+          color: #374151;
+          z-index: 1000;
+          pointer-events: none;
+          text-align: center;
+          white-space: nowrap;
+        }
+      </style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <div class="info-box">Tap map to place delivery pin 📍</div>
+      <script>
+        var map = L.map('map', { zoomControl: false }).setView([${lat}, ${lon}], 13);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        var marker = L.marker([${lat}, ${lon}], {
+          icon: L.divIcon({
+            html: '<div style="background-color: #3B82F6; width: 14px; height: 14px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);"></div>',
+            className: 'm',
+            iconSize: [14, 14]
+          }),
+          draggable: true
+        }).addTo(map);
+
+        function onMapClick(e) {
+          marker.setLatLng(e.latlng);
+          sendCoords(e.latlng.lat, e.latlng.lng);
+        }
+
+        marker.on('dragend', function(e) {
+          var position = marker.getLatLng();
+          sendCoords(position.lat, position.lng);
+        });
+
+        map.on('click', onMapClick);
+
+        function sendCoords(lat, lng) {
+          var data = { type: 'SELECT_LOCATION', lat: lat, lng: lng };
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify(data));
+          } else {
+            window.parent.postMessage(JSON.stringify(data), '*');
+          }
+        }
+      </script>
+    </body>
+    </html>
+  `;
+};
 
 type SearchScreenNavigationProp = NativeStackNavigationProp<CustomerStackParamList, 'HomeTabs'>;
 
@@ -14,15 +107,18 @@ interface SearchScreenProps {
 
 export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
   const [query, setQuery] = useState('');
-  const [maxDistance, setMaxDistance] = useState('10');
+  const [maxDistance, setMaxDistance] = useState('5000');
   const [meals, setMeals] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<'LIST' | 'MAP'>('LIST');
+
+
 
   const distanceOptions = [
-    { label: '3 KM', value: '3' },
     { label: '5 KM', value: '5' },
-    { label: '10 KM', value: '10' },
-    { label: '20 KM', value: '20' },
+    { label: '15 KM', value: '15' },
+    { label: '50 KM', value: '50' },
+    { label: 'Anywhere', value: '5000' },
   ];
 
   const popularCraves = [
@@ -34,10 +130,29 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
     { label: 'Spicy 🔥', query: 'Spicy' },
   ];
 
+  const getUniqueCooksLocations = (mealsList: any[]) => {
+    const cooksMap = new Map();
+    mealsList.forEach(meal => {
+      if (meal.cookId && !cooksMap.has(meal.cookId)) {
+        // Scatter fallback coordinates for demo if coordinates are empty/zero
+        const hasCoords = meal.cookLatitude !== undefined && meal.cookLatitude !== null && meal.cookLatitude !== 0 && 
+                          meal.cookLongitude !== undefined && meal.cookLongitude !== null && meal.cookLongitude !== 0;
+        cooksMap.set(meal.cookId, {
+          id: meal.cookId,
+          kitchenName: meal.cookName + "'s Kitchen",
+          cuisine: meal.cuisineType || 'Home-style Chef',
+          rating: meal.avgRating || 4.8,
+          lat: hasCoords ? meal.cookLatitude : (6.9271 + (Math.random() - 0.5) * 0.03),
+          lng: hasCoords ? meal.cookLongitude : (79.8612 + (Math.random() - 0.5) * 0.03)
+        });
+      }
+    });
+    return Array.from(cooksMap.values());
+  };
+
   const fetchSearchResults = async (searchVal: string, distVal: string) => {
     setLoading(true);
     try {
-      // Pass coordinates for Colombo as default
       const response = await api.get(
         `/api/meals?longitude=79.8612&latitude=6.9271&maxDistance=${parseFloat(distVal)}`
       );
@@ -104,9 +219,48 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* View Mode Switcher tabs */}
+        <View className="flex-row mt-3 bg-gray-100 p-1 rounded-xl">
+          <TouchableOpacity 
+            onPress={() => setViewMode('LIST')} 
+            className={`flex-1 py-1.5 rounded-lg items-center ${viewMode === 'LIST' ? 'bg-white shadow-sm' : ''}`}
+            activeOpacity={0.85}
+          >
+            <View className="flex-row items-center gap-1.5">
+              <Feather name="list" size={13} color={viewMode === 'LIST' ? '#FF6B35' : '#6B7280'} />
+              <Text className={`text-[10px] font-bold ${viewMode === 'LIST' ? 'text-textPrimary font-black' : 'text-textSecondary font-bold'}`}>List View</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => setViewMode('MAP')} 
+            className={`flex-1 py-1.5 rounded-lg items-center ${viewMode === 'MAP' ? 'bg-white shadow-sm' : ''}`}
+            activeOpacity={0.85}
+          >
+            <View className="flex-row items-center gap-1.5">
+              <Feather name="map" size={13} color={viewMode === 'MAP' ? '#FF6B35' : '#6B7280'} />
+              <Text className={`text-[10px] font-bold ${viewMode === 'MAP' ? 'text-textPrimary font-black' : 'text-textSecondary font-bold'}`}>Discovery Map</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+      {viewMode === 'MAP' ? (
+        <View className="flex-1 p-6">
+          <View className="bg-white rounded-3xl overflow-hidden flex-1 border border-gray-150 shadow-sm">
+            <KitchenDiscoveryMap 
+              cooks={getUniqueCooksLocations(meals)} 
+              onSelectCook={(cookId, name) => {
+                const cleanName = name.replace("'s Kitchen", "");
+                setQuery(cleanName);
+                setViewMode('LIST');
+                fetchSearchResults(cleanName, maxDistance);
+              }}
+            />
+          </View>
+        </View>
+      ) : (
+        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         <View className="p-6">
           {/* Visual Distance Filters */}
           <View className="mb-6">
@@ -192,6 +346,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
           )}
         </View>
       </ScrollView>
+      )}
     </View>
   );
 };

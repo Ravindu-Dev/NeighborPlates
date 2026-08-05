@@ -19,7 +19,7 @@ export type CustomerStackParamList = {
   MealDetail: { mealId: string };
   Checkout: undefined;
   Payment: {
-    address: string;
+    streetAddress: string;
     deliveryMethod: string;
     specialInstructions: string;
     scheduledFor: string;
@@ -27,6 +27,8 @@ export type CustomerStackParamList = {
     promoDiscount: number;
     deliveryFee: number;
     total: number;
+    latitude?: number;
+    longitude?: number;
   };
   OrderTracking: { orderId: string };
 };
