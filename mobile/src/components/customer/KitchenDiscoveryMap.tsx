@@ -29,8 +29,8 @@ interface KitchenDiscoveryMapProps {
 export const KitchenDiscoveryMap: React.FC<KitchenDiscoveryMapProps> = ({ 
   cooks, 
   onSelectCook,
-  customerLat = 6.9271,
-  customerLon = 79.8612
+  customerLat = 7.8731,
+  customerLon = 80.7718
 }) => {
   const htmlContent = `
     <!DOCTYPE html>
@@ -92,21 +92,12 @@ export const KitchenDiscoveryMap: React.FC<KitchenDiscoveryMapProps> = ({
       <div id="map"></div>
       <script>
         // Set map centered on customer coordinates
-        var map = L.map('map', { zoomControl: false }).setView([${customerLat}, ${customerLon}], 13);
+        var map = L.map('map', { zoomControl: false }).setView([${customerLat}, ${customerLon}], 8);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© OpenStreetMap'
         }).addTo(map);
-
-        // Add Customer Home location marker
-        L.marker([${customerLat}, ${customerLon}], {
-          icon: L.divIcon({
-            html: '<div style="background-color: #3B82F6; width: 14px; height: 14px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);"></div>',
-            className: 'customer-marker',
-            iconSize: [14, 14]
-          })
-        }).addTo(map).bindPopup('<div style="font-family: sans-serif; font-size: 11px; font-weight: 700; text-align: center;">📍 Your Location</div>');
 
         // Inject active kitchen locations
         var cooksList = ${JSON.stringify(cooks)};

@@ -6,6 +6,7 @@ interface TextInputProps extends RNTextInputProps {
   error?: string;
   helperText?: string;
   className?: string;
+  showPasswordToggle?: boolean;
 }
 
 export const TextInput: React.FC<TextInputProps> = ({
@@ -13,6 +14,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   error,
   helperText,
   secureTextEntry,
+  showPasswordToggle = true,
   className = '',
   ...props
 }) => {
@@ -41,7 +43,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           {...props}
         />
         
-        {secureTextEntry ? (
+        {secureTextEntry && showPasswordToggle ? (
           <TouchableOpacity 
             onPress={() => setIsPasswordVisible(!isPasswordVisible)}
             className="pl-2"
