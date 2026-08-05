@@ -21,7 +21,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'rating' | 'price' | 'none'>('none');
-
   const promos = [
     { id: '1', title: '50% OFF First Order', desc: 'Use code: NEIGHBOR50', color: 'from-orange-500 to-amber-500', badge: 'SPECIAL' },
     { id: '2', title: 'Free Cook Delivery', desc: 'On orders above LKR 1000', color: 'from-emerald-600 to-teal-500', badge: 'FREE SHIPPING' },

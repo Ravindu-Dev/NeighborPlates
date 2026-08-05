@@ -11,7 +11,18 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 type PaymentScreenProps = NativeStackScreenProps<CustomerStackParamList, 'Payment'>;
 
 export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation }) => {
-  const { address, deliveryMethod, specialInstructions, scheduledFor, subtotal, promoDiscount, deliveryFee, total } = route.params;
+  const { 
+    streetAddress, 
+    deliveryMethod, 
+    specialInstructions, 
+    scheduledFor, 
+    subtotal, 
+    promoDiscount, 
+    deliveryFee, 
+    total,
+    latitude = 6.9271,
+    longitude = 79.8612
+  } = route.params;
   const { items: cartItems, clearCart } = useCartStore();
 
   const [cardNumber, setCardNumber] = useState('');
@@ -19,6 +30,12 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
   const [cvv, setCvv] = useState('');
   const [cardholderName, setCardholderName] = useState('');
   const [processing, setProcessing] = useState(false);
+
+  // Field validation error states
+  const [cardError, setCardError] = useState('');
+  const [expiryError, setExpiryError] = useState('');
+  const [cvvError, setCvvError] = useState('');
+  const [nameError, setNameError] = useState('');
 
   // Modal display states for custom web-friendly success dialog
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -77,41 +94,55 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
   const handlePayment = async () => {
     console.log("[PaymentFlow] Pay button clicked");
     setErrorText(null);
+    setCardError('');
+    setExpiryError('');
+    setCvvError('');
+    setNameError('');
+
+    let isValid = true;
     const cleanCard = cardNumber.replace(/\s+/g, '');
     
-    if (cleanCard.length < 13 || cleanCard.length > 16) {
-      console.log("[PaymentFlow] Validation Failed: Card length " + cleanCard.length);
-      setErrorText('Please enter a valid 16-digit card number.');
-      return;
-    }
-    if (!expiry.match(/^(0[1-9]|1[0-2])\/\d{2}$/)) {
-      console.log("[PaymentFlow] Validation Failed: Expiry format: " + expiry);
-      setErrorText('Please enter a valid expiration date (MM/YY).');
-      return;
-    }
-
-    // Parse month and year to check if card has already expired
-    const [expiryMonthStr, expiryYearStr] = expiry.split('/');
-    const expiryMonth = parseInt(expiryMonthStr, 10);
-    const expiryYear = 2000 + parseInt(expiryYearStr, 10);
-
-    const now = new Date();
-    const curYear = now.getFullYear();
-    const curMonth = now.getMonth() + 1; // getMonth() is 0-indexed
-
-    if (expiryYear < curYear || (expiryYear === curYear && expiryMonth < curMonth)) {
-      console.log("[PaymentFlow] Validation Failed: Card is expired: " + expiry);
-      setErrorText('The credit card has expired. Please enter a valid expiration date.');
-      return;
-    }
-    if (cvv.length < 3 || cvv.length > 4) {
-      console.log("[PaymentFlow] Validation Failed: CVV length: " + cvv.length);
-      setErrorText('Please enter a valid 3 or 4 digit CVV.');
-      return;
-    }
     if (!cardholderName.trim()) {
       console.log("[PaymentFlow] Validation Failed: Empty cardholder name");
-      setErrorText('Please enter the cardholder name.');
+      setNameError('Cardholder name is required.');
+      isValid = false;
+    }
+
+    if (cleanCard.length < 13 || cleanCard.length > 16) {
+      console.log("[PaymentFlow] Validation Failed: Card length " + cleanCard.length);
+      setCardError('Please enter a valid 16-digit card number.');
+      isValid = false;
+    }
+
+    if (!expiry.match(/^(0[1-9]|1[0-2])\/\d{2}$/)) {
+      console.log("[PaymentFlow] Validation Failed: Expiry format: " + expiry);
+      setExpiryError('Expiry date is required (MM/YY).');
+      isValid = false;
+    } else {
+      // Parse month and year to check if card has already expired
+      const [expiryMonthStr, expiryYearStr] = expiry.split('/');
+      const expiryMonth = parseInt(expiryMonthStr, 10);
+      const expiryYear = 2000 + parseInt(expiryYearStr, 10);
+
+      const now = new Date();
+      const curYear = now.getFullYear();
+      const curMonth = now.getMonth() + 1; // getMonth() is 0-indexed
+
+      if (expiryYear < curYear || (expiryYear === curYear && expiryMonth < curMonth)) {
+        console.log("[PaymentFlow] Validation Failed: Card is expired: " + expiry);
+        setExpiryError('This credit card has expired.');
+        isValid = false;
+      }
+    }
+
+    if (cvv.length < 3 || cvv.length > 4) {
+      console.log("[PaymentFlow] Validation Failed: CVV length: " + cvv.length);
+      setCvvError('Please enter a valid 3 or 4 digit CVV.');
+      isValid = false;
+    }
+
+    if (!isValid) {
+      setErrorText('Please correct all validation errors above.');
       return;
     }
 
@@ -148,8 +179,8 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
           items: orderItems,
           deliveryMethod,
           address: {
-            label: address,
-            coordinates: [79.8612, 6.9271], // default coordinates
+            label: streetAddress,
+            coordinates: [longitude, latitude], // dynamic customer coordinates
           },
           specialInstructions,
           scheduledFor,
@@ -270,21 +301,29 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
           <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider mb-4">CARD DETAILS</Text>
 
           <TextInput
-            label="CARDHOLDER NAME"
+            label="CARDHOLDER NAME *"
             placeholder="As shown on card"
             value={cardholderName}
-            onChangeText={setCardholderName}
+            onChangeText={(text) => {
+              setCardholderName(text);
+              if (text.trim()) setNameError('');
+            }}
+            error={nameError}
           />
 
           <View className="relative">
             <TextInput
-              label="CARD NUMBER"
+              label="CARD NUMBER *"
               placeholder="4242 4242 4242 4242"
               value={cardNumber}
-              onChangeText={handleCardNumberChange}
+              onChangeText={(text) => {
+                handleCardNumberChange(text);
+                if (text.replace(/\s+/g, '').length >= 13) setCardError('');
+              }}
               keyboardType="number-pad"
+              error={cardError}
             />
-            {cardNumber.length > 0 && (
+            {cardNumber.length > 0 && !cardError && (
               <View className="absolute right-4 top-9">
                 <Text className={`font-black text-xs ${cardDetails.color}`}>{cardDetails.name}</Text>
               </View>
@@ -294,21 +333,29 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
           <View className="flex-row gap-4">
             <View className="flex-1">
               <TextInput
-                label="EXPIRATION"
+                label="EXPIRATION *"
                 placeholder="MM/YY"
                 value={expiry}
-                onChangeText={handleExpiryChange}
+                onChangeText={(text) => {
+                  handleExpiryChange(text);
+                  if (text.match(/^(0[1-9]|1[0-2])\/\d{2}$/)) setExpiryError('');
+                }}
                 keyboardType="number-pad"
+                error={expiryError}
               />
             </View>
             <View className="flex-1">
               <TextInput
-                label="CVV"
+                label="CVV *"
                 placeholder="123"
                 value={cvv}
-                onChangeText={handleCvvChange}
+                onChangeText={(text) => {
+                  handleCvvChange(text);
+                  if (text.length >= 3) setCvvError('');
+                }}
                 keyboardType="number-pad"
                 secureTextEntry
+                error={cvvError}
               />
             </View>
           </View>
