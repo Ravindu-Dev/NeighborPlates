@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Image, Alert, TouchableOpacity } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
 import { api } from '../../services/api';
 import { Button } from '../../components/common/Button';
@@ -29,9 +30,11 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
     }
   };
 
-  useEffect(() => {
-    fetchMealDetails();
-  }, [mealId]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchMealDetails();
+    }, [mealId])
+  );
 
   if (loading) {
     return (

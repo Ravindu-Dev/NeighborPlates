@@ -10,4 +10,6 @@ import java.util.List;
 public interface ReviewRepository extends MongoRepository<Review, String> {
     List<Review> findByMealIdOrderByCreatedAtDesc(String mealId);
     List<Review> findByCookIdOrderByCreatedAtDesc(String cookId);
+    List<Review> findByFlaggedTrueOrderByCreatedAtDesc();
+    List<Review> findAllByOrderByCreatedAtDesc();
 }
