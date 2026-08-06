@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Alert, TouchableOpacity, Platform, Image } from 'react-native';
+import { View, Text, ScrollView, Alert, TouchableOpacity, Platform, Image, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { TextInput } from '../../components/common/TextInput';
 import { Button } from '../../components/common/Button';
@@ -7,6 +7,8 @@ import { FilterChip } from '../../components/common/FilterChip';
 import { SectionHeader } from '../../components/common/SectionHeader';
 import { Toast } from '../../components/common/Toast';
 import { api } from '../../services/api';
+import { requestGalleryPermission, pickImageFromGallery, uploadImageToImgBB } from '../../services/imageService';
+import { Ionicons } from '@expo/vector-icons';
 
 const CATEGORIES = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'];
 const CATEGORY_ICONS: Record<string, string> = {
@@ -48,6 +50,38 @@ export const CreateListingScreen: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
+  const [uploading, setUploading] = useState(false);
+
+  const handlePickFromGallery = async () => {
+    try {
+      const hasPermission = await requestGalleryPermission();
+      if (!hasPermission) {
+        setToast({ visible: true, message: 'Gallery permission is required to upload photos.', type: 'error' });
+        return;
+      }
+
+      const localUri = await pickImageFromGallery();
+      if (!localUri) return; // User cancelled
+
+      // Show local preview immediately while uploading
+      setImageUrl(localUri);
+      setUploading(true);
+
+      const cdnUrl = await uploadImageToImgBB(localUri);
+      setImageUrl(cdnUrl);
+      setToast({ visible: true, message: '📸 Image uploaded successfully!', type: 'success' });
+    } catch (error: any) {
+      console.error('Image upload error:', error);
+      setImageUrl(''); // Clear the local preview on failure
+      setToast({
+        visible: true,
+        message: error.message || 'Failed to upload image. Please try again.',
+        type: 'error',
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (mealToEdit) {
@@ -208,9 +242,28 @@ export const CreateListingScreen: React.FC = () => {
             <SectionHeader title="Meal Image" icon="📸" />
 
             {/* Live Preview Box */}
-            <View className="w-full h-44 rounded-2xl bg-gray-50 border border-gray-200 overflow-hidden items-center justify-center mb-4">
+            <View className="w-full h-44 rounded-2xl bg-gray-50 border border-gray-200 overflow-hidden items-center justify-center mb-4 relative">
               {imageUrl.trim() ? (
-                <Image source={{ uri: imageUrl.trim() }} className="w-full h-full" resizeMode="cover" />
+                <>
+                  <Image source={{ uri: imageUrl.trim() }} className="w-full h-full" resizeMode="cover" />
+                  {/* Uploading overlay */}
+                  {uploading && (
+                    <View className="absolute inset-0 bg-black/40 items-center justify-center rounded-2xl">
+                      <ActivityIndicator size="large" color="#FFFFFF" />
+                      <Text className="text-white font-bold text-xs mt-2">Uploading...</Text>
+                    </View>
+                  )}
+                  {/* Clear image button */}
+                  {!uploading && (
+                    <TouchableOpacity
+                      onPress={() => setImageUrl('')}
+                      className="absolute top-2 right-2 bg-black/50 rounded-full w-7 h-7 items-center justify-center"
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="close" size={16} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  )}
+                </>
               ) : (
                 <View className="items-center p-4">
                   <Text className="text-4xl mb-1">🖼️</Text>
@@ -218,15 +271,38 @@ export const CreateListingScreen: React.FC = () => {
                     No image selected
                   </Text>
                   <Text className="text-textMuted text-[10px] text-center mt-0.5">
-                    Paste an image URL below or tap a sample photo template
+                    Upload from gallery, paste a URL, or pick a template
                   </Text>
                 </View>
               )}
             </View>
 
+            {/* Upload from Gallery Button */}
+            <TouchableOpacity
+              onPress={handlePickFromGallery}
+              disabled={uploading}
+              activeOpacity={0.8}
+              className={`flex-row items-center justify-center py-3.5 rounded-2xl border mb-4 ${
+                uploading
+                  ? 'bg-gray-100 border-gray-200'
+                  : 'bg-primary/10 border-primary/30'
+              }`}
+            >
+              {uploading ? (
+                <ActivityIndicator size="small" color="#FF6B35" className="mr-2" />
+              ) : (
+                <Ionicons name="images-outline" size={18} color="#FF6B35" style={{ marginRight: 8 }} />
+              )}
+              <Text className={`font-bold text-sm ${
+                uploading ? 'text-textMuted' : 'text-primary'
+              }`}>
+                {uploading ? 'Uploading...' : '📷  Upload from Gallery'}
+              </Text>
+            </TouchableOpacity>
+
             {/* Custom URL Input */}
             <TextInput
-              label="IMAGE URL"
+              label="OR PASTE IMAGE URL"
               placeholder="https://example.com/photo.jpg"
               value={imageUrl}
               onChangeText={setImageUrl}

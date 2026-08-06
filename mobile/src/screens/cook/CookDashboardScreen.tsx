@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Alert,
   Platform,
+  Image,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { api } from '../../services/api';
@@ -237,15 +238,21 @@ export const CookDashboardScreen: React.FC = () => {
               {meals.map((meal) => (
                 <View key={meal.id} className="mx-1" style={{ width: 155 }}>
                   <Card className="p-3" bordered>
-                    {/* Meal Photo Placeholder */}
-                    <View className="bg-secondary/10 rounded-xl h-20 items-center justify-center mb-2">
-                      <Text className="text-3xl">
-                        {meal.category === 'BREAKFAST' ? '🥞' 
-                          : meal.category === 'LUNCH' ? '🍛' 
-                          : meal.category === 'DINNER' ? '🍲' 
-                          : '🍿'}
-                      </Text>
-                    </View>
+                    {/* Meal Photo */}
+                    {meal.photos && meal.photos.length > 0 ? (
+                      <View className="rounded-xl h-20 overflow-hidden mb-2">
+                        <Image source={{ uri: meal.photos[0] }} className="w-full h-full" resizeMode="cover" />
+                      </View>
+                    ) : (
+                      <View className="bg-secondary/10 rounded-xl h-20 items-center justify-center mb-2">
+                        <Text className="text-3xl">
+                          {meal.category === 'BREAKFAST' ? '🥞' 
+                            : meal.category === 'LUNCH' ? '🍛' 
+                            : meal.category === 'DINNER' ? '🍲' 
+                            : '🍿'}
+                        </Text>
+                      </View>
+                    )}
                     <Text className="text-textPrimary font-bold text-xs" numberOfLines={1}>
                       {meal.name}
                     </Text>
