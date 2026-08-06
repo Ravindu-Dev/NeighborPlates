@@ -35,6 +35,16 @@ public class User {
 
     private List<String> favorites = new ArrayList<>(); // Cook IDs favorited by customer
 
+    private Boolean active = true;
+
+    public Boolean getActive() {
+        return active == null ? true : active;
+    }
+
+    public boolean isActive() {
+        return active == null ? true : active;
+    }
+
     private Instant createdAt = Instant.now();
 
     private Instant updatedAt = Instant.now();

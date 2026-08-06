@@ -132,4 +132,12 @@ public class AdminService {
             userRepository.save(cook);
         }
     }
+
+    public User toggleUserActiveStatus(String id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        user.setActive(!user.isActive());
+        user.setUpdatedAt(java.time.Instant.now());
+        return userRepository.save(user);
+    }
 }

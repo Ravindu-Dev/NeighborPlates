@@ -70,4 +70,10 @@ public class AdminController {
         adminService.deleteReview(id);
         return ResponseEntity.ok(new ApiResponse(true, "Review deleted successfully"));
     }
+
+    @PutMapping("/users/{id}/toggle-active")
+    public ResponseEntity<User> toggleUserActive(@PathVariable String id) {
+        User user = adminService.toggleUserActiveStatus(id);
+        return ResponseEntity.ok(user);
+    }
 }
