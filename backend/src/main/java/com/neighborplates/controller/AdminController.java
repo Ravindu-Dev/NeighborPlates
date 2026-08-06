@@ -1,6 +1,9 @@
 package com.neighborplates.controller;
 
 import com.neighborplates.dto.response.AdminAnalyticsResponse;
+import com.neighborplates.dto.response.ApiResponse;
+import com.neighborplates.model.Meal;
+import com.neighborplates.model.Review;
 import com.neighborplates.model.User;
 import com.neighborplates.service.AdminService;
 import org.springframework.http.ResponseEntity;
@@ -36,5 +39,35 @@ public class AdminController {
     public ResponseEntity<AdminAnalyticsResponse> getPlatformAnalytics() {
         AdminAnalyticsResponse response = adminService.getPlatformAnalytics();
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/meals")
+    public ResponseEntity<List<Meal>> getAllMeals() {
+        List<Meal> meals = adminService.getAllMeals();
+        return ResponseEntity.ok(meals);
+    }
+
+    @PutMapping("/meals/{id}/toggle-active")
+    public ResponseEntity<Meal> toggleMealActive(@PathVariable String id) {
+        Meal meal = adminService.toggleMealActiveStatus(id);
+        return ResponseEntity.ok(meal);
+    }
+
+    @GetMapping("/reviews")
+    public ResponseEntity<List<Review>> getAllReviews(@RequestParam(required = false) Boolean flagged) {
+        List<Review> reviews = adminService.getAllReviews(flagged);
+        return ResponseEntity.ok(reviews);
+    }
+
+    @PutMapping("/reviews/{id}/dismiss-flag")
+    public ResponseEntity<Review> dismissReviewFlag(@PathVariable String id) {
+        Review review = adminService.dismissReviewFlag(id);
+        return ResponseEntity.ok(review);
+    }
+
+    @DeleteMapping("/reviews/{id}")
+    public ResponseEntity<ApiResponse> deleteReview(@PathVariable String id) {
+        adminService.deleteReview(id);
+        return ResponseEntity.ok(new ApiResponse(true, "Review deleted successfully"));
     }
 }

@@ -1,5 +1,6 @@
 package com.neighborplates.service;
 
+import com.neighborplates.dto.request.FlagReviewRequest;
 import com.neighborplates.dto.request.SubmitReviewRequest;
 import com.neighborplates.exception.ResourceNotFoundException;
 import com.neighborplates.exception.UnauthorizedException;
@@ -113,5 +114,17 @@ public class ReviewService {
                 .orElse(0.0);
         cook.getStats().setAvgRating(cookAvg);
         userRepository.save(cook);
+    }
+
+    public void flagReview(String customerEmail, String reviewId, FlagReviewRequest request) {
+        userRepository.findByEmail(customerEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new ResourceNotFoundException("Review not found"));
+
+        review.setFlagged(true);
+        review.setFlaggedReason(request.getReason());
+        reviewRepository.save(review);
     }
 }

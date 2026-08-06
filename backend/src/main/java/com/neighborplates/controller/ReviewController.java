@@ -1,14 +1,12 @@
 package com.neighborplates.controller;
 
+import com.neighborplates.dto.request.FlagReviewRequest;
 import com.neighborplates.dto.request.SubmitReviewRequest;
 import com.neighborplates.dto.response.ApiResponse;
 import com.neighborplates.service.ReviewService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 
@@ -28,5 +26,14 @@ public class ReviewController {
             Principal principal) {
         reviewService.submitReview(principal.getName(), request);
         return ResponseEntity.ok(new ApiResponse(true, "Review submitted successfully"));
+    }
+
+    @PutMapping("/{id}/flag")
+    public ResponseEntity<ApiResponse> flagReview(
+            @PathVariable String id,
+            @Valid @RequestBody FlagReviewRequest request,
+            Principal principal) {
+        reviewService.flagReview(principal.getName(), id, request);
+        return ResponseEntity.ok(new ApiResponse(true, "Review flagged successfully"));
     }
 }

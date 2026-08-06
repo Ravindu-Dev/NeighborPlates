@@ -31,5 +31,9 @@ public class Review {
 
     private String comment;
 
+    private boolean flagged = false;
+
+    private String flaggedReason;
+
     private Instant createdAt = Instant.now();
 }
