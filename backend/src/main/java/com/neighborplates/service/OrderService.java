@@ -127,7 +127,56 @@ public class OrderService {
 
         Order savedOrder = orderRepository.save(order);
         firebaseNotificationService.updateOrderTrackingStatus(savedOrder.getId(), "PLACED");
-        return mapToOrderResponse(savedOrder, customer.getProfile().getName(), cook.getProfile().getName());
+        return mapToOrderResponse(savedOrder, customer.getProfile().getName(), cook.getProfile().getName(), null);
+    }
+
+    public List<OrderResponse> getAvailableOrdersForRiders() {
+        List<Order> orders = orderRepository.findByStatusAndRiderIdIsNull(OrderStatus.READY);
+        return orders.stream()
+                .map(order -> {
+                    User customer = userRepository.findById(order.getCustomerId()).orElse(null);
+                    User cook = userRepository.findById(order.getCookId()).orElse(null);
+                    String custName = customer != null ? customer.getProfile().getName() : "Deleted User";
+                    String cookName = cook != null ? cook.getProfile().getName() : "Deleted Cook";
+                    return mapToOrderResponse(order, custName, cookName, null);
+                })
+                .collect(Collectors.toList());
+    }
+
+    public OrderResponse acceptOrderAsRider(String email, String orderId) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (user.getRole() != UserRole.RIDER) {
+            throw new UnauthorizedException("Only riders can accept orders for delivery");
+        }
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+
+        if (order.getRiderId() != null) {
+            throw new IllegalArgumentException("Someone else got there first");
+        }
+
+        if (order.getStatus() != OrderStatus.READY) {
+            throw new IllegalArgumentException("Only READY orders can be accepted by a rider");
+        }
+
+        // Set Rider ID and rider earnings (mocked as 15% of total amount or 150 min)
+        order.setRiderId(user.getId());
+        double earnings = Math.max(150.0, order.getTotalAmount() * 0.15);
+        // round to 2 decimal places
+        earnings = Math.round(earnings * 100.0) / 100.0;
+        order.setRiderEarnings(earnings);
+
+        Order savedOrder = orderRepository.save(order);
+
+        User customer = userRepository.findById(order.getCustomerId()).orElse(null);
+        User cook = userRepository.findById(order.getCookId()).orElse(null);
+        String custName = customer != null ? customer.getProfile().getName() : "Deleted User";
+        String cookName = cook != null ? cook.getProfile().getName() : "Deleted Cook";
+
+        return mapToOrderResponse(savedOrder, custName, cookName, user.getProfile().getName());
     }
 
     public List<OrderResponse> getMyOrders(String email) {
@@ -139,6 +188,8 @@ public class OrderService {
             orders = orderRepository.findByCustomerIdOrderByCreatedAtDesc(user.getId());
         } else if (user.getRole() == UserRole.COOK) {
             orders = orderRepository.findByCookIdOrderByCreatedAtDesc(user.getId());
+        } else if (user.getRole() == UserRole.RIDER) {
+            orders = orderRepository.findByRiderIdOrderByCreatedAtDesc(user.getId());
         } else {
             orders = orderRepository.findAll(); // Admins see all
         }
@@ -149,7 +200,9 @@ public class OrderService {
                     User cook = userRepository.findById(order.getCookId()).orElse(null);
                     String custName = customer != null ? customer.getProfile().getName() : "Deleted User";
                     String cookName = cook != null ? cook.getProfile().getName() : "Deleted Cook";
-                    return mapToOrderResponse(order, custName, cookName);
+                    User rider = order.getRiderId() != null ? userRepository.findById(order.getRiderId()).orElse(null) : null;
+                    String riderName = rider != null ? rider.getProfile().getName() : null;
+                    return mapToOrderResponse(order, custName, cookName, riderName);
                 })
                 .collect(Collectors.toList());
     }
@@ -185,6 +238,19 @@ public class OrderService {
             }
             // Cook-side state transitions check
             validateStateTransition(order.getStatus(), newStatus);
+        } else if (user.getRole() == UserRole.RIDER) {
+            if (!user.getId().equals(order.getRiderId())) {
+                throw new UnauthorizedException("You are not assigned to this order");
+            }
+            if (newStatus != OrderStatus.DELIVERING && newStatus != OrderStatus.DELIVERED) {
+                throw new IllegalArgumentException("Riders can only transition orders to DELIVERING or DELIVERED");
+            }
+            validateStateTransition(order.getStatus(), newStatus);
+            if (newStatus == OrderStatus.DELIVERING) {
+                order.setPickedUpAt(Instant.now());
+            } else if (newStatus == OrderStatus.DELIVERED) {
+                order.setDeliveredAt(Instant.now());
+            }
         } else if (user.getRole() != UserRole.ADMIN) {
             throw new UnauthorizedException("Insufficient roles for status updates");
         }
@@ -213,7 +279,9 @@ public class OrderService {
 
         Order updatedOrder = orderRepository.save(order);
         firebaseNotificationService.updateOrderTrackingStatus(updatedOrder.getId(), newStatus.name());
-        return mapToOrderResponse(updatedOrder, customer.getProfile().getName(), cook.getProfile().getName());
+        User rider = order.getRiderId() != null ? userRepository.findById(order.getRiderId()).orElse(null) : null;
+        String riderName = rider != null ? rider.getProfile().getName() : null;
+        return mapToOrderResponse(updatedOrder, customer.getProfile().getName(), cook.getProfile().getName(), riderName);
     }
 
     private void validateStateTransition(OrderStatus current, OrderStatus next) {
@@ -264,7 +332,7 @@ public class OrderService {
         return "NP-" + datePrefix + "-" + randomCode;
     }
 
-    private OrderResponse mapToOrderResponse(Order order, String customerName, String cookName) {
+    private OrderResponse mapToOrderResponse(Order order, String customerName, String cookName, String riderName) {
         return new OrderResponse(
                 order.getId(),
                 order.getOrderNumber(),
@@ -284,7 +352,12 @@ public class OrderService {
                 order.getSpecialInstructions(),
                 order.getPaymentTransactionId(),
                 order.getCreatedAt(),
-                order.getUpdatedAt()
+                order.getUpdatedAt(),
+                order.getRiderId(),
+                riderName,
+                order.getRiderEarnings(),
+                order.getPickedUpAt(),
+                order.getDeliveredAt()
         );
     }
 }

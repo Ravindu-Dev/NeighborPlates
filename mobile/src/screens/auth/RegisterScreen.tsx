@@ -143,11 +143,11 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ route, navigatio
     }
     try {
       const regData = {
-        name,
-        email,
-        password,
+        name: name.trim(),
+        email: email.trim(),
+        password: password.trim(),
         role,
-        phone,
+        phone: phone.trim(),
         bio: role === 'COOK' ? bio : undefined,
         deliveryRadius: role === 'COOK' ? parseFloat(radius) : undefined,
         coordinates: role === 'COOK' 

@@ -6,6 +6,7 @@ import { AuthNavigator } from './AuthNavigator';
 import { CustomerNavigator } from './CustomerNavigator';
 import { CookNavigator } from './CookNavigator';
 import { AdminNavigator } from './AdminNavigator';
+import { RiderNavigator } from './RiderNavigator';
 
 export const AppNavigator = () => {
   const { isAuthenticated, user, isLoading, checkAuth } = useAuthStore();
@@ -30,6 +31,8 @@ export const AppNavigator = () => {
         <CustomerNavigator />
       ) : user.role === 'COOK' ? (
         <CookNavigator />
+      ) : user.role === 'RIDER' ? (
+        <RiderNavigator />
       ) : (
         <AdminNavigator />
       )}

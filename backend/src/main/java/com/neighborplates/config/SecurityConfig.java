@@ -59,6 +59,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/meals/**").hasRole("COOK")
                 .requestMatchers(HttpMethod.PUT, "/api/meals/**").hasRole("COOK")
                 .requestMatchers(HttpMethod.DELETE, "/api/meals/**").hasRole("COOK")
+                .requestMatchers(HttpMethod.GET, "/api/orders/available").hasRole("RIDER")
+                .requestMatchers(HttpMethod.PUT, "/api/orders/*/rider-accept").hasRole("RIDER")
+                .requestMatchers("/api/riders/**").hasRole("RIDER")
                 
                 // General authenticated endpoints
                 .anyRequest().authenticated()

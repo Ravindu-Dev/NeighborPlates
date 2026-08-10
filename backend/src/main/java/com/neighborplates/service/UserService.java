@@ -34,11 +34,27 @@ public class UserService {
         current.setAvatarUrl(update.getAvatarUrl());
         current.setKitchenPhotos(update.getKitchenPhotos());
         current.setDeliveryRadius(update.getDeliveryRadius());
+        if (update.getVehicleType() != null) {
+            current.setVehicleType(update.getVehicleType());
+        }
 
         if (update.getLocation() != null && update.getLocation().getCoordinates().size() == 2) {
             current.setLocation(update.getLocation());
         }
 
+        user.setUpdatedAt(Instant.now());
+        return userRepository.save(user);
+    }
+
+    public User toggleRiderAvailability(String email, boolean isAvailable) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User profile not found"));
+
+        if (user.getRole() != UserRole.RIDER) {
+            throw new UnauthorizedException("Only riders can toggle availability");
+        }
+
+        user.getProfile().setIsAvailable(isAvailable);
         user.setUpdatedAt(Instant.now());
         return userRepository.save(user);
     }

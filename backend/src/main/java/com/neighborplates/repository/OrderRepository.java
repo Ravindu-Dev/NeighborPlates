@@ -10,4 +10,6 @@ import java.util.List;
 public interface OrderRepository extends MongoRepository<Order, String> {
     List<Order> findByCustomerIdOrderByCreatedAtDesc(String customerId);
     List<Order> findByCookIdOrderByCreatedAtDesc(String cookId);
+    List<Order> findByRiderIdOrderByCreatedAtDesc(String riderId);
+    List<Order> findByStatusAndRiderIdIsNull(com.neighborplates.model.enums.OrderStatus status);
 }

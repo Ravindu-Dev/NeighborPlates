@@ -61,6 +61,8 @@ public class User {
         private boolean hygieneVerified = false; // Cook verification status
         private GeoJsonPoint location = new GeoJsonPoint();
         private Double deliveryRadius; // km, Cook only
+        private Boolean isAvailable = false; // Rider only: indicates if online
+        private String vehicleType; // Rider only: e.g. "Motorcycle"
     }
 
     @Data

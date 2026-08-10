@@ -23,7 +23,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       return;
     }
     try {
-      await login({ email, password });
+      await login({ email: email.trim(), password: password.trim() });
     } catch (err) {
       // Error handled by store and displayed on UI
     }
@@ -84,6 +84,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           onPress={() => navigation.navigate('Register', { role: 'COOK' })}
         >
           <Text className="text-secondary font-bold text-sm">Sign Up as a Local Cook</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          className="mt-3 align-center self-center" 
+          onPress={() => navigation.navigate('Register', { role: 'RIDER' })}
+        >
+          <Text className="text-indigo-500 font-bold text-sm">Sign Up as a Rider</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

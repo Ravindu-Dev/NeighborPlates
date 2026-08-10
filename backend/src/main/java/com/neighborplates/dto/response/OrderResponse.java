@@ -31,4 +31,10 @@ public class OrderResponse {
     private String paymentTransactionId;
     private Instant createdAt;
     private Instant updatedAt;
+    // Rider fields
+    private String riderId;
+    private String riderName;
+    private Double riderEarnings;
+    private Instant pickedUpAt;
+    private Instant deliveredAt;
 }

@@ -3,5 +3,6 @@ package com.neighborplates.model.enums;
 public enum UserRole {
     CUSTOMER,
     COOK,
-    ADMIN
+    ADMIN,
+    RIDER
 }
