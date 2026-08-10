@@ -5,7 +5,7 @@ import { RegisterScreen } from '../screens/auth/RegisterScreen';
 
 export type AuthStackParamList = {
   Login: undefined;
-  Register: { role: 'CUSTOMER' | 'COOK' };
+  Register: { role: 'CUSTOMER' | 'COOK' | 'RIDER' };
 };
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();

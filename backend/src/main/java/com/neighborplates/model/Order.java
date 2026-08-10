@@ -54,6 +54,14 @@ public class Order {
 
     private String paymentTransactionId;
 
+    private String riderId; // Set when a rider accepts this order for delivery
+
+    private Instant pickedUpAt; // Timestamp when rider confirmed pickup (DELIVERING)
+
+    private Instant deliveredAt; // Timestamp when rider confirmed delivery (DELIVERED)
+
+    private Double riderEarnings; // Rider's share of the delivery fee
+
     @Indexed(expireAfterSeconds = 7776000) // TTL index: auto-delete after 90 days (90 * 24 * 3600 seconds)
     private Instant ttlExpiryDate;
 

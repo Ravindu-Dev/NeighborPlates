@@ -9,7 +9,7 @@ import { Feather } from '@expo/vector-icons';
 
 export const UserManagementScreen: React.FC = () => {
   const { user: currentUser } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'cooks' | 'customers'>('cooks');
+  const [activeTab, setActiveTab] = useState<'cooks' | 'customers' | 'riders'>('cooks');
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -71,7 +71,8 @@ export const UserManagementScreen: React.FC = () => {
 
   const cooks = users.filter((u: any) => u.role === 'COOK');
   const customers = users.filter((u: any) => u.role === 'CUSTOMER');
-  const displayData = activeTab === 'cooks' ? cooks : customers;
+  const riders = users.filter((u: any) => u.role === 'RIDER');
+  const displayData = activeTab === 'cooks' ? cooks : activeTab === 'customers' ? customers : riders;
 
   return (
     <View className="flex-1 bg-surface-elevated">
@@ -91,6 +92,14 @@ export const UserManagementScreen: React.FC = () => {
         >
           <Text className={`font-bold text-sm ${activeTab === 'customers' ? 'text-primary' : 'text-textSecondary'}`}>
             Customers ({customers.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveTab('riders')}
+          className={`flex-1 py-4 items-center border-b-2 ${activeTab === 'riders' ? 'border-primary' : 'border-transparent'}`}
+        >
+          <Text className={`font-bold text-sm ${activeTab === 'riders' ? 'text-primary' : 'text-textSecondary'}`}>
+            Riders ({riders.length})
           </Text>
         </TouchableOpacity>
       </View>

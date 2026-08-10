@@ -52,9 +52,12 @@ export const useAuthStore = create<AuthState>((set) => ({
         isLoading: false,
       });
     } catch (err: any) {
+      const errorMessage = err.response?.data?.message 
+        || (err.message === 'Network Error' ? 'Network Error: Cannot connect to backend server. Make sure your PC and phone are on the same Wi-Fi.' : null)
+        || 'Authentication failed. Please verify credentials.';
       set({
         isLoading: false,
-        error: err.response?.data?.message || 'Authentication failed. Please verify credentials.',
+        error: errorMessage,
       });
       throw err;
     }

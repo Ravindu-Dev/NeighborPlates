@@ -41,4 +41,18 @@ public class OrderController {
         OrderResponse response = orderService.updateOrderStatus(principal.getName(), id, status);
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/available")
+    public ResponseEntity<List<OrderResponse>> getAvailableOrders() {
+        List<OrderResponse> response = orderService.getAvailableOrdersForRiders();
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{id}/rider-accept")
+    public ResponseEntity<OrderResponse> acceptOrderAsRider(
+            @PathVariable String id,
+            Principal principal) {
+        OrderResponse response = orderService.acceptOrderAsRider(principal.getName(), id);
+        return ResponseEntity.ok(response);
+    }
 }
