@@ -71,7 +71,7 @@ export const uploadImageToImgBB = async (localUri: string): Promise<string> => {
   } else {
     // On native, use expo-file-system
     base64Data = await FileSystem.readAsStringAsync(localUri, {
-      encoding: FileSystem.EncodingType.Base64,
+      encoding: (FileSystem as any).EncodingType?.Base64 || 'base64',
     });
   }
 

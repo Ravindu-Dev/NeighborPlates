@@ -46,6 +46,16 @@ export const UserManagementScreen: React.FC = () => {
     }
   };
 
+  const handleVerifyRider = async (userId: string, currentlyVerified: boolean) => {
+    try {
+      await api.put(`/api/admin/riders/${userId}/verify`);
+      Alert.alert('Success', `Rider verification ${currentlyVerified ? 'revoked' : 'approved'} successfully.`);
+      fetchUsers();
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to update rider verification status.');
+    }
+  };
+
   const handleToggleActive = async (userId: string, currentActive: boolean) => {
     Alert.alert(
       currentActive ? 'Suspend Account' : 'Reactivate Account',
@@ -73,6 +83,16 @@ export const UserManagementScreen: React.FC = () => {
   const customers = users.filter((u: any) => u.role === 'CUSTOMER');
   const riders = users.filter((u: any) => u.role === 'RIDER');
   const displayData = activeTab === 'cooks' ? cooks : activeTab === 'customers' ? customers : riders;
+
+  const getVehicleIcon = (type?: string) => {
+    switch (type) {
+      case 'Motorcycle': return '🛵';
+      case 'Bicycle': return '🚲';
+      case 'Car': return '🚗';
+      case 'Walking': return '🚶';
+      default: return '🛵';
+    }
+  };
 
   return (
     <View className="flex-1 bg-surface-elevated">
@@ -128,9 +148,14 @@ export const UserManagementScreen: React.FC = () => {
             <Card className="mb-4">
               <View className="flex-row justify-between items-start mb-2">
                 <View className="flex-1 mr-2">
-                  <Text className="text-textPrimary font-extrabold text-sm">{item.profile.name}</Text>
+                  <Text className="text-textPrimary font-extrabold text-sm">{item.profile?.name || 'Unnamed'}</Text>
                   <Text className="text-textSecondary text-xs mt-0.5">{item.email}</Text>
-                  <Text className="text-textSecondary text-xs mt-0.5">Phone: {item.profile.phone || 'None'}</Text>
+                  <Text className="text-textSecondary text-xs mt-0.5">Phone: {item.profile?.phone || 'None'}</Text>
+                  {item.role === 'RIDER' && (
+                    <Text className="text-textPrimary font-semibold text-xs mt-1">
+                      Vehicle: {getVehicleIcon(item.profile?.vehicleType)} {item.profile?.vehicleType || 'Not specified'}
+                    </Text>
+                  )}
                 </View>
                 <View className="items-end gap-1.5">
                   <Badge
@@ -139,24 +164,45 @@ export const UserManagementScreen: React.FC = () => {
                   />
                   {item.role === 'COOK' && (
                     <Badge
-                      label={item.profile.hygieneVerified ? "Certified" : "Unverified"}
-                      variant={item.profile.hygieneVerified ? "success" : "warning"}
+                      label={item.profile?.hygieneVerified ? "Certified" : "Unverified"}
+                      variant={item.profile?.hygieneVerified ? "success" : "warning"}
                     />
+                  )}
+                  {item.role === 'RIDER' && (
+                    <>
+                      <Badge
+                        label={item.profile?.riderVerified ? "Verified Rider" : "Pending Approval"}
+                        variant={item.profile?.riderVerified ? "success" : "warning"}
+                      />
+                      <Badge
+                        label={item.profile?.isAvailable ? "Online 🟢" : "Offline ⚪"}
+                        variant={item.profile?.isAvailable ? "primary" : "neutral"}
+                      />
+                    </>
                   )}
                 </View>
               </View>
 
-              {item.role === 'COOK' && item.profile.bio && (
+              {item.role === 'COOK' && item.profile?.bio && (
                 <Text className="text-textMuted text-[11px] italic mt-2">
                   Bio: "{item.profile.bio}"
                 </Text>
               )}
 
               <View className="flex-row gap-3 mt-4">
-                {item.role === 'COOK' && !item.profile.hygieneVerified && item.active && (
+                {item.role === 'COOK' && !item.profile?.hygieneVerified && item.active && (
                   <Button
                     title="CERTIFY HYGIENE"
                     onPress={() => handleVerify(item.id)}
+                    size="sm"
+                    className="flex-1"
+                  />
+                )}
+                {item.role === 'RIDER' && item.active && (
+                  <Button
+                    title={item.profile?.riderVerified ? "REVOKE RIDER" : "VERIFY RIDER"}
+                    onPress={() => handleVerifyRider(item.id, item.profile?.riderVerified)}
+                    variant={item.profile?.riderVerified ? "outline" : "primary"}
                     size="sm"
                     className="flex-1"
                   />

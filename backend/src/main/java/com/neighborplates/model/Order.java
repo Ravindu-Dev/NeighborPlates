@@ -62,6 +62,10 @@ public class Order {
 
     private Double riderEarnings; // Rider's share of the delivery fee
 
+    private boolean cookPayoutSettled = false; // Indicates if cook payout has been processed by admin
+
+    private boolean riderPayoutSettled = false; // Indicates if rider payout has been processed by admin
+
     @Indexed(expireAfterSeconds = 7776000) // TTL index: auto-delete after 90 days (90 * 24 * 3600 seconds)
     private Instant ttlExpiryDate;
 
