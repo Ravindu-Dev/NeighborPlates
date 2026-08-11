@@ -1,6 +1,7 @@
 package com.neighborplates.controller;
 
 import com.neighborplates.dto.response.AdminAnalyticsResponse;
+import com.neighborplates.dto.response.AdminPayoutSummaryResponse;
 import com.neighborplates.dto.response.ApiResponse;
 import com.neighborplates.model.Meal;
 import com.neighborplates.model.Review;
@@ -32,6 +33,12 @@ public class AdminController {
     @PutMapping("/users/{id}/verify")
     public ResponseEntity<User> verifyCook(@PathVariable String id) {
         User user = adminService.verifyCook(id);
+        return ResponseEntity.ok(user);
+    }
+
+    @PutMapping("/riders/{id}/verify")
+    public ResponseEntity<User> verifyRider(@PathVariable String id) {
+        User user = adminService.verifyRider(id);
         return ResponseEntity.ok(user);
     }
 
@@ -75,5 +82,17 @@ public class AdminController {
     public ResponseEntity<User> toggleUserActive(@PathVariable String id) {
         User user = adminService.toggleUserActiveStatus(id);
         return ResponseEntity.ok(user);
+    }
+
+    @GetMapping("/payouts/summary")
+    public ResponseEntity<AdminPayoutSummaryResponse> getPayoutSummary() {
+        AdminPayoutSummaryResponse response = adminService.getPayoutSummary();
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/payouts/settle/{userId}")
+    public ResponseEntity<AdminPayoutSummaryResponse.UserPayoutBalance> settleUserPayouts(@PathVariable String userId) {
+        AdminPayoutSummaryResponse.UserPayoutBalance result = adminService.settleUserPayouts(userId);
+        return ResponseEntity.ok(result);
     }
 }
