@@ -4,6 +4,7 @@ import com.neighborplates.dto.response.AdminAnalyticsResponse;
 import com.neighborplates.dto.response.AdminPayoutSummaryResponse;
 import com.neighborplates.dto.response.ApiResponse;
 import com.neighborplates.model.Meal;
+import com.neighborplates.model.Order;
 import com.neighborplates.model.Review;
 import com.neighborplates.model.User;
 import com.neighborplates.service.AdminService;
@@ -94,5 +95,34 @@ public class AdminController {
     public ResponseEntity<AdminPayoutSummaryResponse.UserPayoutBalance> settleUserPayouts(@PathVariable String userId) {
         AdminPayoutSummaryResponse.UserPayoutBalance result = adminService.settleUserPayouts(userId);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/operations/live")
+    public ResponseEntity<com.neighborplates.dto.response.LiveOperationsSummaryResponse> getLiveOperationsSummary() {
+        com.neighborplates.dto.response.LiveOperationsSummaryResponse response = adminService.getLiveOperationsSummary();
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/orders/{id}/reassign-rider/{riderId}")
+    public ResponseEntity<Order> reassignRider(@PathVariable String id, @PathVariable String riderId) {
+        Order order = adminService.reassignOrderRider(id, riderId);
+        return ResponseEntity.ok(order);
+    }
+
+    @PostMapping("/orders/{id}/resolve-dispute")
+    public ResponseEntity<Order> resolveDispute(
+            @PathVariable String id,
+            @RequestBody com.neighborplates.dto.request.ResolveDisputeRequest request) {
+        Order order = adminService.resolveOrderDispute(id, request);
+        return ResponseEntity.ok(order);
+    }
+
+    @PutMapping("/orders/{id}/force-status")
+    public ResponseEntity<Order> forceStatus(
+            @PathVariable String id,
+            @RequestParam com.neighborplates.model.enums.OrderStatus status,
+            @RequestParam(required = false) String adminNotes) {
+        Order order = adminService.forceUpdateOrderStatus(id, status, adminNotes);
+        return ResponseEntity.ok(order);
     }
 }
