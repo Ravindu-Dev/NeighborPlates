@@ -66,6 +66,19 @@ public class Order {
 
     private boolean riderPayoutSettled = false; // Indicates if rider payout has been processed by admin
 
+    // Dispute & Admin Override Fields
+    private boolean disputed = false;
+
+    private String disputeReason;
+
+    private String disputeStatus = "NONE"; // "NONE", "OPEN", "RESOLVED", "REJECTED"
+
+    private Instant disputeReportedAt;
+
+    private String adminNotes;
+
+    private String disputeResolutionAction; // "REFUND", "REASSIGN", "DISMISS", "FORCE_CANCEL"
+
     @Indexed(expireAfterSeconds = 7776000) // TTL index: auto-delete after 90 days (90 * 24 * 3600 seconds)
     private Instant ttlExpiryDate;
 

@@ -360,4 +360,37 @@ public class OrderService {
                 order.getDeliveredAt()
         );
     }
+
+    public OrderResponse reportDispute(String orderId, String customerEmail, com.neighborplates.dto.request.ReportDisputeRequest request) {
+        User customer = userRepository.findByEmail(customerEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+
+        if (!order.getCustomerId().equals(customer.getId())) {
+            throw new UnauthorizedException("You can only report disputes for your own orders");
+        }
+
+        order.setDisputed(true);
+        order.setDisputeReason(request.getReason() + (request.getDetails() != null && !request.getDetails().isBlank() ? ": " + request.getDetails() : ""));
+        order.setDisputeStatus("OPEN");
+        order.setDisputeReportedAt(Instant.now());
+        order.setUpdatedAt(Instant.now());
+
+        Order saved = orderRepository.save(order);
+
+        User cook = userRepository.findById(saved.getCookId()).orElse(null);
+        User rider = saved.getRiderId() != null ? userRepository.findById(saved.getRiderId()).orElse(null) : null;
+
+        // Notify admins / real-time trigger
+        firebaseNotificationService.updateOrderTrackingStatus(saved.getId(), "DISPUTED");
+
+        return mapToOrderResponse(
+                saved,
+                customer.getProfile() != null ? customer.getProfile().getName() : "Customer",
+                cook != null && cook.getProfile() != null ? cook.getProfile().getName() : "Cook",
+                rider != null && rider.getProfile() != null ? rider.getProfile().getName() : null
+        );
+    }
 }

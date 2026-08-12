@@ -294,4 +294,162 @@ public class AdminService {
                 0
         );
     }
+
+    public com.neighborplates.dto.response.LiveOperationsSummaryResponse getLiveOperationsSummary() {
+        List<OrderStatus> activeStatuses = List.of(
+                OrderStatus.PLACED,
+                OrderStatus.ACCEPTED,
+                OrderStatus.PREPARING,
+                OrderStatus.READY,
+                OrderStatus.DELIVERING
+        );
+
+        List<Order> activeOrders = orderRepository.findByStatusInOrderByCreatedAtDesc(activeStatuses);
+        // Fetch ALL disputed orders regardless of status (includes disputes on delivered/cancelled orders)
+        List<Order> disputedOrders = orderRepository.findByDisputedTrueOrderByDisputeReportedAtDesc();
+
+        // All RIDER users (no strict riderVerified filter so demo riders also appear)
+        List<User> riders = userRepository.findByRole(UserRole.RIDER);
+        List<User> availableRiders = riders.stream()
+                .filter(r -> Boolean.TRUE.equals(r.getActive()))
+                .collect(Collectors.toList());
+
+        List<com.neighborplates.dto.response.LiveOperationsSummaryResponse.OrderOperationalDetail> operationalDetails = new ArrayList<>();
+
+        long delayedCount = 0;
+        java.time.Instant now = java.time.Instant.now();
+
+        // Build a set of order IDs already in activeOrders for deduplication
+        java.util.Set<String> activeOrderIds = new java.util.HashSet<>();
+
+        for (Order o : activeOrders) {
+            activeOrderIds.add(o.getId());
+            User customer = userRepository.findById(o.getCustomerId()).orElse(null);
+            User cook = userRepository.findById(o.getCookId()).orElse(null);
+            User rider = o.getRiderId() != null ? userRepository.findById(o.getRiderId()).orElse(null) : null;
+
+            boolean isDelayed = false;
+            String delayReason = null;
+
+            long minutesSinceCreated = java.time.Duration.between(o.getCreatedAt(), now).toMinutes();
+
+            if (o.getStatus() == OrderStatus.PLACED && minutesSinceCreated > 15) {
+                isDelayed = true;
+                delayReason = "Cook acceptance delayed (>15 mins)";
+            } else if (o.getStatus() == OrderStatus.PREPARING && minutesSinceCreated > 30) {
+                isDelayed = true;
+                delayReason = "Meal preparation delayed (>30 mins)";
+            } else if (o.getStatus() == OrderStatus.READY && o.getRiderId() == null && minutesSinceCreated > 10) {
+                isDelayed = true;
+                delayReason = "Unassigned delivery rider (>10 mins)";
+            }
+
+            if (isDelayed) delayedCount++;
+
+            operationalDetails.add(new com.neighborplates.dto.response.LiveOperationsSummaryResponse.OrderOperationalDetail(
+                    o,
+                    customer != null && customer.getProfile() != null ? customer.getProfile().getName() : "Customer",
+                    customer != null && customer.getProfile() != null ? customer.getProfile().getPhone() : null,
+                    cook != null && cook.getProfile() != null ? cook.getProfile().getName() : "Cook",
+                    cook != null && cook.getProfile() != null ? cook.getProfile().getPhone() : null,
+                    rider != null && rider.getProfile() != null ? rider.getProfile().getName() : null,
+                    rider != null && rider.getProfile() != null ? rider.getProfile().getPhone() : null,
+                    isDelayed,
+                    delayReason
+            ));
+        }
+
+        // Also add disputed orders that are NOT already in active orders list
+        for (Order o : disputedOrders) {
+            if (activeOrderIds.contains(o.getId())) continue; // skip duplicates
+            if (!"OPEN".equalsIgnoreCase(o.getDisputeStatus())) continue; // only open disputes
+            User customer = userRepository.findById(o.getCustomerId()).orElse(null);
+            User cook = userRepository.findById(o.getCookId()).orElse(null);
+            User rider = o.getRiderId() != null ? userRepository.findById(o.getRiderId()).orElse(null) : null;
+            operationalDetails.add(new com.neighborplates.dto.response.LiveOperationsSummaryResponse.OrderOperationalDetail(
+                    o,
+                    customer != null && customer.getProfile() != null ? customer.getProfile().getName() : "Customer",
+                    customer != null && customer.getProfile() != null ? customer.getProfile().getPhone() : null,
+                    cook != null && cook.getProfile() != null ? cook.getProfile().getName() : "Cook",
+                    cook != null && cook.getProfile() != null ? cook.getProfile().getPhone() : null,
+                    rider != null && rider.getProfile() != null ? rider.getProfile().getName() : null,
+                    rider != null && rider.getProfile() != null ? rider.getProfile().getPhone() : null,
+                    false,
+                    null
+            ));
+        }
+
+        long openDisputesCount = disputedOrders.stream()
+                .filter(o -> "OPEN".equalsIgnoreCase(o.getDisputeStatus()))
+                .count();
+
+        return new com.neighborplates.dto.response.LiveOperationsSummaryResponse(
+                activeOrders.size(),
+                delayedCount,
+                openDisputesCount,
+                operationalDetails,
+                availableRiders
+        );
+    }
+
+    public Order reassignOrderRider(String orderId, String newRiderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+
+        User newRider = userRepository.findById(newRiderId)
+                .orElseThrow(() -> new ResourceNotFoundException("New rider user not found"));
+
+        if (newRider.getRole() != UserRole.RIDER) {
+            throw new IllegalArgumentException("Target user is not registered as a rider");
+        }
+
+        order.setRiderId(newRider.getId());
+        if (order.getStatus() == OrderStatus.READY) {
+            order.setStatus(OrderStatus.DELIVERING);
+            order.setPickedUpAt(java.time.Instant.now());
+        }
+        String riderName = newRider.getProfile() != null ? newRider.getProfile().getName() : newRider.getEmail();
+        order.setAdminNotes("Rider manually re-assigned to " + riderName + " by Admin");
+        order.setUpdatedAt(java.time.Instant.now());
+
+        return orderRepository.save(order);
+    }
+
+    public Order resolveOrderDispute(String orderId, com.neighborplates.dto.request.ResolveDisputeRequest request) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+
+        String action = request.getAction();
+        order.setDisputeResolutionAction(action);
+        order.setAdminNotes(request.getAdminNotes());
+
+        if ("REFUND".equalsIgnoreCase(action) || "FORCE_CANCEL".equalsIgnoreCase(action)) {
+            order.setStatus(OrderStatus.CANCELLED);
+            order.setDisputeStatus("RESOLVED");
+        } else if ("REASSIGN".equalsIgnoreCase(action) && request.getNewRiderId() != null) {
+            reassignOrderRider(orderId, request.getNewRiderId());
+            order.setDisputeStatus("RESOLVED");
+        } else if ("DISMISS".equalsIgnoreCase(action)) {
+            order.setDisputeStatus("REJECTED");
+        } else {
+            order.setDisputeStatus("RESOLVED");
+        }
+
+        order.setUpdatedAt(java.time.Instant.now());
+        return orderRepository.save(order);
+    }
+
+    public Order forceUpdateOrderStatus(String orderId, OrderStatus status, String adminNotes) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+
+        order.setStatus(status);
+        if (status == OrderStatus.DELIVERED && order.getDeliveredAt() == null) {
+            order.setDeliveredAt(java.time.Instant.now());
+        }
+        order.setAdminNotes("Status force updated to " + status + ". Notes: " + (adminNotes != null ? adminNotes : "None"));
+        order.setUpdatedAt(java.time.Instant.now());
+
+        return orderRepository.save(order);
+    }
 }

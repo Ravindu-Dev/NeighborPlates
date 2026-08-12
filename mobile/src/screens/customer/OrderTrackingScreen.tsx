@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Alert, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Alert, TouchableOpacity, Platform, Modal } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
 import { api } from '../../services/api';
@@ -123,6 +123,34 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
   const [commentError, setCommentError] = useState('');
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewed, setReviewed] = useState(false);
+
+  // Dispute inputs
+  const [disputeModalVisible, setDisputeModalVisible] = useState(false);
+  const [disputeReason, setDisputeReason] = useState('Late Delivery');
+  const [disputeDetails, setDisputeDetails] = useState('');
+  const [disputeSubmitting, setDisputeSubmitting] = useState(false);
+
+  const handleReportDisputeSubmit = async () => {
+    if (!disputeReason) {
+      Alert.alert('Error', 'Please select or enter a dispute reason.');
+      return;
+    }
+    setDisputeSubmitting(true);
+    try {
+      await api.post(`/api/orders/${orderId}/dispute`, {
+        reason: disputeReason,
+        details: disputeDetails,
+      });
+      Alert.alert('Dispute Escalated', 'Your dispute has been logged and sent to Admin Command Center for resolution.');
+      setDisputeModalVisible(false);
+      setDisputeDetails('');
+      fetchOrder();
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to submit dispute');
+    } finally {
+      setDisputeSubmitting(false);
+    }
+  };
 
   const fetchOrder = async () => {
     try {
@@ -342,7 +370,85 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
             />
           </View>
         ) : null}
+        {/* Report Dispute Button */}
+        <View className="mb-12">
+          {order?.disputed ? (
+            <View className="bg-red-50 p-4 rounded-2xl border border-red-200 flex-row items-center">
+              <Feather name="shield" size={16} color="#DC2626" />
+              <Text className="text-red-700 text-xs font-bold ml-2">
+                Dispute logged with Admin Command Center. (Status: {order.disputeStatus || 'OPEN'})
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={() => setDisputeModalVisible(true)}
+              className="py-3 px-4 rounded-2xl bg-gray-100 border border-gray-200 flex-row justify-center items-center"
+            >
+              <Feather name="alert-circle" size={14} color="#6B7280" />
+              <Text className="text-textSecondary text-xs font-bold ml-2">Need help? Report an Order Issue</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </ScrollView>
+
+      {/* Customer Dispute Modal */}
+      <Modal visible={disputeModalVisible} transparent animationType="slide">
+        <View className="flex-1 bg-black/60 justify-end">
+          <View className="bg-white rounded-t-3xl p-6 border-t border-gray-100">
+            <View className="flex-row justify-between items-center mb-3">
+              <Text className="text-textPrimary font-black text-lg">Report Order Issue</Text>
+              <TouchableOpacity onPress={() => setDisputeModalVisible(false)}>
+                <Feather name="x" size={20} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <Text className="text-textMuted text-xs mb-4">
+              Having trouble with Order #{order?.orderNumber}? Submit an issue to notify platform Admin support.
+            </Text>
+
+            <Text className="text-textPrimary font-bold text-xs uppercase mb-2">Issue Reason</Text>
+            <View className="flex-row flex-wrap gap-2 mb-4">
+              {['Late Delivery', 'Missing Items', 'Cold Food', 'Rider Issue', 'Other'].map((r) => (
+                <TouchableOpacity
+                  key={r}
+                  onPress={() => setDisputeReason(r)}
+                  className={`px-3 py-2 rounded-xl border ${
+                    disputeReason === r ? 'bg-primary/10 border-primary' : 'bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <Text
+                    className={`text-xs font-bold ${
+                      disputeReason === r ? 'text-primary' : 'text-textMuted'
+                    }`}
+                  >
+                    {r}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TextInput
+              label="ADDITIONAL DETAILS (OPTIONAL)"
+              placeholder="Describe what went wrong with your order..."
+              value={disputeDetails}
+              onChangeText={setDisputeDetails}
+              multiline
+              numberOfLines={3}
+            />
+
+            <View className="flex-row gap-3 mt-4">
+              <Button title="CANCEL" onPress={() => setDisputeModalVisible(false)} variant="outline" className="flex-1" />
+              <Button
+                title="SUBMIT DISPUTE"
+                onPress={handleReportDisputeSubmit}
+                loading={disputeSubmitting}
+                variant="primary"
+                className="flex-1"
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

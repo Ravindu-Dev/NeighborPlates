@@ -55,4 +55,13 @@ public class OrderController {
         OrderResponse response = orderService.acceptOrderAsRider(principal.getName(), id);
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/{id}/dispute")
+    public ResponseEntity<OrderResponse> reportDispute(
+            @PathVariable String id,
+            @Valid @RequestBody com.neighborplates.dto.request.ReportDisputeRequest request,
+            Principal principal) {
+        OrderResponse response = orderService.reportDispute(id, principal.getName(), request);
+        return ResponseEntity.ok(response);
+    }
 }
