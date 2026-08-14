@@ -255,7 +255,12 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
                     ))}
                   </View>
                 </View>
-                <Text className="text-textSecondary text-xs leading-relaxed font-medium">{item.comment}</Text>
+                {item.comment ? (
+                  <Text className="text-textSecondary text-xs leading-relaxed font-medium mb-1">{item.comment}</Text>
+                ) : null}
+                {item.photoUrl ? (
+                  <Image source={{ uri: item.photoUrl }} className="w-full h-40 rounded-xl mt-2 bg-gray-50" resizeMode="cover" />
+                ) : null}
               </View>
             ))
           ) : (

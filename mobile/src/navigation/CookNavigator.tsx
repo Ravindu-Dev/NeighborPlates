@@ -40,56 +40,73 @@ const TabIcon = ({
   </View>
 );
 
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { CookReviewsScreen } from '../screens/cook/CookReviewsScreen';
+
+export type CookStackParamList = {
+  CookTabs: undefined;
+  CookReviews: undefined;
+};
+
+const Stack = createNativeStackNavigator<CookStackParamList>();
+
+const CookTabNavigator = () => (
+  <Tab.Navigator
+    screenOptions={{
+      headerShown: false,
+      tabBarShowLabel: false,
+      tabBarActiveTintColor: '#2D6A4F',
+      tabBarInactiveTintColor: '#9CA3AF',
+      tabBarStyle: {
+        backgroundColor: '#FFFFFF',
+        borderTopWidth: 0,
+        height: Platform.OS === 'ios' ? 88 : 68,
+        paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+        paddingTop: 4,
+        elevation: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 12,
+      },
+    }}
+  >
+    <Tab.Screen
+      name="Dashboard"
+      component={CookDashboardScreen}
+      options={{
+        tabBarIcon: ({ focused }) => <TabIcon iconName="home" label="Dashboard" focused={focused} />,
+      }}
+    />
+    <Tab.Screen
+      name="AddListing"
+      component={CreateListingScreen}
+      options={{
+        tabBarIcon: ({ focused }) => <TabIcon iconName="edit-3" label="Add Meal" focused={focused} />,
+      }}
+    />
+    <Tab.Screen
+      name="Orders"
+      component={CookOrdersScreen}
+      options={{
+        tabBarIcon: ({ focused }) => <TabIcon iconName="package" label="Orders" focused={focused} />,
+      }}
+    />
+    <Tab.Screen
+      name="Profile"
+      component={CookProfileScreen}
+      options={{
+        tabBarIcon: ({ focused }) => <TabIcon iconName="user" label="Profile" focused={focused} />,
+      }}
+    />
+  </Tab.Navigator>
+);
+
 export const CookNavigator = () => {
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarShowLabel: false,
-        tabBarActiveTintColor: '#2D6A4F',
-        tabBarInactiveTintColor: '#9CA3AF',
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopWidth: 0,
-          height: Platform.OS === 'ios' ? 88 : 68,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-          paddingTop: 4,
-          elevation: 20,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.06,
-          shadowRadius: 12,
-        },
-      }}
-    >
-      <Tab.Screen
-        name="Dashboard"
-        component={CookDashboardScreen}
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon iconName="home" label="Dashboard" focused={focused} />,
-        }}
-      />
-      <Tab.Screen
-        name="AddListing"
-        component={CreateListingScreen}
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon iconName="edit-3" label="Add Meal" focused={focused} />,
-        }}
-      />
-      <Tab.Screen
-        name="Orders"
-        component={CookOrdersScreen}
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon iconName="package" label="Orders" focused={focused} />,
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={CookProfileScreen}
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon iconName="user" label="Profile" focused={focused} />,
-        }}
-      />
-    </Tab.Navigator>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="CookTabs" component={CookTabNavigator} />
+      <Stack.Screen name="CookReviews" component={CookReviewsScreen} />
+    </Stack.Navigator>
   );
 };

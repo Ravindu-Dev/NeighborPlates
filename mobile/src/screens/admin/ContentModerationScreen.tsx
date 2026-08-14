@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, ActivityIndicator, Alert, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, Alert, TouchableOpacity, RefreshControl, Image } from 'react-native';
 import { api } from '../../services/api';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
@@ -7,7 +7,7 @@ import { Button } from '../../components/common/Button';
 import { Feather } from '@expo/vector-icons';
 
 export const ContentModerationScreen: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'meals' | 'reviews'>('meals');
+  const [activeTab, setActiveTab] = useState<'meals' | 'flagged' | 'all'>('meals');
   const [meals, setMeals] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,11 +25,12 @@ export const ContentModerationScreen: React.FC = () => {
 
   const fetchReviews = async () => {
     try {
-      const response = await api.get('/api/admin/reviews?flagged=true');
+      const url = activeTab === 'flagged' ? '/api/admin/reviews?flagged=true' : '/api/admin/reviews';
+      const response = await api.get(url);
       setReviews(response.data);
     } catch (error) {
       console.error('Error fetching reviews:', error);
-      Alert.alert('Error', 'Failed to fetch flagged reviews.');
+      Alert.alert('Error', 'Failed to fetch reviews.');
     }
   };
 
@@ -115,16 +116,24 @@ export const ContentModerationScreen: React.FC = () => {
           onPress={() => setActiveTab('meals')}
           className={`flex-1 py-4 items-center border-b-2 ${activeTab === 'meals' ? 'border-primary' : 'border-transparent'}`}
         >
-          <Text className={`font-bold text-sm ${activeTab === 'meals' ? 'text-primary' : 'text-textSecondary'}`}>
-            Meal Listings ({meals.length})
+          <Text className={`font-bold text-xs ${activeTab === 'meals' ? 'text-primary' : 'text-textSecondary'}`}>
+            Meals ({meals.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={() => setActiveTab('reviews')}
-          className={`flex-1 py-4 items-center border-b-2 ${activeTab === 'reviews' ? 'border-primary' : 'border-transparent'}`}
+          onPress={() => setActiveTab('flagged')}
+          className={`flex-1 py-4 items-center border-b-2 ${activeTab === 'flagged' ? 'border-primary' : 'border-transparent'}`}
         >
-          <Text className={`font-bold text-sm ${activeTab === 'reviews' ? 'text-primary' : 'text-textSecondary'}`}>
-            Flagged Reviews ({reviews.length})
+          <Text className={`font-bold text-xs ${activeTab === 'flagged' ? 'text-primary' : 'text-textSecondary'}`}>
+            Flagged Reviews
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveTab('all')}
+          className={`flex-1 py-4 items-center border-b-2 ${activeTab === 'all' ? 'border-primary' : 'border-transparent'}`}
+        >
+          <Text className={`font-bold text-xs ${activeTab === 'all' ? 'text-primary' : 'text-textSecondary'}`}>
+            All Reviews
           </Text>
         </TouchableOpacity>
       </View>
@@ -189,46 +198,64 @@ export const ContentModerationScreen: React.FC = () => {
           }
           ListEmptyComponent={
             <View className="flex-1 justify-center items-center py-20">
-              <Feather name="check-circle" size={48} color="#10B981" />
-              <Text className="text-textSecondary text-sm font-semibold mt-4">No flagged reviews</Text>
+              <Feather name={activeTab === 'flagged' ? "check-circle" : "message-square"} size={48} color={activeTab === 'flagged' ? "#10B981" : "#9CA3AF"} />
+              <Text className="text-textSecondary text-sm font-semibold mt-4">
+                {activeTab === 'flagged' ? 'No flagged reviews' : 'No reviews left yet'}
+              </Text>
             </View>
           }
           renderItem={({ item }) => (
-            <Card className="mb-4 border-l-4 border-l-red-500">
+            <Card className={`mb-4 border-l-4 ${item.flagged ? 'border-l-red-500' : 'border-l-gray-300'}`}>
               <View className="flex-row justify-between items-start mb-2">
-                <View>
+                <View className="flex-1 mr-2">
                   <Text className="text-textPrimary font-extrabold text-sm">{item.customerName}</Text>
                   <Text className="text-amber-500 text-xs mt-0.5 font-bold">{renderStars(item.rating)}</Text>
                 </View>
-                <Badge label="Reported" variant="error" />
+                <Badge label={item.flagged ? "Flagged" : "Active"} variant={item.flagged ? "error" : "success"} />
               </View>
 
-              <Text className="text-textSecondary text-xs mt-1">
-                "{item.comment}"
-              </Text>
+              {item.comment ? (
+                <Text className="text-textSecondary text-xs mt-1 leading-relaxed">
+                  "{item.comment}"
+                </Text>
+              ) : (
+                <Text className="text-textMuted text-xs mt-1 italic">
+                  No comment description
+                </Text>
+              )}
 
-              <View className="bg-red-50 p-2.5 rounded-xl border border-red-100 mt-3">
-                <View className="flex-row items-center">
-                  <Feather name="alert-triangle" size={12} color="#EF4444" />
-                  <Text className="text-red-700 font-extrabold text-[10px] uppercase ml-1.5 tracking-wider">Report Reason</Text>
+              {item.photoUrl ? (
+                <View className="rounded-xl h-36 overflow-hidden bg-gray-50 border border-gray-150 mt-3">
+                  <Image source={{ uri: item.photoUrl }} className="w-full h-full" resizeMode="cover" />
                 </View>
-                <Text className="text-red-600 text-xs mt-1 font-medium">{item.flaggedReason || 'Unspecified reason'}</Text>
-              </View>
+              ) : null}
+
+              {item.flagged && (
+                <View className="bg-red-50 p-2.5 rounded-xl border border-red-100 mt-3">
+                  <View className="flex-row items-center">
+                    <Feather name="alert-triangle" size={12} color="#EF4444" />
+                    <Text className="text-red-700 font-extrabold text-[10px] uppercase ml-1.5 tracking-wider">Report Reason</Text>
+                  </View>
+                  <Text className="text-red-600 text-xs mt-1 font-medium">{item.flaggedReason || 'Unspecified reason'}</Text>
+                </View>
+              )}
 
               <View className="flex-row justify-between mt-4">
-                <Button
-                  title="DISMISS FLAG"
-                  onPress={() => handleDismissFlag(item.id)}
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 mr-2"
-                />
+                {item.flagged ? (
+                  <Button
+                    title="DISMISS FLAG"
+                    onPress={() => handleDismissFlag(item.id)}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 mr-2"
+                  />
+                ) : null}
                 <Button
                   title="DELETE REVIEW"
                   onPress={() => handleDeleteReview(item.id)}
                   variant="primary"
                   size="sm"
-                  className="flex-1 ml-2 bg-red-600 border-red-600"
+                  className={`flex-1 bg-red-600 border-red-600 ${item.flagged ? 'ml-2' : ''}`}
                 />
               </View>
             </Card>

@@ -78,6 +78,7 @@ public class ReviewService {
         review.setCustomerName(customer.getProfile().getName());
         review.setRating(request.getRating());
         review.setComment(request.getComment());
+        review.setPhotoUrl(request.getPhotoUrl());
         review.setCreatedAt(Instant.now());
 
         reviewRepository.save(review);
@@ -88,6 +89,7 @@ public class ReviewService {
                 customer.getProfile().getName(),
                 request.getRating(),
                 request.getComment(),
+                request.getPhotoUrl(),
                 Instant.now()
         );
 
@@ -126,5 +128,13 @@ public class ReviewService {
         review.setFlagged(true);
         review.setFlaggedReason(request.getReason());
         reviewRepository.save(review);
+    }
+
+    public List<Review> getReviewsByCook(String cookId) {
+        return reviewRepository.findByCookIdOrderByCreatedAtDesc(cookId);
+    }
+
+    public List<Review> getReviewsByOrderId(String orderId) {
+        return reviewRepository.findByOrderId(orderId);
     }
 }
