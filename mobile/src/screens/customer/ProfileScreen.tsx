@@ -1,15 +1,17 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ActivityIndicator, ScrollView,
-  TouchableOpacity, Modal, Alert, TextInput,
+  TouchableOpacity, Modal, Alert, TextInput, Image,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { pickImageFromGallery, uploadImageToImgBB } from '../../services/imageService';
 
 // Types
-type ActiveModal = 'addresses' | 'dietary' | 'wallet' | 'help' | 'orders' | null;
+type ActiveModal = 'addresses' | 'dietary' | 'wallet' | 'help' | 'orders' | 'editProfile' | null;
 
 const DIETARY_OPTIONS = [
   'Vegan', 'Vegetarian', 'Gluten-Free',
@@ -54,14 +56,27 @@ export const ProfileScreen: React.FC = () => {
   // FAQ accordion
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
+  // Edit Profile state
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [editAvatarUrl, setEditAvatarUrl] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+
   // Orders state
   const [orders, setOrders] = useState<any[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+
+  const { updateUserAvatar } = useAuthStore();
 
   const fetchProfile = async () => {
     try {
       const response = await api.get('/api/users/profile');
       setProfile(response.data);
+      if (response.data?.profile?.avatarUrl) {
+        updateUserAvatar(response.data.profile.avatarUrl);
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -95,6 +110,49 @@ export const ProfileScreen: React.FC = () => {
   const openModal = (modal: ActiveModal) => {
     setActiveModal(modal);
     if (modal === 'orders') fetchOrders();
+    if (modal === 'editProfile') {
+      setEditName(profile?.profile?.name || '');
+      setEditPhone(profile?.profile?.phone || '');
+      setEditBio(profile?.profile?.bio || '');
+      setEditAvatarUrl(profile?.profile?.avatarUrl || '');
+    }
+  };
+
+  const handlePickAvatar = async () => {
+    try {
+      const uri = await pickImageFromGallery();
+      if (!uri) return;
+      setUploadingAvatar(true);
+      const cdnUrl = await uploadImageToImgBB(uri);
+      setEditAvatarUrl(cdnUrl);
+    } catch (err: any) {
+      Alert.alert('Upload Error', err?.message || 'Could not upload image.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const saveProfile = async () => {
+    if (!editName.trim()) {
+      Alert.alert('Required', 'Name cannot be empty.');
+      return;
+    }
+    setEditSaving(true);
+    try {
+      await api.put('/api/users/profile', {
+        name: editName.trim(),
+        phone: editPhone.trim(),
+        bio: editBio.trim(),
+        avatarUrl: editAvatarUrl.trim(),
+      });
+      await fetchProfile();
+      setActiveModal(null);
+      Alert.alert('✅ Updated', 'Your profile has been saved!');
+    } catch (error) {
+      Alert.alert('Error', 'Could not update profile. Please try again.');
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const toggleDiet = (diet: string) =>
@@ -159,10 +217,23 @@ export const ProfileScreen: React.FC = () => {
     </TouchableOpacity>
   );
 
-  // Modal Wrapper with dynamic height fit and scrolling support
-  const ModalWrapper = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <Modal visible={activeModal !== null} transparent animationType="slide">
-      <View className="flex-1 justify-end bg-black/60">
+  // Modal Wrapper with dynamic height fit, keyboard avoiding, and scrolling support
+  const renderModalWrapper = (title: string, children: React.ReactNode) => (
+    <Modal
+      visible={activeModal !== null}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setActiveModal(null)}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        className="flex-1 justify-end bg-black/60"
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setActiveModal(null)}
+          className="flex-1"
+        />
         <View className="bg-white rounded-t-[32px] w-full max-h-[85%] border-t border-gray-150 flex-col">
           {/* Pull indicator */}
           <View className="items-center pt-3 pb-1">
@@ -181,77 +252,73 @@ export const ProfileScreen: React.FC = () => {
           </View>
           
           {/* Scroll container wrapper */}
-          <View className="flex-grow shrink min-h-0">
-            <ScrollView 
-              contentContainerStyle={{ padding: 24, paddingBottom: 48 }} 
-              showsVerticalScrollIndicator={false}
-            >
-              {children}
-            </ScrollView>
-          </View>
+          <ScrollView 
+            contentContainerStyle={{ padding: 24, paddingBottom: 48 }} 
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {children}
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 
-  // Orders List Modal
-  const OrdersModal = () => (
-    <ModalWrapper title="My Orders">
-      {ordersLoading ? (
-        <View className="py-12 items-center">
-          <ActivityIndicator size="large" color="#FF6B35" />
-          <Text className="text-textMuted text-xs mt-3">Loading orders...</Text>
-        </View>
-      ) : orders.length === 0 ? (
-        <View className="py-12 items-center">
-          <Text className="text-5xl mb-4">🍽️</Text>
-          <Text className="text-textPrimary font-bold text-base mb-1">No orders yet</Text>
-          <Text className="text-textMuted text-xs text-center px-6 leading-relaxed">
-            Place your first home-cooked order from the listings screen to see it tracked here!
-          </Text>
-        </View>
-      ) : (
-        <>
-          {orders.map((order) => {
-            const statusInfo = STATUS_STYLES[order.status] ?? STATUS_STYLES['PLACED'];
-            return (
-              <TouchableOpacity 
-                key={order.id} 
-                onPress={() => {
-                  setActiveModal(null);
-                  navigation.navigate('OrderTracking', { orderId: order.id });
-                }}
-                className="bg-white rounded-3xl border border-gray-150 p-4 mb-3.5 shadow-sm active:opacity-80"
-                activeOpacity={0.7}
-              >
-                <View className="flex-row items-center justify-between mb-2 pb-2 border-b border-gray-50">
-                  <Text className="text-textPrimary font-black text-xs">#{order.orderNumber || order.id.slice(-6).toUpperCase()}</Text>
-                  <View className={`rounded-full px-2.5 py-0.5 ${statusInfo.bg}`}>
-                    <Text className={`text-[9px] font-black uppercase ${statusInfo.text}`}>{statusInfo.label}</Text>
-                  </View>
+  // Modal content renderers
+  const renderOrdersContent = () => (
+    ordersLoading ? (
+      <View className="py-12 items-center">
+        <ActivityIndicator size="large" color="#FF6B35" />
+        <Text className="text-textMuted text-xs mt-3">Loading orders...</Text>
+      </View>
+    ) : orders.length === 0 ? (
+      <View className="py-12 items-center">
+        <Text className="text-5xl mb-4">🍽️</Text>
+        <Text className="text-textPrimary font-bold text-base mb-1">No orders yet</Text>
+        <Text className="text-textMuted text-xs text-center px-6 leading-relaxed">
+          Place your first home-cooked order from the listings screen to see it tracked here!
+        </Text>
+      </View>
+    ) : (
+      <>
+        {orders.map((order) => {
+          const statusInfo = STATUS_STYLES[order.status] ?? STATUS_STYLES['PLACED'];
+          return (
+            <TouchableOpacity 
+              key={order.id} 
+              onPress={() => {
+                setActiveModal(null);
+                navigation.navigate('OrderTracking', { orderId: order.id });
+              }}
+              className="bg-white rounded-3xl border border-gray-150 p-4 mb-3.5 shadow-sm active:opacity-80"
+              activeOpacity={0.7}
+            >
+              <View className="flex-row items-center justify-between mb-2 pb-2 border-b border-gray-50">
+                <Text className="text-textPrimary font-black text-xs">#{order.orderNumber || order.id.slice(-6).toUpperCase()}</Text>
+                <View className={`rounded-full px-2.5 py-0.5 ${statusInfo.bg}`}>
+                  <Text className={`text-[9px] font-black uppercase ${statusInfo.text}`}>{statusInfo.label}</Text>
                 </View>
-                <Text className="text-textSecondary text-xs mb-3 font-semibold" numberOfLines={2}>
-                  {order.items?.map((item: any) => `${item.name} ×${item.quantity}`).join(' • ')}
+              </View>
+              <Text className="text-textSecondary text-xs mb-3 font-semibold" numberOfLines={2}>
+                {order.items?.map((item: any) => `${item.name} ×${item.quantity}`).join(' • ')}
+              </Text>
+              <View className="flex-row justify-between items-center">
+                <Text className="text-textMuted text-[10px] font-bold">
+                  {new Date(order.createdAt).toLocaleDateString('en-LK', {
+                    day: 'numeric', month: 'short', year: 'numeric',
+                  })}
                 </Text>
-                <View className="flex-row justify-between items-center">
-                  <Text className="text-textMuted text-[10px] font-bold">
-                    {new Date(order.createdAt).toLocaleDateString('en-LK', {
-                      day: 'numeric', month: 'short', year: 'numeric',
-                    })}
-                  </Text>
-                  <Text className="text-primary font-black text-sm">LKR {order.totalAmount}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </>
-      )}
-    </ModalWrapper>
+                <Text className="text-primary font-black text-sm">LKR {order.totalAmount}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </>
+    )
   );
 
-  // Delivery Addresses Modal
-  const AddressesModal = () => (
-    <ModalWrapper title="Delivery Places">
+  const renderAddressesContent = () => (
+    <>
       {savedAddresses.map((addr, i) => (
         <View key={i} className="flex-row items-center justify-between bg-gray-50 rounded-2xl p-4 mb-3 border border-gray-200">
           <View className="flex-1 mr-3">
@@ -278,12 +345,11 @@ export const ProfileScreen: React.FC = () => {
           <Text className="text-white font-extrabold text-xs tracking-wider uppercase">+ SAVE NEW PLACE</Text>
         </TouchableOpacity>
       </View>
-    </ModalWrapper>
+    </>
   );
 
-  // Dietary preferences selection
-  const DietaryModal = () => (
-    <ModalWrapper title="Dietary Preferences">
+  const renderDietaryContent = () => (
+    <>
       <Text className="text-textSecondary text-xs mb-5 leading-relaxed font-medium">
         Select your dietary tags — we will filter the neighborhood menus to match your choices automatically.
       </Text>
@@ -311,12 +377,11 @@ export const ProfileScreen: React.FC = () => {
       >
         <Text className="text-white font-extrabold text-xs tracking-wider uppercase">SAVE PREFERENCES</Text>
       </TouchableOpacity>
-    </ModalWrapper>
+    </>
   );
 
-  // Wallet and payment references
-  const WalletModal = () => (
-    <ModalWrapper title="Wallet & Credits">
+  const renderWalletContent = () => (
+    <>
       <View className="bg-gradient-to-tr from-orange-500 to-amber-600 rounded-3xl p-6 mb-5 shadow-lg relative overflow-hidden">
         <View className="absolute w-32 h-32 rounded-full bg-white/10 -top-10 -right-10" />
         <View className="absolute w-24 h-24 rounded-full bg-white/5 bottom-0 left-5" />
@@ -349,12 +414,11 @@ export const ProfileScreen: React.FC = () => {
       >
         <Text className="text-textSecondary font-bold text-xs">+ Add payment card</Text>
       </TouchableOpacity>
-    </ModalWrapper>
+    </>
   );
 
-  // FAQ Modal
-  const HelpModal = () => (
-    <ModalWrapper title="Help Center">
+  const renderHelpContent = () => (
+    <>
       <Text className="text-textSecondary text-xs font-bold uppercase tracking-wider mb-4">FAQ Support</Text>
       {FAQ_ITEMS.map((item, i) => {
         const isOpen = expandedFaq === i;
@@ -385,7 +449,79 @@ export const ProfileScreen: React.FC = () => {
         <Feather name="mail" size={14} color="#FF6B35" />
         <Text className="text-primary font-extrabold text-xs uppercase tracking-wide">Write Support Ticket</Text>
       </TouchableOpacity>
-    </ModalWrapper>
+    </>
+  );
+
+  const renderEditProfileContent = () => (
+    <>
+      {/* Profile Photo Selector */}
+      <View className="items-center mb-6">
+        <TouchableOpacity
+          onPress={handlePickAvatar}
+          disabled={uploadingAvatar}
+          className="relative"
+          activeOpacity={0.8}
+        >
+          <View className="w-24 h-24 rounded-full bg-orange-100 border-2 border-primary/30 items-center justify-center overflow-hidden shadow-sm">
+            {uploadingAvatar ? (
+              <ActivityIndicator size="small" color="#FF6B35" />
+            ) : editAvatarUrl ? (
+              <Image source={{ uri: editAvatarUrl }} className="w-full h-full" resizeMode="cover" />
+            ) : (
+              <Text className="text-primary-dark font-black text-3xl">{getInitials(editName)}</Text>
+            )}
+          </View>
+          <View className="absolute bottom-0 right-0 bg-primary rounded-full p-2 border-2 border-white shadow-xs">
+            <Feather name="camera" size={13} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
+        <Text className="text-textSecondary text-[10px] font-semibold mt-2">
+          {uploadingAvatar ? 'Uploading photo...' : 'Tap camera icon to change photo'}
+        </Text>
+      </View>
+
+      <Text className="text-textSecondary text-[10px] font-black uppercase tracking-wider mb-2">Full Name</Text>
+      <TextInput
+        value={editName}
+        onChangeText={setEditName}
+        placeholder="Your full name"
+        placeholderTextColor="#9CA3AF"
+        className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs text-textPrimary mb-4 font-semibold"
+      />
+
+      <Text className="text-textSecondary text-[10px] font-black uppercase tracking-wider mb-2">Phone Number</Text>
+      <TextInput
+        value={editPhone}
+        onChangeText={setEditPhone}
+        placeholder="e.g. +94 77 123 4567"
+        placeholderTextColor="#9CA3AF"
+        keyboardType="phone-pad"
+        className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs text-textPrimary mb-4 font-semibold"
+      />
+
+      <Text className="text-textSecondary text-[10px] font-black uppercase tracking-wider mb-2">Bio</Text>
+      <TextInput
+        value={editBio}
+        onChangeText={setEditBio}
+        placeholder="Tell neighbors a little about yourself..."
+        placeholderTextColor="#9CA3AF"
+        multiline
+        numberOfLines={3}
+        className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs text-textPrimary mb-6 font-semibold"
+        style={{ textAlignVertical: 'top', minHeight: 72 }}
+      />
+
+      <TouchableOpacity
+        onPress={saveProfile}
+        disabled={editSaving}
+        className={`rounded-xl py-3.5 items-center shadow-md ${editSaving ? 'bg-gray-300' : 'bg-primary'}`}
+        activeOpacity={0.8}
+      >
+        <Text className="text-white font-extrabold text-xs tracking-wider uppercase">
+          {editSaving ? 'SAVING...' : 'SAVE CHANGES'}
+        </Text>
+      </TouchableOpacity>
+    </>
   );
 
   const activeOrdersCount = orders.filter(
@@ -395,11 +531,12 @@ export const ProfileScreen: React.FC = () => {
   return (
     <View className="flex-1 bg-surface-elevated relative">
       {/* Active Modals */}
-      {activeModal === 'orders'    && <OrdersModal />}
-      {activeModal === 'addresses' && <AddressesModal />}
-      {activeModal === 'dietary'   && <DietaryModal />}
-      {activeModal === 'wallet'    && <WalletModal />}
-      {activeModal === 'help'      && <HelpModal />}
+      {activeModal === 'orders'       && renderModalWrapper("My Orders", renderOrdersContent())}
+      {activeModal === 'addresses'    && renderModalWrapper("Delivery Places", renderAddressesContent())}
+      {activeModal === 'dietary'      && renderModalWrapper("Dietary Preferences", renderDietaryContent())}
+      {activeModal === 'wallet'       && renderModalWrapper("Wallet & Credits", renderWalletContent())}
+      {activeModal === 'help'         && renderModalWrapper("Help Center", renderHelpContent())}
+      {activeModal === 'editProfile'  && renderModalWrapper("Edit Profile", renderEditProfileContent())}
 
       {/* Liquid Background Blobs */}
       <View className="absolute w-72 h-72 rounded-full bg-primary/5 -top-20 -left-20 blur-3xl opacity-40" />
@@ -418,13 +555,34 @@ export const ProfileScreen: React.FC = () => {
       >
         {/* Profile Card */}
         <View className="bg-white rounded-3xl p-5 mb-5 shadow-sm border border-gray-100 items-center relative overflow-hidden">
-          <View className="w-16 h-16 rounded-full bg-orange-100 border border-orange-200 items-center justify-center shadow-inner mb-3">
-            <Text className="text-primary-dark font-black text-xl">{getInitials(profile?.profile?.name)}</Text>
+          {/* Edit button — top right corner */}
+          <TouchableOpacity
+            onPress={() => openModal('editProfile')}
+            className="absolute top-4 right-4 bg-primary/10 rounded-full w-8 h-8 items-center justify-center border border-primary/20"
+            activeOpacity={0.7}
+          >
+            <Feather name="edit-2" size={13} color="#FF6B35" />
+          </TouchableOpacity>
+
+          <View className="w-16 h-16 rounded-full bg-orange-100 border border-orange-200 items-center justify-center shadow-inner mb-3 overflow-hidden">
+            {profile?.profile?.avatarUrl ? (
+              <Image source={{ uri: profile.profile.avatarUrl }} className="w-full h-full" resizeMode="cover" />
+            ) : (
+              <Text className="text-primary-dark font-black text-xl">{getInitials(profile?.profile?.name)}</Text>
+            )}
           </View>
           <Text className="font-extrabold text-lg text-textPrimary mb-1">
             {profile?.profile?.name || 'Neighbor'}
           </Text>
-          <Text className="text-textSecondary text-xs mb-4 font-semibold">{profile?.email}</Text>
+          {profile?.profile?.phone ? (
+            <Text className="text-textSecondary text-[10px] font-semibold mb-1">{profile.profile.phone}</Text>
+          ) : null}
+          <Text className="text-textSecondary text-xs mb-3 font-semibold">{profile?.email}</Text>
+          {profile?.profile?.bio ? (
+            <Text className="text-textMuted text-[10px] text-center leading-relaxed mb-3 font-medium px-2" numberOfLines={2}>
+              {profile.profile.bio}
+            </Text>
+          ) : null}
           <View className="border border-primary/20 rounded-full px-3 py-1 flex-row items-center bg-primary/5 gap-1 shadow-xs">
             <Ionicons name="shield-checkmark" size={10} color="#FF6B35" />
             <Text className="font-black text-[8px] uppercase tracking-wider text-primary">👑 Premium Gourmet</Text>
