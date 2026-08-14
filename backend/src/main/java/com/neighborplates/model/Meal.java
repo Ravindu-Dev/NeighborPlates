@@ -73,6 +73,7 @@ public class Meal {
         private String userName;
         private int rating;
         private String comment;
+        private String photoUrl;
         private Instant createdAt = Instant.now();
     }
 }

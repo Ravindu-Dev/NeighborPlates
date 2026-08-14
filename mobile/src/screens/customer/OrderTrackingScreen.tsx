@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Alert, TouchableOpacity, Platform, Modal } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Alert, TouchableOpacity, Platform, Modal, Image } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
 import { api } from '../../services/api';
 import { Button } from '../../components/common/Button';
 import { TextInput } from '../../components/common/TextInput';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
+import { pickImageFromGallery, uploadImageToImgBB } from '../../services/imageService';
 
 let WebView: any = null;
 if (Platform.OS !== 'web') {
@@ -123,6 +124,10 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
   const [commentError, setCommentError] = useState('');
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewed, setReviewed] = useState(false);
+  const [reviewedMealIds, setReviewedMealIds] = useState<string[]>([]);
+  const [selectedMealIndex, setSelectedMealIndex] = useState(0);
+  const [reviewPhotoUrl, setReviewPhotoUrl] = useState('');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // Dispute inputs
   const [disputeModalVisible, setDisputeModalVisible] = useState(false);
@@ -158,16 +163,27 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
       const target = response.data.find((o: any) => o.id === orderId);
       setOrder(target);
 
-      if (target && target.cookId && !cookCoords) {
+      if (target) {
+        // Fetch existing reviews for this order
         try {
-          const cookRes = await api.get(`/api/users/cooks/${target.cookId}`);
-          if (cookRes.data && cookRes.data.profile && cookRes.data.profile.location) {
-            setCookCoords(cookRes.data.profile.location.coordinates);
+          const reviewsRes = await api.get(`/api/reviews/order/${orderId}`);
+          const reviewedIds = reviewsRes.data.map((r: any) => r.mealId);
+          setReviewedMealIds(reviewedIds);
+        } catch (err) {
+          console.warn("Failed fetching order reviews:", err);
+        }
+
+        if (target.cookId && !cookCoords) {
+          try {
+            const cookRes = await api.get(`/api/users/cooks/${target.cookId}`);
+            if (cookRes.data && cookRes.data.profile && cookRes.data.profile.location) {
+              setCookCoords(cookRes.data.profile.location.coordinates);
+            }
+          } catch (e) {
+            console.warn("Failed fetching cook coordinates:", e);
+            // Scatter fallback coordinates for demo
+            setCookCoords([79.865, 6.932]);
           }
-        } catch (e) {
-          console.warn("Failed fetching cook coordinates:", e);
-          // Scatter fallback coordinates for demo
-          setCookCoords([79.865, 6.932]);
         }
       }
     } catch (error) {
@@ -206,28 +222,153 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
     }
   };
 
-  const submitReview = async () => {
-    if (!comment.trim()) {
-      setCommentError('Comment is required to submit a review.');
-      return;
-    } else {
-      setCommentError('');
+  const handlePickReviewPhoto = async () => {
+    try {
+      const uri = await pickImageFromGallery();
+      if (!uri) return;
+      setUploadingPhoto(true);
+      const cdnUrl = await uploadImageToImgBB(uri);
+      setReviewPhotoUrl(cdnUrl);
+    } catch (err: any) {
+      Alert.alert('Upload Error', err?.message || 'Could not upload food image.');
+    } finally {
+      setUploadingPhoto(false);
     }
+  };
+
+  const submitReviewForMeal = async (mealId: string) => {
     setReviewSubmitting(true);
     try {
       await api.post('/api/reviews', {
         orderId: order.id,
-        mealId: order.items[0].mealId,
+        mealId: mealId,
         rating: rating,
-        comment: comment,
+        comment: comment.trim(),
+        photoUrl: reviewPhotoUrl,
       });
-      Alert.alert('Thank you!', 'Your feedback was successfully submitted.');
-      setReviewed(true);
+      Alert.alert('Thank you! 🎉', 'Your review has been shared with the kitchen.');
+      
+      // Reset inputs
+      setRating(5);
+      setComment('');
+      setReviewPhotoUrl('');
+      
+      // Refresh order reviews list
+      fetchOrder();
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to submit review.');
     } finally {
       setReviewSubmitting(false);
     }
+  };
+
+  const renderReviewForm = () => {
+    if (order?.status !== 'DELIVERED') return null;
+
+    const unreviewedItems = order?.items?.filter((item: any) => !reviewedMealIds.includes(item.mealId)) || [];
+    if (unreviewedItems.length === 0) {
+      return (
+        <View className="bg-emerald-50 border border-emerald-200 p-5 rounded-3xl mb-12 items-center">
+          <Text className="text-emerald-700 font-extrabold text-base mb-1">🎉 All Reviewed!</Text>
+          <Text className="text-emerald-600 text-xs text-center">
+            Thank you for sharing your feedback on all meals in this order!
+          </Text>
+        </View>
+      );
+    }
+
+    const currentItem = unreviewedItems[selectedMealIndex] || unreviewedItems[0];
+    if (!currentItem) return null;
+
+    return (
+      <View className="bg-white p-5 rounded-3xl border border-gray-150 shadow-sm mb-12">
+        <Text className="text-textPrimary font-bold text-base mb-1">Rate Your Meal</Text>
+        <Text className="text-textMuted text-xs mb-4">Share your feedback to support local home kitchens!</Text>
+
+        {/* Multi-item selector if applicable */}
+        {unreviewedItems.length > 1 && (
+          <View className="mb-5">
+            <Text className="text-textSecondary text-[9px] font-black uppercase tracking-wider mb-2">SELECT ITEM TO RATE</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2">
+              {unreviewedItems.map((item: any, idx: number) => {
+                const isSelected = (unreviewedItems[selectedMealIndex]?.mealId || unreviewedItems[0]?.mealId) === item.mealId;
+                return (
+                  <TouchableOpacity
+                    key={item.mealId}
+                    onPress={() => {
+                      setSelectedMealIndex(idx);
+                      setReviewPhotoUrl('');
+                    }}
+                    className={`px-3 py-2 rounded-xl border mr-2 ${isSelected ? 'bg-primary/10 border-primary' : 'bg-gray-50 border-gray-200'}`}
+                  >
+                    <Text className={`text-xs font-bold ${isSelected ? 'text-primary' : 'text-textMuted'}`}>
+                      {item.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
+        <Text className="text-textSecondary text-[10px] font-black uppercase mb-3">Rating for "{currentItem.name}"</Text>
+        
+        {/* Star Selector */}
+        <View className="flex-row justify-center mb-6">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <TouchableOpacity key={star} onPress={() => setRating(star)} className="px-2">
+              <Text className="text-3xl">{star <= rating ? "★" : "☆"}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Photo Selector */}
+        <View className="mb-4">
+          <Text className="text-textSecondary text-[10px] font-black uppercase mb-2">Food Photo (Optional)</Text>
+          <TouchableOpacity
+            onPress={handlePickReviewPhoto}
+            disabled={uploadingPhoto}
+            className="border border-dashed border-gray-300 bg-gray-50 rounded-2xl py-4 items-center justify-center relative overflow-hidden"
+            activeOpacity={0.8}
+          >
+            {uploadingPhoto ? (
+              <ActivityIndicator size="small" color="#FF6B35" />
+            ) : reviewPhotoUrl ? (
+              <View className="w-full h-32 items-center justify-center">
+                <Image source={{ uri: reviewPhotoUrl }} className="w-full h-full" resizeMode="contain" />
+                <TouchableOpacity
+                  onPress={() => setReviewPhotoUrl('')}
+                  className="absolute top-2 right-2 bg-red-500 rounded-full p-1.5"
+                >
+                  <Feather name="trash-2" size={12} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View className="flex-row items-center gap-2">
+                <Feather name="camera" size={16} color="#6B7280" />
+                <Text className="text-textSecondary font-bold text-xs">Add Food Photo</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <TextInput
+          label="REVIEW COMMENT (OPTIONAL)"
+          placeholder="Write a brief comment about food taste, portion sizes, packaging..."
+          value={comment}
+          onChangeText={setComment}
+          multiline
+          numberOfLines={3}
+        />
+        <Button
+          title={`SUBMIT REVIEW FOR ${currentItem.name.toUpperCase()}`}
+          onPress={() => submitReviewForMeal(currentItem.mealId)}
+          loading={reviewSubmitting}
+          variant="primary"
+          className="w-full mt-2"
+        />
+      </View>
+    );
   };
 
   return (
@@ -335,41 +476,9 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
             variant="outline"
             className="w-full mb-10 border-red-500 text-red-500"
           />
-        ) : order?.status === 'DELIVERED' && !reviewed ? (
-          <View className="bg-white p-5 rounded-3xl border border-gray-150 shadow-sm mb-12">
-            <Text className="text-textPrimary font-bold text-base mb-1">Rate Your Meal</Text>
-            <Text className="text-textMuted text-xs mb-4">Share your feedback to support local home cooks!</Text>
-            
-            {/* Star Selector */}
-            <View className="flex-row justify-center mb-6">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity key={star} onPress={() => setRating(star)} className="px-2">
-                  <Text className="text-3xl">{star <= rating ? "★" : "☆"}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <TextInput
-              label="REVIEW COMMENT *"
-              placeholder="Write a brief comment about food taste, portion sizes, packaging..."
-              value={comment}
-              onChangeText={(text) => {
-                setComment(text);
-                if (text.trim()) setCommentError('');
-              }}
-              error={commentError}
-              multiline
-              numberOfLines={3}
-            />
-            <Button
-              title="SUBMIT REVIEW"
-              onPress={submitReview}
-              loading={reviewSubmitting}
-              variant="primary"
-              className="w-full mt-2"
-            />
-          </View>
-        ) : null}
+        ) : (
+          renderReviewForm()
+        )}
         {/* Report Dispute Button */}
         <View className="mb-12">
           {order?.disputed ? (

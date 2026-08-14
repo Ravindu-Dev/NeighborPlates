@@ -192,13 +192,18 @@ export const CookDashboardScreen: React.FC = () => {
             value={`${(profile?.stats?.totalEarnings ?? 0).toLocaleString()}`}
             className="mr-2"
           />
-          <StatCard
-            icon="⭐"
-            label="RATING"
-            value={profile?.stats?.avgRating?.toFixed(1) ?? '0.0'}
-            valueColor="#FBBF24"
-            className="mr-2"
-          />
+          <TouchableOpacity
+            onPress={() => navigation.navigate('CookReviews')}
+            className="flex-1 mr-2"
+            activeOpacity={0.7}
+          >
+            <StatCard
+              icon="⭐"
+              label="RATING"
+              value={profile?.stats?.avgRating?.toFixed(1) ?? '0.0'}
+              valueColor="#FBBF24"
+            />
+          </TouchableOpacity>
           <StatCard
             icon="🍽️"
             label="ACTIVE MEALS"

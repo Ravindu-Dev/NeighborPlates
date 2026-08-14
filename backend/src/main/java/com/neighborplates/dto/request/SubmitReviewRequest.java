@@ -22,6 +22,7 @@ public class SubmitReviewRequest {
     @Max(value = 5, message = "Rating cannot exceed 5")
     private int rating;
 
-    @NotBlank(message = "Comment is required")
     private String comment;
+
+    private String photoUrl;
 }
