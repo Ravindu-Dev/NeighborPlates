@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { Text, View, Image } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { HomeScreen } from '../screens/customer/HomeScreen';
@@ -11,6 +11,7 @@ import { CheckoutScreen } from '../screens/customer/CheckoutScreen';
 import { PaymentScreen } from '../screens/customer/PaymentScreen';
 import { OrderTrackingScreen } from '../screens/customer/OrderTrackingScreen';
 import { useCartStore } from '../store/cartStore';
+import { useAuthStore } from '../store/authStore';
 
 import { Feather } from '@expo/vector-icons';
 
@@ -45,6 +46,7 @@ const Stack = createNativeStackNavigator<CustomerStackParamList>();
 
 const HomeTabNavigator = () => {
   const cartItemCount = useCartStore((state) => state.getItemCount());
+  const user = useAuthStore((state) => state.user);
 
   return (
     <Tab.Navigator
@@ -62,7 +64,28 @@ const HomeTabNavigator = () => {
           fontSize: 10,
           fontWeight: '700',
         },
-        tabBarIcon: ({ color, size }) => {
+        tabBarIcon: ({ color, size, focused }) => {
+          if (route.name === 'Profile' && user?.avatarUrl) {
+            return (
+              <View
+                style={{
+                  width: (size || 20) + 4,
+                  height: (size || 20) + 4,
+                  borderRadius: ((size || 20) + 4) / 2,
+                  borderWidth: focused ? 2 : 1,
+                  borderColor: focused ? '#FF6B35' : '#D1D5DB',
+                  overflow: 'hidden',
+                }}
+              >
+                <Image
+                  source={{ uri: user.avatarUrl }}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="cover"
+                />
+              </View>
+            );
+          }
+
           const icons: Record<string, keyof typeof Feather.glyphMap> = {
             Home: 'home',
             Search: 'search',

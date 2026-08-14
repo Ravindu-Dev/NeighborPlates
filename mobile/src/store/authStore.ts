@@ -7,6 +7,7 @@ interface User {
   name: string;
   email: string;
   role: 'CUSTOMER' | 'COOK' | 'ADMIN' | 'RIDER';
+  avatarUrl?: string;
 }
 
 interface AuthState {
@@ -16,6 +17,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  updateUserAvatar: (avatarUrl: string) => void;
   login: (request: any) => Promise<void>;
   register: (request: any) => Promise<void>;
   logout: () => Promise<void>;
@@ -32,6 +34,15 @@ export const useAuthStore = create<AuthState>((set) => ({
   error: null,
 
   clearError: () => set({ error: null }),
+
+  updateUserAvatar: (avatarUrl: string) => {
+    set((state) => {
+      if (!state.user) return state;
+      const updatedUser = { ...state.user, avatarUrl };
+      AsyncStorage.setItem('user', JSON.stringify(updatedUser)).catch(console.error);
+      return { user: updatedUser };
+    });
+  },
 
   login: async (request) => {
     set({ isLoading: true, error: null });
