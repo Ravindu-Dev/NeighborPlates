@@ -86,7 +86,7 @@ const getTrackingMapHtml = (cookCoords: number[], customerCoords: number[], stat
         }).addTo(map);
 
         var status = "${status}";
-        if (status === 'READY') {
+        if (status === 'READY' || status === 'DELIVERING') {
           // Animate rider path progression loop
           var startTime = Date.now();
           var duration = 25000; // 25 seconds loop
@@ -209,7 +209,7 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
     );
   }
 
-  const steps = ['PLACED', 'ACCEPTED', 'PREPARING', 'READY', 'DELIVERED'];
+  const steps = ['PLACED', 'ACCEPTED', 'PREPARING', 'READY', 'DELIVERING', 'DELIVERED'];
   const currentStepIndex = steps.indexOf(order?.status || 'PLACED');
 
   const handleCancel = async () => {
