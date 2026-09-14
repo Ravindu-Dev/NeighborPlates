@@ -18,6 +18,7 @@ import { Badge } from '../../components/common/Badge';
 import { StatCard } from '../../components/common/StatCard';
 import { SectionHeader } from '../../components/common/SectionHeader';
 import { SkeletonLoader } from '../../components/common/SkeletonLoader';
+import { Toast } from '../../components/common/Toast';
 
 export const CookDashboardScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -27,6 +28,7 @@ export const CookDashboardScreen: React.FC = () => {
   const [meals, setMeals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -42,13 +44,13 @@ export const CookDashboardScreen: React.FC = () => {
         api.get('/api/orders/my'),
       ]);
       setProfile(profRes.data);
-      setOrders(ordRes.data);
+      setOrders(ordRes.data || []);
 
       // Fetch cook's meals
       if (profRes.data?.id) {
         try {
           const mealsRes = await api.get(`/api/meals/cook/${profRes.data.id}`);
-          setMeals(mealsRes.data);
+          setMeals(mealsRes.data || []);
         } catch {
           setMeals([]);
         }
@@ -67,6 +69,7 @@ export const CookDashboardScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    fetchData();
     const unsubscribe = navigation.addListener('focus', () => {
       fetchData();
     });
@@ -95,6 +98,7 @@ export const CookDashboardScreen: React.FC = () => {
       case 'ACCEPTED': return 'border-l-blue-500';
       case 'PREPARING': return 'border-l-amber-500';
       case 'READY': return 'border-l-secondary';
+      case 'DELIVERING': return 'border-l-indigo-500';
       default: return 'border-l-gray-300';
     }
   };
@@ -103,20 +107,22 @@ export const CookDashboardScreen: React.FC = () => {
     const deleteAction = async () => {
       try {
         await api.delete(`/api/meals/${mealId}`);
+        setToast({ visible: true, message: 'Meal deactivated successfully', type: 'success' });
         fetchData();
       } catch (error) {
         console.error(error);
+        setToast({ visible: true, message: 'Failed to delete meal', type: 'error' });
       }
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to delete this meal?')) {
+      if (window.confirm('Are you sure you want to deactivate this meal?')) {
         deleteAction();
       }
     } else {
-      Alert.alert('Delete Meal', 'Are you sure you want to delete this meal?', [
+      Alert.alert('Deactivate Meal', 'Are you sure you want to deactivate this meal?', [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: deleteAction },
+        { text: 'Deactivate', style: 'destructive', onPress: deleteAction },
       ]);
     }
   };
@@ -124,6 +130,10 @@ export const CookDashboardScreen: React.FC = () => {
   const handleEditMeal = (meal: any) => {
     navigation.navigate('AddListing', { mealToEdit: meal });
   };
+
+  const chefName = profile?.profile?.name 
+    ? profile.profile.name.split(' ')[0] 
+    : (user?.name ? user.name.split(' ')[0] : 'Chef');
 
   if (loading) {
     return (
@@ -149,34 +159,42 @@ export const CookDashboardScreen: React.FC = () => {
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-surface-elevated"
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2D6A4F" colors={['#2D6A4F']} />
-      }
-    >
-      <View className="px-4 pt-14 pb-6">
-        {/* ─── Cook Welcome Header ─── */}
-        <View className="mb-6 flex-row justify-between items-start">
-          <View className="flex-1 mr-3">
-            <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider">
-              KITCHEN STATUS
-            </Text>
-            <Text className="text-textPrimary font-extrabold text-lg mt-0.5">
-              {getGreeting()}, Chef {profile?.profile?.name?.split(' ')[0]} 🍳
-            </Text>
-            <Text className="text-textSecondary text-xs mt-1">
-              {todayOrders.length > 0
-                ? `You have ${activeOrders.length} active order${activeOrders.length !== 1 ? 's' : ''} today`
-                : 'No orders yet today — your kitchen is ready!'}
-            </Text>
+    <View className="flex-1 bg-surface-elevated">
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        visible={toast.visible}
+        onDismiss={() => setToast({ ...toast, visible: false })}
+      />
+
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2D6A4F" colors={['#2D6A4F']} />
+        }
+      >
+        <View className="px-4 pt-14 pb-6">
+          {/* ─── Cook Welcome Header ─── */}
+          <View className="mb-6 flex-row justify-between items-start">
+            <View className="flex-1 mr-3">
+              <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider">
+                KITCHEN STATUS
+              </Text>
+              <Text className="text-textPrimary font-extrabold text-lg mt-0.5">
+                {getGreeting()}, Chef {chefName} 🍳
+              </Text>
+              <Text className="text-textSecondary text-xs mt-1">
+                {todayOrders.length > 0
+                  ? `You have ${activeOrders.length} active order${activeOrders.length !== 1 ? 's' : ''} today`
+                  : 'No orders yet today — your kitchen is ready!'}
+              </Text>
+            </View>
+            <Badge
+              label={profile?.profile?.hygieneVerified ? 'Verified ✓' : 'Pending'}
+              variant={profile?.profile?.hygieneVerified ? 'success' : 'warning'}
+            />
           </View>
-          <Badge
-            label={profile?.profile?.hygieneVerified ? 'Verified ✓' : 'Pending'}
-            variant={profile?.profile?.hygieneVerified ? 'success' : 'warning'}
-          />
-        </View>
 
         {/* ─── Stats Row ─── */}
         <View className="flex-row mb-6">
@@ -347,5 +365,6 @@ export const CookDashboardScreen: React.FC = () => {
         <View className="h-4" />
       </View>
     </ScrollView>
+  </View>
   );
 };

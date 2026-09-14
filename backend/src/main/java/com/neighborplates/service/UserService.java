@@ -38,7 +38,7 @@ public class UserService {
             current.setVehicleType(update.getVehicleType());
         }
 
-        if (update.getLocation() != null && update.getLocation().getCoordinates().size() == 2) {
+        if (update.getLocation() != null && update.getLocation().getCoordinates() != null && update.getLocation().getCoordinates().size() == 2) {
             current.setLocation(update.getLocation());
         }
 

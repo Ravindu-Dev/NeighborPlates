@@ -18,6 +18,7 @@ import { SectionHeader } from '../../components/common/SectionHeader';
 import { Toast } from '../../components/common/Toast';
 import { SkeletonLoader } from '../../components/common/SkeletonLoader';
 import { useAuthStore } from '../../store/authStore';
+import { useNavigation } from '@react-navigation/native';
 import { api } from '../../services/api';
 import { Feather } from '@expo/vector-icons';
 
@@ -114,7 +115,8 @@ const getPickerMapHtml = (initLat: number, initLon: number) => {
 };
 
 export const CookProfileScreen: React.FC = () => {
-  const { logout } = useAuthStore();
+  const navigation = useNavigation<any>();
+  const { logout, updateUser } = useAuthStore();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -214,6 +216,7 @@ export const CookProfileScreen: React.FC = () => {
 
       const response = await api.put('/api/users/profile', updatedProfile);
       setProfile(response.data);
+      updateUser({ name: editName.trim() });
       setIsEditing(false);
       setToast({ visible: true, message: '✅ Profile updated successfully!', type: 'success' });
     } catch (error: any) {
@@ -320,13 +323,18 @@ export const CookProfileScreen: React.FC = () => {
               value={profile?.stats?.totalOrders ?? 0}
               className="mr-2"
             />
-            <StatCard
-              icon="⭐"
-              label="RATING"
-              value={profile?.stats?.avgRating?.toFixed(1) ?? '0.0'}
-              valueColor="#FBBF24"
-              className="mr-2"
-            />
+            <TouchableOpacity
+              onPress={() => navigation.navigate('CookReviews')}
+              className="flex-1 mr-2"
+              activeOpacity={0.7}
+            >
+              <StatCard
+                icon="⭐"
+                label="RATING"
+                value={profile?.stats?.avgRating?.toFixed(1) ?? '0.0'}
+                valueColor="#FBBF24"
+              />
+            </TouchableOpacity>
             <StatCard
               icon="💰"
               label="EARNINGS"

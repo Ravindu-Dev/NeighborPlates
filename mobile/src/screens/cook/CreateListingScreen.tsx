@@ -192,9 +192,10 @@ export const CreateListingScreen: React.FC = () => {
         setToast({ visible: true, message: '🎉 Meal published successfully!', type: 'success' });
       }
 
-      // Reset form after short delay
+      // Reset form and navigation params after short delay
       setTimeout(() => {
         clearFormAction();
+        navigation.setParams({ mealToEdit: undefined });
         navigation.navigate('Dashboard');
       }, 1500);
     } catch (error: any) {
@@ -224,13 +225,24 @@ export const CreateListingScreen: React.FC = () => {
           <View className="flex-row justify-between items-center mb-6">
             <View>
               <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider">
-                CREATE LISTING
+                {mealToEdit ? 'EDIT LISTING' : 'CREATE LISTING'}
               </Text>
               <Text className="text-textPrimary font-extrabold text-xl mt-0.5">
                 {mealToEdit ? 'Edit Meal 📝' : 'List a New Meal 📝'}
               </Text>
             </View>
-            {!mealToEdit && (
+            {mealToEdit ? (
+              <TouchableOpacity
+                onPress={() => {
+                  clearFormAction();
+                  navigation.setParams({ mealToEdit: undefined });
+                  navigation.navigate('Dashboard');
+                }}
+                activeOpacity={0.7}
+              >
+                <Text className="text-red-400 font-semibold text-xs">CANCEL EDIT</Text>
+              </TouchableOpacity>
+            ) : (
               <TouchableOpacity onPress={clearForm} activeOpacity={0.7}>
                 <Text className="text-red-400 font-semibold text-xs">CLEAR ALL</Text>
               </TouchableOpacity>
