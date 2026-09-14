@@ -7,26 +7,36 @@ import {
   Image,
   TouchableOpacity,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 
 export const CookReviewsScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { user } = useAuthStore();
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchReviews = async () => {
-    if (!user?.id) return;
     try {
-      const response = await api.get(`/api/reviews/cook/${user.id}`);
-      setReviews(response.data);
+      let cookId = user?.id;
+      if (!cookId) {
+        const profRes = await api.get('/api/users/profile');
+        cookId = profRes.data?.id;
+      }
+      if (!cookId) {
+        setReviews([]);
+        return;
+      }
+      const response = await api.get(`/api/reviews/cook/${cookId}`);
+      setReviews(response.data || []);
     } catch (error) {
       console.error('Error fetching reviews:', error);
+      setReviews([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -35,26 +45,31 @@ export const CookReviewsScreen: React.FC = () => {
 
   useEffect(() => {
     fetchReviews();
-  }, [user]);
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchReviews();
+    });
+    return unsubscribe;
+  }, [navigation, user]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchReviews();
   }, [user]);
 
-  const getInitials = (nameStr: string) => {
-    return nameStr ? nameStr.charAt(0).toUpperCase() : 'N';
+  const getInitials = (nameStr?: string) => {
+    return nameStr && nameStr.trim() ? nameStr.trim().charAt(0).toUpperCase() : 'C';
   };
 
   // Summary calculations
   const totalReviews = reviews.length;
-  const avgRating = totalReviews > 0 
-    ? (reviews.reduce((acc, r) => acc + r.rating, 0) / totalReviews).toFixed(1)
-    : '0.0';
+  const avgRatingNumber = totalReviews > 0
+    ? reviews.reduce((acc, r) => acc + (Number(r.rating) || 0), 0) / totalReviews
+    : 0;
+  const avgRating = avgRatingNumber > 0 ? avgRatingNumber.toFixed(1) : '0.0';
 
   const starCounts = [0, 0, 0, 0, 0]; // index 0 = 5 star, 1 = 4 star etc
   reviews.forEach(r => {
-    const starIdx = 5 - r.rating;
+    const starIdx = 5 - Math.round(Number(r.rating) || 0);
     if (starIdx >= 0 && starIdx < 5) {
       starCounts[starIdx]++;
     }
@@ -69,11 +84,11 @@ export const CookReviewsScreen: React.FC = () => {
             <Text className="text-secondary font-black text-xs">{getInitials(item.customerName)}</Text>
           </View>
           <View className="flex-1">
-            <Text className="text-textPrimary font-extrabold text-sm">{item.customerName}</Text>
+            <Text className="text-textPrimary font-extrabold text-sm">{item.customerName || 'Customer'}</Text>
             <Text className="text-textMuted text-[9px] font-bold mt-0.5">
-              {new Date(item.createdAt).toLocaleDateString('en-LK', {
+              {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-LK', {
                 day: 'numeric', month: 'short', year: 'numeric'
-              })}
+              }) : 'Recent'}
             </Text>
           </View>
         </View>
@@ -81,7 +96,9 @@ export const CookReviewsScreen: React.FC = () => {
         {/* Star rating display */}
         <View className="flex-row bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full items-center">
           <Text className="text-[10px] mr-1">⭐</Text>
-          <Text className="text-amber-800 font-extrabold text-[10px]">{item.rating}.0</Text>
+          <Text className="text-amber-800 font-extrabold text-[10px]">
+            {item.rating !== undefined ? Number(item.rating).toFixed(1) : '5.0'}
+          </Text>
         </View>
       </View>
 
@@ -103,10 +120,12 @@ export const CookReviewsScreen: React.FC = () => {
     </View>
   );
 
+  const filledStarsCount = Math.max(0, Math.min(5, Math.round(Number(avgRating) || 0)));
+
   return (
     <View className="flex-1 bg-surface-elevated">
-      {/* Premium Header */}
-      <View className="bg-white px-6 pt-12 pb-4 border-b border-gray-100 shadow-sm z-10 flex-row justify-between items-center">
+      {/* Header */}
+      <View className={`bg-white px-6 ${Platform.OS === 'ios' ? 'pt-14' : 'pt-12'} pb-4 border-b border-gray-100 shadow-sm z-10 flex-row justify-between items-center`}>
         <View className="flex-row items-center flex-1 mr-2">
           <TouchableOpacity onPress={() => navigation.goBack()} className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center mr-3 border border-gray-150">
             <Feather name="chevron-left" size={18} color="#1A1A2E" />
@@ -125,9 +144,9 @@ export const CookReviewsScreen: React.FC = () => {
       ) : (
         <FlatList
           data={reviews}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id || Math.random().toString()}
           renderItem={renderReviewItem}
-          contentContainerStyle={{ padding: 24 }}
+          contentContainerStyle={{ padding: 20 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2D6A4F" colors={['#2D6A4F']} />
@@ -139,7 +158,7 @@ export const CookReviewsScreen: React.FC = () => {
                 <Text className="text-textPrimary font-black text-4xl">{avgRating}</Text>
                 <Text className="text-[9px] font-black uppercase text-textSecondary tracking-wider mt-1">AVERAGE</Text>
                 <View className="flex-row mt-1.5">
-                  {Array.from({ length: Math.round(Number(avgRating)) }).map((_, i) => (
+                  {Array.from({ length: filledStarsCount }).map((_, i) => (
                     <Text key={i} className="text-[10px]">⭐</Text>
                   ))}
                 </View>

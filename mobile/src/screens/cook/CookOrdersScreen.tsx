@@ -3,7 +3,6 @@ import {
   View,
   Text,
   FlatList,
-  ActivityIndicator,
   TouchableOpacity,
   Alert,
   RefreshControl,
@@ -15,9 +14,10 @@ import { api } from '../../services/api';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { FilterChip } from '../../components/common/FilterChip';
+import { Toast } from '../../components/common/Toast';
 import { SkeletonLoader } from '../../components/common/SkeletonLoader';
 
-type FilterType = 'ALL' | 'PLACED' | 'ACCEPTED' | 'PREPARING' | 'READY' | 'DELIVERED' | 'CANCELLED';
+type FilterType = 'ALL' | 'PLACED' | 'ACCEPTED' | 'PREPARING' | 'READY' | 'DELIVERING' | 'DELIVERED' | 'CANCELLED';
 
 const FILTERS: { key: FilterType; label: string }[] = [
   { key: 'ALL', label: 'All' },
@@ -25,6 +25,7 @@ const FILTERS: { key: FilterType; label: string }[] = [
   { key: 'ACCEPTED', label: 'Accepted' },
   { key: 'PREPARING', label: 'Preparing' },
   { key: 'READY', label: 'Ready' },
+  { key: 'DELIVERING', label: 'In Transit' },
   { key: 'DELIVERED', label: 'Completed' },
   { key: 'CANCELLED', label: 'Cancelled' },
 ];
@@ -49,11 +50,12 @@ export const CookOrdersScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
 
   const fetchOrders = async () => {
     try {
       const response = await api.get('/api/orders/my');
-      setOrders(response.data);
+      setOrders(response.data || []);
     } catch (error) {
       console.error(error);
     } finally {
@@ -68,28 +70,38 @@ export const CookOrdersScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    fetchOrders();
     const unsubscribe = navigation.addListener('focus', () => {
       fetchOrders();
     });
     return unsubscribe;
   }, [navigation]);
 
-  const handleUpdateStatus = async (orderId: string, currentStatus: string) => {
+  const handleUpdateStatus = async (orderId: string, currentStatus: string, deliveryMethod?: string) => {
     let nextStatus = '';
     switch (currentStatus) {
       case 'PLACED': nextStatus = 'ACCEPTED'; break;
       case 'ACCEPTED': nextStatus = 'PREPARING'; break;
       case 'PREPARING': nextStatus = 'READY'; break;
-      case 'READY': nextStatus = 'DELIVERED'; break;
+      case 'READY': 
+        if (deliveryMethod === 'RIDER') {
+          return; // Rider handles delivery
+        }
+        nextStatus = 'DELIVERED'; 
+        break;
       default: return;
     }
 
     try {
       await api.put(`/api/orders/${orderId}/status?status=${nextStatus}`);
-      Alert.alert('Status Updated', `Order is now: ${nextStatus}`);
+      setToast({ visible: true, message: `✅ Order updated to ${nextStatus}`, type: 'success' });
       fetchOrders();
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to update order status.');
+      setToast({
+        visible: true,
+        message: error.response?.data?.message || 'Failed to update order status.',
+        type: 'error',
+      });
     }
   };
 
@@ -97,10 +109,14 @@ export const CookOrdersScreen: React.FC = () => {
     const confirmAction = async () => {
       try {
         await api.put(`/api/orders/${orderId}/status?status=CANCELLED`);
-        Alert.alert('Order Declined', 'The order has been cancelled.');
+        setToast({ visible: true, message: 'Order has been declined and cancelled.', type: 'error' });
         fetchOrders();
       } catch (error: any) {
-        Alert.alert('Error', error.response?.data?.message || 'Failed to decline order.');
+        setToast({
+          visible: true,
+          message: error.response?.data?.message || 'Failed to decline order.',
+          type: 'error',
+        });
       }
     };
 
@@ -124,12 +140,15 @@ export const CookOrdersScreen: React.FC = () => {
     }
   };
 
-  const getActionLabel = (status: string) => {
+  const getActionLabel = (status: string, deliveryMethod?: string) => {
     switch (status) {
       case 'PLACED': return 'ACCEPT ORDER';
       case 'ACCEPTED': return 'START PREPARING';
       case 'PREPARING': return 'MARK AS READY';
-      case 'READY': return 'MARK DELIVERED';
+      case 'READY':
+        if (deliveryMethod === 'RIDER') return null; // Rider picks up
+        if (deliveryMethod === 'PICKUP') return 'HAND OVER TO CUSTOMER';
+        return 'MARK DELIVERED';
       default: return null;
     }
   };
@@ -140,6 +159,7 @@ export const CookOrdersScreen: React.FC = () => {
       case 'ACCEPTED': return 'border-l-blue-500';
       case 'PREPARING': return 'border-l-amber-500';
       case 'READY': return 'border-l-secondary';
+      case 'DELIVERING': return 'border-l-indigo-500';
       case 'DELIVERED': return 'border-l-green-400';
       case 'CANCELLED': return 'border-l-red-400';
       default: return 'border-l-gray-300';
@@ -152,6 +172,7 @@ export const CookOrdersScreen: React.FC = () => {
       case 'ACCEPTED': return 'secondary';
       case 'PREPARING': return 'primary';
       case 'READY': return 'success';
+      case 'DELIVERING': return 'primary';
       case 'DELIVERED': return 'success';
       case 'CANCELLED': return 'error';
       default: return 'neutral';
@@ -162,7 +183,7 @@ export const CookOrdersScreen: React.FC = () => {
     switch (method) {
       case 'PICKUP': return '🏃 Pickup';
       case 'COOK_DELIVERY': return '🚗 Cook Delivery';
-      case 'RIDER': return '🛵 Rider';
+      case 'RIDER': return '🛵 Rider Delivery';
       default: return method;
     }
   };
@@ -181,7 +202,8 @@ export const CookOrdersScreen: React.FC = () => {
       case 'PLACED': return { emoji: '📥', title: 'No new orders', subtitle: 'New orders from customers will appear here.' };
       case 'ACCEPTED': return { emoji: '✅', title: 'No accepted orders', subtitle: 'Accept incoming orders to see them here.' };
       case 'PREPARING': return { emoji: '👨‍🍳', title: 'Nothing cooking', subtitle: 'Orders you start preparing will show here.' };
-      case 'READY': return { emoji: '🍽️', title: 'No orders ready', subtitle: 'Mark orders as ready when they are done.' };
+      case 'READY': return { emoji: '🍽️', title: 'No orders ready', subtitle: 'Mark orders as ready when preparation is finished.' };
+      case 'DELIVERING': return { emoji: '🛵', title: 'No orders in transit', subtitle: 'Orders currently on their way will show here.' };
       case 'DELIVERED': return { emoji: '📦', title: 'No completed orders', subtitle: 'Delivered orders will be listed here.' };
       case 'CANCELLED': return { emoji: '❌', title: 'No cancelled orders', subtitle: 'Declined orders will appear here.' };
       default: return { emoji: '📭', title: 'No orders yet', subtitle: 'Publish meals to receive orders from nearby customers.' };
@@ -206,6 +228,13 @@ export const CookOrdersScreen: React.FC = () => {
 
   return (
     <View className="flex-1 bg-surface-elevated">
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        visible={toast.visible}
+        onDismiss={() => setToast({ ...toast, visible: false })}
+      />
+
       <View className="px-4 pt-14 pb-2">
         {/* ─── Header ─── */}
         <View className="flex-row justify-between items-center mb-4">
@@ -262,12 +291,12 @@ export const CookOrdersScreen: React.FC = () => {
           data={filteredOrders}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2D6A4F" colors={['#2D6A4F']} />
           }
           renderItem={({ item }) => {
-            const actionLabel = getActionLabel(item.status);
+            const actionLabel = getActionLabel(item.status, item.deliveryMethod);
             const isExpanded = expandedOrder === item.id;
 
             return (
@@ -286,7 +315,7 @@ export const CookOrdersScreen: React.FC = () => {
                 {/* Customer & Delivery Info */}
                 <View className="flex-row justify-between items-center mb-1">
                   <Text className="text-textSecondary text-xs">
-                    👤 {item.customerName}
+                    👤 {item.customerName || 'Customer'}
                   </Text>
                   {item.deliveryMethod && (
                     <Text className="text-textMuted text-[10px] font-semibold">
@@ -295,6 +324,15 @@ export const CookOrdersScreen: React.FC = () => {
                   )}
                 </View>
 
+                {/* Rider Details if assigned */}
+                {item.riderName && (
+                  <View className="flex-row items-center mt-0.5 mb-1 bg-indigo-50 px-2 py-1 rounded-lg">
+                    <Text className="text-indigo-800 text-[10px] font-bold">
+                      🛵 Rider Assigned: {item.riderName}
+                    </Text>
+                  </View>
+                )}
+
                 {item.address?.label && (
                   <Text className="text-textMuted text-[10px] mb-1">
                     📍 {item.address.label}
@@ -302,14 +340,14 @@ export const CookOrdersScreen: React.FC = () => {
                 )}
 
                 {/* Special Instructions */}
-                {item.specialInstructions && (
+                {item.specialInstructions ? (
                   <View className="bg-amber-50 rounded-lg px-3 py-2 mt-1 mb-1">
                     <Text className="text-amber-700 text-[10px] font-bold uppercase mb-0.5">
                       SPECIAL INSTRUCTIONS
                     </Text>
                     <Text className="text-amber-800 text-xs">{item.specialInstructions}</Text>
                   </View>
-                )}
+                ) : null}
 
                 {/* Order Items - Expandable */}
                 <TouchableOpacity
@@ -340,12 +378,12 @@ export const CookOrdersScreen: React.FC = () => {
                         </View>
                       ))}
                       <View className="border-t border-gray-200 mt-1 pt-2 flex-row justify-between">
-                        <Text className="text-textSecondary text-xs font-semibold">Total</Text>
+                        <Text className="text-textSecondary text-xs font-semibold">Total Amount</Text>
                         <Text className="text-secondary font-black text-sm">LKR {item.totalAmount}</Text>
                       </View>
                       {item.cookEarnings !== undefined && (
                         <View className="flex-row justify-between mt-1">
-                          <Text className="text-textMuted text-[10px]">Your Earnings</Text>
+                          <Text className="text-textMuted text-[10px]">Your Net Earnings</Text>
                           <Text className="text-secondary font-bold text-xs">
                             LKR {item.cookEarnings?.toFixed(0)}
                           </Text>
@@ -362,6 +400,23 @@ export const CookOrdersScreen: React.FC = () => {
                   </View>
                 )}
 
+                {/* Rider delivery waiting notice */}
+                {item.deliveryMethod === 'RIDER' && item.status === 'READY' && (
+                  <View className="mt-3 bg-emerald-50 border border-emerald-100 rounded-xl py-2 px-3 items-center justify-center">
+                    <Text className="text-secondary font-extrabold text-xs">
+                      {item.riderName ? `🛵 Waiting for ${item.riderName} to pickup` : '⏳ Meal Ready — Waiting for Rider to Accept'}
+                    </Text>
+                  </View>
+                )}
+
+                {item.deliveryMethod === 'RIDER' && item.status === 'DELIVERING' && (
+                  <View className="mt-3 bg-indigo-50 border border-indigo-100 rounded-xl py-2 px-3 items-center justify-center">
+                    <Text className="text-indigo-800 font-extrabold text-xs">
+                      🛵 Order is out for delivery with {item.riderName || 'Rider'}
+                    </Text>
+                  </View>
+                )}
+
                 {/* Action Buttons */}
                 {actionLabel && (
                   <View className="flex-row mt-3">
@@ -374,7 +429,7 @@ export const CookOrdersScreen: React.FC = () => {
                       </TouchableOpacity>
                     )}
                     <TouchableOpacity
-                      onPress={() => handleUpdateStatus(item.id, item.status)}
+                      onPress={() => handleUpdateStatus(item.id, item.status, item.deliveryMethod)}
                       className={`bg-secondary rounded-xl py-2.5 items-center justify-center active:opacity-85 ${item.status === 'PLACED' ? 'flex-[2]' : 'flex-1'}`}
                     >
                       <Text className="text-white font-bold text-xs tracking-wider">{actionLabel}</Text>

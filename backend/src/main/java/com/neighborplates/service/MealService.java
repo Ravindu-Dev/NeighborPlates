@@ -96,10 +96,17 @@ public class MealService {
         }
 
         Meal.MealAvailability availability = meal.getAvailability();
-        availability.setDays(request.getAvailability().getDays() != null ? request.getAvailability().getDays() : new ArrayList<>());
-        availability.setCutoffTime(request.getAvailability().getCutoffTime());
-        availability.setServingTime(request.getAvailability().getServingTime());
+        if (availability == null) {
+            availability = new Meal.MealAvailability();
+            meal.setAvailability(availability);
+        }
+        if (request.getAvailability() != null) {
+            availability.setDays(request.getAvailability().getDays() != null ? request.getAvailability().getDays() : new ArrayList<>());
+            availability.setCutoffTime(request.getAvailability().getCutoffTime());
+            availability.setServingTime(request.getAvailability().getServingTime());
+        }
 
+        meal.setActive(true);
         meal.setUpdatedAt(Instant.now());
 
         Meal updatedMeal = mealRepository.save(meal);

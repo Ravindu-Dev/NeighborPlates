@@ -18,6 +18,7 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   updateUserAvatar: (avatarUrl: string) => void;
+  updateUser: (partial: Partial<User>) => void;
   login: (request: any) => Promise<void>;
   register: (request: any) => Promise<void>;
   logout: () => Promise<void>;
@@ -39,6 +40,15 @@ export const useAuthStore = create<AuthState>((set) => ({
     set((state) => {
       if (!state.user) return state;
       const updatedUser = { ...state.user, avatarUrl };
+      AsyncStorage.setItem('user', JSON.stringify(updatedUser)).catch(console.error);
+      return { user: updatedUser };
+    });
+  },
+
+  updateUser: (partial: Partial<User>) => {
+    set((state) => {
+      if (!state.user) return state;
+      const updatedUser = { ...state.user, ...partial };
       AsyncStorage.setItem('user', JSON.stringify(updatedUser)).catch(console.error);
       return { user: updatedUser };
     });
