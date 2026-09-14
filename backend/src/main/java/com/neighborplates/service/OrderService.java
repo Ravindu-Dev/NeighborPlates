@@ -131,7 +131,9 @@ public class OrderService {
     }
 
     public List<OrderResponse> getAvailableOrdersForRiders() {
-        List<Order> orders = orderRepository.findByStatusAndRiderIdIsNull(OrderStatus.READY);
+        List<Order> orders = orderRepository.findByStatusInAndRiderIdIsNull(
+                List.of(OrderStatus.READY, OrderStatus.DELIVERING)
+        );
         return orders.stream()
                 .map(order -> {
                     User customer = userRepository.findById(order.getCustomerId()).orElse(null);
@@ -158,12 +160,16 @@ public class OrderService {
             throw new IllegalArgumentException("Someone else got there first");
         }
 
-        if (order.getStatus() != OrderStatus.READY) {
-            throw new IllegalArgumentException("Only READY orders can be accepted by a rider");
+        if (order.getStatus() != OrderStatus.READY && order.getStatus() != OrderStatus.DELIVERING) {
+            throw new IllegalArgumentException("Only READY or IN TRANSIT orders can be accepted by a rider");
         }
 
-        // Set Rider ID and rider earnings (mocked as 15% of total amount or 150 min)
+        // Set Rider ID, status to DELIVERING, and rider earnings (mocked as 15% of total amount or 150 min)
         order.setRiderId(user.getId());
+        order.setStatus(OrderStatus.DELIVERING);
+        if (order.getPickedUpAt() == null) {
+            order.setPickedUpAt(Instant.now());
+        }
         double earnings = Math.max(150.0, order.getTotalAmount() * 0.15);
         // round to 2 decimal places
         earnings = Math.round(earnings * 100.0) / 100.0;

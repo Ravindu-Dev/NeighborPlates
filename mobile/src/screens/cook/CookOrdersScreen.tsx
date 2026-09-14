@@ -83,18 +83,21 @@ export const CookOrdersScreen: React.FC = () => {
       case 'PLACED': nextStatus = 'ACCEPTED'; break;
       case 'ACCEPTED': nextStatus = 'PREPARING'; break;
       case 'PREPARING': nextStatus = 'READY'; break;
-      case 'READY': 
-        if (deliveryMethod === 'RIDER') {
-          return; // Rider handles delivery
+      case 'READY': nextStatus = 'DELIVERING'; break;
+      case 'DELIVERING': 
+        if (deliveryMethod !== 'RIDER') {
+          nextStatus = 'DELIVERED';
+        } else {
+          return; // Rider confirms delivery completion
         }
-        nextStatus = 'DELIVERED'; 
         break;
       default: return;
     }
 
     try {
       await api.put(`/api/orders/${orderId}/status?status=${nextStatus}`);
-      setToast({ visible: true, message: `✅ Order updated to ${nextStatus}`, type: 'success' });
+      const statusText = nextStatus === 'DELIVERING' ? 'IN TRANSIT (Dispatched to Riders)' : nextStatus;
+      setToast({ visible: true, message: `✅ Order is now ${statusText}`, type: 'success' });
       fetchOrders();
     } catch (error: any) {
       setToast({
@@ -146,9 +149,12 @@ export const CookOrdersScreen: React.FC = () => {
       case 'ACCEPTED': return 'START PREPARING';
       case 'PREPARING': return 'MARK AS READY';
       case 'READY':
-        if (deliveryMethod === 'RIDER') return null; // Rider picks up
-        if (deliveryMethod === 'PICKUP') return 'HAND OVER TO CUSTOMER';
-        return 'MARK DELIVERED';
+        return 'HAND OVER FOR DELIVERY';
+      case 'DELIVERING':
+        if (deliveryMethod === 'COOK_DELIVERY' || deliveryMethod === 'PICKUP') {
+          return 'MARK DELIVERED';
+        }
+        return null;
       default: return null;
     }
   };
@@ -400,19 +406,21 @@ export const CookOrdersScreen: React.FC = () => {
                   </View>
                 )}
 
-                {/* Rider delivery waiting notice */}
-                {item.deliveryMethod === 'RIDER' && item.status === 'READY' && (
-                  <View className="mt-3 bg-emerald-50 border border-emerald-100 rounded-xl py-2 px-3 items-center justify-center">
-                    <Text className="text-secondary font-extrabold text-xs">
-                      {item.riderName ? `🛵 Waiting for ${item.riderName} to pickup` : '⏳ Meal Ready — Waiting for Rider to Accept'}
+                {/* Delivery & dispatch status banners */}
+                {item.status === 'READY' && (
+                  <View className="mt-3 bg-amber-50 border border-amber-200 rounded-xl py-2 px-3 items-center justify-center">
+                    <Text className="text-amber-800 font-extrabold text-xs">
+                      🍽️ Meal Prepared — Tap below to Hand Over for Delivery
                     </Text>
                   </View>
                 )}
 
-                {item.deliveryMethod === 'RIDER' && item.status === 'DELIVERING' && (
+                {item.status === 'DELIVERING' && (
                   <View className="mt-3 bg-indigo-50 border border-indigo-100 rounded-xl py-2 px-3 items-center justify-center">
                     <Text className="text-indigo-800 font-extrabold text-xs">
-                      🛵 Order is out for delivery with {item.riderName || 'Rider'}
+                      {item.riderName
+                        ? `🛵 In Transit — Delivered by ${item.riderName}`
+                        : '🛵 Dispatched — Visible to available Delivery Riders'}
                     </Text>
                   </View>
                 )}
