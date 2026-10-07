@@ -154,7 +154,11 @@ export const ComboDealsScreen: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchData();
+    });
+    return unsubscribe;
+  }, [navigation, fetchData]);
 
   const onRefresh = () => {
     setRefreshing(true);

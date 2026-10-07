@@ -9,6 +9,7 @@ import com.neighborplates.model.User;
 import com.neighborplates.model.enums.MealCategory;
 import com.neighborplates.model.enums.UserRole;
 import com.neighborplates.repository.MealRepository;
+import com.neighborplates.repository.ReviewRepository;
 import com.neighborplates.repository.UserRepository;
 import com.neighborplates.util.GeoUtils;
 import org.springframework.stereotype.Service;
@@ -23,10 +24,12 @@ public class MealService {
 
     private final MealRepository mealRepository;
     private final UserRepository userRepository;
+    private final ReviewRepository reviewRepository;
 
-    public MealService(MealRepository mealRepository, UserRepository userRepository) {
+    public MealService(MealRepository mealRepository, UserRepository userRepository, ReviewRepository reviewRepository) {
         this.mealRepository = mealRepository;
         this.userRepository = userRepository;
+        this.reviewRepository = reviewRepository;
     }
 
     public MealResponse createMeal(String cookEmail, CreateMealRequest request) {
@@ -106,7 +109,13 @@ public class MealService {
             availability.setServingTime(request.getAvailability().getServingTime());
         }
 
-        meal.setActive(true);
+        if (request.getPortionsRemaining() != null) {
+            meal.setPortionsRemaining(request.getPortionsRemaining());
+        }
+
+        if (request.getActive() != null) {
+            meal.setActive(request.getActive());
+        }
         meal.setUpdatedAt(Instant.now());
 
         Meal updatedMeal = mealRepository.save(meal);
@@ -141,6 +150,11 @@ public class MealService {
             }
         } catch (Exception ignored) {}
 
+        // Clean up associated reviews
+        try {
+            reviewRepository.deleteByMealId(mealId);
+        } catch (Exception ignored) {}
+
         mealRepository.deleteById(mealId);
     }
 
@@ -158,6 +172,51 @@ public class MealService {
         meal.setActive(false);
         meal.setUpdatedAt(Instant.now());
         mealRepository.save(meal);
+    }
+
+    public MealResponse toggleMealStatus(String cookEmailOrId, String mealId) {
+        Meal meal = mealRepository.findById(mealId)
+                .orElseThrow(() -> new ResourceNotFoundException("Meal not found"));
+
+        User cook = userRepository.findByEmail(cookEmailOrId)
+                .or(() -> userRepository.findById(cookEmailOrId))
+                .orElseThrow(() -> new ResourceNotFoundException("Cook not found"));
+
+        if (!meal.getCookId().equals(cook.getId())) {
+            throw new UnauthorizedException("You are not authorized to edit this meal listing");
+        }
+
+        boolean nextActive = !meal.isActive();
+        meal.setActive(nextActive);
+        if (nextActive && meal.getPortionsRemaining() <= 0) {
+            int defaultPortions = meal.getPortionLimit() > 0 ? meal.getPortionLimit() : 10;
+            meal.setPortionsRemaining(defaultPortions);
+            if (meal.getPortionLimit() <= 0) {
+                meal.setPortionLimit(defaultPortions);
+            }
+        }
+        meal.setUpdatedAt(Instant.now());
+        Meal updatedMeal = mealRepository.save(meal);
+        return mapToMealResponse(updatedMeal, cook);
+    }
+
+    public MealResponse updateMealPortions(String cookEmailOrId, String mealId, int portions) {
+        Meal meal = mealRepository.findById(mealId)
+                .orElseThrow(() -> new ResourceNotFoundException("Meal not found"));
+
+        User cook = userRepository.findByEmail(cookEmailOrId)
+                .or(() -> userRepository.findById(cookEmailOrId))
+                .orElseThrow(() -> new ResourceNotFoundException("Cook not found"));
+
+        if (!meal.getCookId().equals(cook.getId())) {
+            throw new UnauthorizedException("You are not authorized to edit this meal listing");
+        }
+
+        meal.setPortionsRemaining(Math.max(0, portions));
+        meal.setPortionLimit(Math.max(meal.getPortionLimit(), portions));
+        meal.setUpdatedAt(Instant.now());
+        Meal updatedMeal = mealRepository.save(meal);
+        return mapToMealResponse(updatedMeal, cook);
     }
 
     public MealResponse getMealById(String id) {

@@ -47,7 +47,15 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
   if (!meal) {
     return (
       <View className="flex-1 justify-center items-center bg-surface-elevated p-6">
-        <Text className="text-textMuted text-base font-bold text-center">Meal details missing</Text>
+        <Text className="text-4xl mb-3">🍽️</Text>
+        <Text className="text-textPrimary text-lg font-bold text-center mb-1">Meal No Longer Available</Text>
+        <Text className="text-textMuted text-xs text-center mb-6">This meal listing may have been removed by the home chef.</Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          className="bg-primary px-6 py-3 rounded-2xl shadow-sm"
+        >
+          <Text className="text-white font-bold text-sm">Explore Other Meals</Text>
+        </TouchableOpacity>
       </View>
     );
   }

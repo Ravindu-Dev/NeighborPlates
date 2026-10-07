@@ -158,7 +158,7 @@ public class GeminiComboService {
               }
             ]
             """,
-            customer != null && customer.getName() != null ? customer.getName() : "Valued Customer",
+            customer != null && customer.getProfile() != null && customer.getProfile().getName() != null ? customer.getProfile().getName() : "Valued Customer",
             orderCount,
             totalSpent,
             !topCuisines.isEmpty() ? topCuisines : "Sri Lankan, Asian, Home-style",

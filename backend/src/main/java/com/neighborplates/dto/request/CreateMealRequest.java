@@ -40,6 +40,10 @@ public class CreateMealRequest {
     @Min(value = 1, message = "Portion limit must be at least 1")
     private int portionLimit;
 
+    private Integer portionsRemaining;
+
+    private Boolean active;
+
     @NotNull(message = "Availability config is required")
     private AvailabilityDto availability;
 
