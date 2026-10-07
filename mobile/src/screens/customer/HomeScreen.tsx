@@ -231,7 +231,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                snapToInterval={280}
+                snapToInterval={300}
                 decelerationRate="fast"
               >
                 {aiCombos.map((item, idx) => {
@@ -239,45 +239,77 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   if (!combo) return null;
                   const discount = combo.discountPercentage || 15;
                   const savings = Math.round((combo.originalTotalPrice || combo.price) - combo.price);
+                  const comboImage =
+                    (combo.photos && combo.photos.length > 0 && combo.photos[0]) ||
+                    (item.includedMeals && item.includedMeals.find((m: any) => m.photo)?.photo) ||
+                    'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=800';
 
                   return (
                     <TouchableOpacity 
                       key={combo.id || `combo-${idx}`}
                       onPress={() => navigation.navigate('MealDetail', { mealId: combo.id })}
                       activeOpacity={0.88}
-                      className="w-72 bg-[#1A1A2E] rounded-3xl p-5 mr-4 border border-gray-800 shadow-md relative overflow-hidden h-36 justify-between"
+                      className="w-80 rounded-3xl mr-4 border border-white/20 shadow-lg relative overflow-hidden h-44 justify-between p-4"
+                      style={{ backgroundColor: '#1A1A2E' }}
                     >
-                      <View className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-primary/20" />
-                      <View className="absolute -top-6 -left-6 w-20 h-20 rounded-full bg-white/5" />
+                      {/* Background Image of the Bundled Meal */}
+                      <Image
+                        source={{ uri: comboImage }}
+                        className="absolute inset-0 w-full h-full"
+                        resizeMode="cover"
+                      />
+
+                      {/* Dark Gradient Overlay for Maximum Readability */}
+                      <View
+                        className="absolute inset-0"
+                        style={{
+                          backgroundColor: 'rgba(12, 12, 22, 0.70)',
+                        }}
+                      />
                       
-                      <View>
-                        <View className="flex-row items-center justify-between mb-2">
-                          <View className="bg-primary/20 px-2.5 py-0.5 rounded-md self-start border border-primary/40 flex-row items-center gap-1">
-                            <Ionicons name="sparkles" size={8} color="#FF6B35" />
-                            <Text className="text-white text-[8px] font-black tracking-widest uppercase">
-                              {item.tag || `${discount}% OFF COMBO`}
+                      {/* Top Badges (AI Discount Tag & Price) */}
+                      <View className="flex-row items-center justify-between z-10">
+                        <View className="bg-primary/95 px-2.5 py-1 rounded-full flex-row items-center gap-1 shadow-sm">
+                          <Ionicons name="sparkles" size={10} color="#FFFFFF" />
+                          <Text className="text-white text-[9px] font-black tracking-wider uppercase">
+                            {item.tag || `${discount}% OFF BUNDLE`}
+                          </Text>
+                        </View>
+                        <View className="bg-black/60 border border-white/25 px-2.5 py-1 rounded-full flex-row items-center gap-1.5">
+                          {combo.originalTotalPrice > combo.price && (
+                            <Text className="text-white/50 text-[10px] line-through font-semibold">
+                              LKR {Math.round(combo.originalTotalPrice)}
                             </Text>
-                          </View>
+                          )}
                           <Text className="text-emerald-400 font-black text-xs">
                             LKR {Math.round(combo.price)}
                           </Text>
                         </View>
+                      </View>
 
-                        <Text className="text-white font-extrabold text-base leading-5 mb-1" numberOfLines={1}>
+                      {/* Middle Details (Combo Name & Description/Reason) */}
+                      <View className="z-10 my-auto">
+                        <Text className="text-white font-black text-lg leading-6 mb-1 shadow-sm" numberOfLines={1}>
                           {combo.name}
                         </Text>
-                        <Text className="text-white/70 text-[11px] font-semibold leading-4" numberOfLines={2}>
+                        <Text className="text-white/90 text-xs font-medium leading-4" numberOfLines={2}>
                           {item.reason || combo.description || `Fresh bundled feast by Chef ${combo.cookName}. Save LKR ${savings}!`}
                         </Text>
                       </View>
 
-                      <View className="flex-row justify-between items-center pt-1 border-t border-white/10">
-                        <Text className="text-white/50 text-[9px] font-bold uppercase tracking-wider">
-                          Chef {combo.cookName}
-                        </Text>
-                        <View className="flex-row items-center gap-1">
-                          <Text className="text-primary font-black text-[10px]">ORDER NOW</Text>
-                          <Feather name="arrow-right" size={10} color="#FF6B35" />
+                      {/* Bottom Footer (Chef & Order CTA) */}
+                      <View className="flex-row justify-between items-center pt-2 border-t border-white/20 z-10">
+                        <View className="flex-row items-center gap-1.5">
+                          <View className="w-5 h-5 rounded-full bg-white/20 items-center justify-center">
+                            <Text className="text-[10px]">👨‍🍳</Text>
+                          </View>
+                          <Text className="text-white/85 text-[11px] font-bold tracking-wide">
+                            Chef {combo.cookName || 'Home Cook'}
+                          </Text>
+                        </View>
+                        <View className="bg-primary px-3 py-1 rounded-full flex-row items-center gap-1 shadow-sm">
+                          <Text className="text-white font-black text-[10px] tracking-wider">ORDER NOW</Text>
+                          <Feather name="arrow-right" size={10} color="#FFFFFF" />
                         </View>
                       </View>
                     </TouchableOpacity>
@@ -285,17 +317,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 })}
               </ScrollView>
             ) : (
-              <View className="w-full bg-[#1A1A2E] rounded-3xl p-5 border border-gray-800 shadow-md relative overflow-hidden h-36 justify-between">
-                <View className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-primary/10" />
-                <View>
-                  <View className="bg-white/10 px-2.5 py-0.5 rounded-md self-start mb-2 border border-white/20">
-                    <Text className="text-white text-[8px] font-black tracking-widest uppercase">AI MEAL BUNDLES</Text>
+              <View 
+                className="w-full rounded-3xl p-5 border border-white/15 shadow-md relative overflow-hidden h-44 justify-between"
+                style={{ backgroundColor: '#1A1A2E' }}
+              >
+                <Image
+                  source={{ uri: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=800' }}
+                  className="absolute inset-0 w-full h-full"
+                  resizeMode="cover"
+                />
+                <View className="absolute inset-0" style={{ backgroundColor: 'rgba(12, 12, 22, 0.75)' }} />
+                
+                <View className="z-10">
+                  <View className="bg-primary/95 px-2.5 py-1 rounded-full self-start mb-2 flex-row items-center gap-1 shadow-sm">
+                    <Ionicons name="sparkles" size={10} color="#FFFFFF" />
+                    <Text className="text-white text-[9px] font-black tracking-widest uppercase">AI MEAL BUNDLES</Text>
                   </View>
-                  <Text className="text-white font-extrabold text-base mb-1">Custom Combo Deals Coming Up</Text>
-                  <Text className="text-white/60 text-xs font-semibold">Home chefs are preparing exciting meal bundles with special discounts for you!</Text>
+                  <Text className="text-white font-black text-lg mb-1">Custom Combo Deals Coming Up</Text>
+                  <Text className="text-white/80 text-xs font-semibold">Home chefs are preparing exciting meal bundles with special discounts for you!</Text>
                 </View>
-                <View className="flex-row items-center gap-1 self-end">
-                  <Text className="text-primary font-bold text-[10px]">CHECK BACK SOON</Text>
+                <View className="flex-row items-center gap-1 self-end bg-white/15 px-3 py-1 rounded-full border border-white/25 z-10">
+                  <Text className="text-white font-bold text-[10px]">CHECK BACK SOON</Text>
                 </View>
               </View>
             )}

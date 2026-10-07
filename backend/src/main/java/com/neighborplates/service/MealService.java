@@ -113,6 +113,37 @@ public class MealService {
         return mapToMealResponse(updatedMeal, cook);
     }
 
+    public void deleteMeal(String cookEmail, String mealId) {
+        Meal meal = mealRepository.findById(mealId)
+                .orElseThrow(() -> new ResourceNotFoundException("Meal not found"));
+
+        User cook = userRepository.findByEmail(cookEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Cook not found"));
+
+        if (!meal.getCookId().equals(cook.getId())) {
+            throw new UnauthorizedException("You are not authorized to delete this meal listing");
+        }
+
+        // Clean up any combo deals by this cook that include this meal
+        try {
+            List<Meal> cookCombos = mealRepository.findByCookId(cook.getId()).stream()
+                    .filter(Meal::isCombo)
+                    .collect(Collectors.toList());
+            for (Meal combo : cookCombos) {
+                if (combo.getIncludedMealIds() != null && combo.getIncludedMealIds().contains(mealId)) {
+                    combo.getIncludedMealIds().remove(mealId);
+                    if (combo.getIncludedMealIds().size() < 2) {
+                        mealRepository.deleteById(combo.getId());
+                    } else {
+                        mealRepository.save(combo);
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+
+        mealRepository.deleteById(mealId);
+    }
+
     public void deactivateMeal(String cookEmail, String mealId) {
         Meal meal = mealRepository.findById(mealId)
                 .orElseThrow(() -> new ResourceNotFoundException("Meal not found"));

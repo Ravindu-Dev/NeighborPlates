@@ -107,7 +107,8 @@ export const CookDashboardScreen: React.FC = () => {
     const deleteAction = async () => {
       try {
         await api.delete(`/api/meals/${mealId}`);
-        setToast({ visible: true, message: 'Meal deactivated successfully', type: 'success' });
+        setMeals((prev) => prev.filter((m) => m.id !== mealId));
+        setToast({ visible: true, message: 'Meal deleted successfully', type: 'success' });
         fetchData();
       } catch (error) {
         console.error(error);
@@ -116,13 +117,13 @@ export const CookDashboardScreen: React.FC = () => {
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to deactivate this meal?')) {
+      if (window.confirm('Are you sure you want to permanently delete this meal listing?')) {
         deleteAction();
       }
     } else {
-      Alert.alert('Deactivate Meal', 'Are you sure you want to deactivate this meal?', [
+      Alert.alert('Delete Meal', 'Are you sure you want to permanently delete this meal listing?', [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Deactivate', style: 'destructive', onPress: deleteAction },
+        { text: 'Delete', style: 'destructive', onPress: deleteAction },
       ]);
     }
   };

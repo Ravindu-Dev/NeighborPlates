@@ -120,10 +120,10 @@ export const ProfileScreen: React.FC = () => {
 
   const handlePickAvatar = async () => {
     try {
-      const uri = await pickImageFromGallery();
-      if (!uri) return;
+      const asset = await pickImageFromGallery();
+      if (!asset) return;
       setUploadingAvatar(true);
-      const cdnUrl = await uploadImageToImgBB(uri);
+      const cdnUrl = await uploadImageToImgBB(asset.uri);
       setEditAvatarUrl(cdnUrl);
     } catch (err: any) {
       Alert.alert('Upload Error', err?.message || 'Could not upload image.');

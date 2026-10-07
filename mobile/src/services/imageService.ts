@@ -63,8 +63,10 @@ export const validateImageSize = async (asset: PickedImageAsset): Promise<void> 
   // If fileSize wasn't reported by the picker, try to read it via FileSystem (native only)
   if (sizeBytes == null && Platform.OS !== 'web') {
     try {
-      const info = await FileSystem.getInfoAsync(asset.uri, { size: true });
-      sizeBytes = (info as any).size;
+      const info = await FileSystem.getInfoAsync(asset.uri);
+      if (info.exists && 'size' in info) {
+        sizeBytes = info.size;
+      }
     } catch {
       // Can't determine size — let it through
       return;
@@ -78,18 +80,19 @@ export const validateImageSize = async (asset: PickedImageAsset): Promise<void> 
 };
 
 /**
- * Upload a local image URI to ImgBB and return the CDN URL.
+ * Upload a local image URI or PickedImageAsset to ImgBB and return the CDN URL.
  *
  * Flow:
  *   1. Read local file as base64
  *   2. POST base64 string to ImgBB API
  *   3. Return the hosted image URL
  *
- * @param localUri - file:// URI from expo-image-picker
+ * @param imageInput - file:// URI string or PickedImageAsset from expo-image-picker
  * @returns ImgBB CDN URL string
  * @throws Error on network failure, invalid key, or upload error
  */
-export const uploadImageToImgBB = async (localUri: string): Promise<string> => {
+export const uploadImageToImgBB = async (imageInput: string | PickedImageAsset): Promise<string> => {
+  const localUri = typeof imageInput === 'string' ? imageInput : imageInput.uri;
   // Read the file as base64
   let base64Data: string;
 

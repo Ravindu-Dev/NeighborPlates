@@ -224,10 +224,10 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
 
   const handlePickReviewPhoto = async () => {
     try {
-      const uri = await pickImageFromGallery();
-      if (!uri) return;
+      const asset = await pickImageFromGallery();
+      if (!asset) return;
       setUploadingPhoto(true);
-      const cdnUrl = await uploadImageToImgBB(uri);
+      const cdnUrl = await uploadImageToImgBB(asset.uri);
       setReviewPhotoUrl(cdnUrl);
     } catch (err: any) {
       Alert.alert('Upload Error', err?.message || 'Could not upload food image.');
