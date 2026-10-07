@@ -293,8 +293,8 @@ export const CookDashboardScreen: React.FC = () => {
                     </View>
                     <View className="mt-1.5 flex-row justify-between items-center">
                       <Badge
-                        label={meal.active ? 'Active' : 'Inactive'}
-                        variant={meal.active ? 'success' : 'neutral'}
+                        label={meal.active ? 'Available' : 'Out of Stock'}
+                        variant={meal.active ? 'success' : 'warning'}
                       />
                     </View>
                     {/* Actions */}

@@ -33,6 +33,21 @@ public class MealController {
         return ResponseEntity.ok(response);
     }
 
+    @PatchMapping("/{id}/toggle-status")
+    public ResponseEntity<MealResponse> toggleMealStatus(@PathVariable String id, Principal principal) {
+        MealResponse response = mealService.toggleMealStatus(principal.getName(), id);
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{id}/portions")
+    public ResponseEntity<MealResponse> updatePortions(
+            @PathVariable String id,
+            @RequestParam int portions,
+            Principal principal) {
+        MealResponse response = mealService.updateMealPortions(principal.getName(), id, portions);
+        return ResponseEntity.ok(response);
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse> deleteMeal(@PathVariable String id, Principal principal) {
         mealService.deleteMeal(principal.getName(), id);

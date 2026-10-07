@@ -107,10 +107,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     fetchAiCombos();
 
     const unsubscribe = navigation.addListener('focus', () => {
+      fetchMeals(selectedCategory);
       fetchAiCombos();
     });
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, selectedCategory]);
 
   // Extract unique chefs dynamically from the active list of meals
   const getUniqueCooks = (mealsList: any[]) => {
