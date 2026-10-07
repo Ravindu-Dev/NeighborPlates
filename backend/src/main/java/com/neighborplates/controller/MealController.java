@@ -34,9 +34,9 @@ public class MealController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse> deactivateMeal(@PathVariable String id, Principal principal) {
-        mealService.deactivateMeal(principal.getName(), id);
-        return ResponseEntity.ok(new ApiResponse(true, "Meal deactivation successful"));
+    public ResponseEntity<ApiResponse> deleteMeal(@PathVariable String id, Principal principal) {
+        mealService.deleteMeal(principal.getName(), id);
+        return ResponseEntity.ok(new ApiResponse(true, "Meal deleted successfully"));
     }
 
     @GetMapping("/{id}")

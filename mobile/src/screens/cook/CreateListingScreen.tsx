@@ -18,16 +18,6 @@ const CATEGORY_ICONS: Record<string, string> = {
   SNACK: '🍿',
 };
 
-const SAMPLE_PHOTOS = [
-  { name: 'Rice & Curry', url: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600' },
-  { name: 'Kottu Roti', url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=600' },
-  { name: 'Biryani / Rice', url: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600' },
-  { name: 'Pasta & Noodles', url: 'https://images.unsplash.com/photo-1621996346565-e3d5d6281293?w=600' },
-  { name: 'Burger & Snacks', url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600' },
-  { name: 'Pancakes', url: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=600' },
-  { name: 'Fresh Salad', url: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600' },
-];
-
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
 export const CreateListingScreen: React.FC = () => {
@@ -317,7 +307,7 @@ export const CreateListingScreen: React.FC = () => {
                     No image selected
                   </Text>
                   <Text className="text-textMuted text-[10px] text-center mt-0.5">
-                    Upload from gallery, paste a URL, or pick a template
+                    Upload a photo from your gallery (Max 5 MB)
                   </Text>
                 </View>
               )}
@@ -328,7 +318,7 @@ export const CreateListingScreen: React.FC = () => {
               onPress={handlePickFromGallery}
               disabled={uploading}
               activeOpacity={0.8}
-              className={`flex-row items-center justify-center py-3.5 rounded-2xl border mb-4 ${
+              className={`flex-row items-center justify-center py-3.5 rounded-2xl border ${
                 uploading
                   ? 'bg-gray-100 border-gray-200'
                   : 'bg-primary/10 border-primary/30'
@@ -345,35 +335,6 @@ export const CreateListingScreen: React.FC = () => {
                 {uploading ? 'Uploading...' : '📷  Upload from Gallery'}
               </Text>
             </TouchableOpacity>
-
-            {/* Custom URL Input */}
-            <TextInput
-              label="OR PASTE IMAGE URL"
-              placeholder="https://example.com/photo.jpg"
-              value={imageUrl}
-              onChangeText={setImageUrl}
-              helperText="Direct image link or paste photo URL"
-            />
-
-            {/* Sample Photo Preset Gallery */}
-            <Text className="text-textPrimary font-semibold text-xs mb-2 ml-1">OR CHOOSE QUICK TEMPLATE PHOTO</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1">
-              {SAMPLE_PHOTOS.map((sample, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  onPress={() => setImageUrl(sample.url)}
-                  activeOpacity={0.8}
-                  className={`mx-1 p-1.5 rounded-2xl border items-center w-24 ${
-                    imageUrl === sample.url ? 'border-secondary bg-secondary/10' : 'border-gray-200 bg-white'
-                  }`}
-                >
-                  <Image source={{ uri: sample.url }} className="w-20 h-14 rounded-xl mb-1" />
-                  <Text className="text-[10px] font-bold text-textPrimary text-center" numberOfLines={1}>
-                    {sample.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
           </View>
 
           {/* ─── Section 1: Meal Details ─── */}
