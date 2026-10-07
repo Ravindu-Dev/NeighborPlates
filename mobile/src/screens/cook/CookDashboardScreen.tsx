@@ -19,6 +19,7 @@ import { StatCard } from '../../components/common/StatCard';
 import { SectionHeader } from '../../components/common/SectionHeader';
 import { SkeletonLoader } from '../../components/common/SkeletonLoader';
 import { Toast } from '../../components/common/Toast';
+import { Feather } from '@expo/vector-icons';
 
 export const CookDashboardScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -205,12 +206,17 @@ export const CookDashboardScreen: React.FC = () => {
             value={profile?.stats?.totalOrders ?? 0}
             className="mr-2"
           />
-          <StatCard
-            icon="💰"
-            label="EARNINGS"
-            value={`${(profile?.stats?.totalEarnings ?? 0).toLocaleString()}`}
-            className="mr-2"
-          />
+          <TouchableOpacity
+            onPress={() => navigation.navigate('EarningDashboard')}
+            className="flex-1 mr-2"
+            activeOpacity={0.7}
+          >
+            <StatCard
+              icon="💰"
+              label="EARNINGS"
+              value={`${(profile?.stats?.totalEarnings ?? 0).toLocaleString()}`}
+            />
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={() => navigation.navigate('CookReviews')}
             className="flex-1 mr-2"
@@ -313,6 +319,45 @@ export const CookDashboardScreen: React.FC = () => {
             </ScrollView>
           </View>
         )}
+
+        {/* ─── Earning Dashboard Button ─── */}
+        <View className="mb-6">
+          <TouchableOpacity
+            testID="earning-dashboard-button"
+            accessibilityLabel="Earning Dashboard"
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('EarningDashboard')}
+            activeOpacity={0.85}
+            className="bg-secondary rounded-2xl py-3.5 px-4 flex-row items-center justify-between shadow-sm"
+            style={{
+              shadowColor: '#2D6A4F',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.18,
+              shadowRadius: 8,
+              elevation: 4,
+            }}
+          >
+            <View className="flex-row items-center flex-1 mr-3">
+              <View className="w-10 h-10 rounded-xl bg-white/20 items-center justify-center mr-3">
+                <Text className="text-xl">💰</Text>
+              </View>
+              <View className="flex-1">
+                <Text className="text-white font-extrabold text-sm tracking-wide">
+                  Earning Dashboard
+                </Text>
+                <Text className="text-white/80 text-[11px] mt-0.5" numberOfLines={1}>
+                  View revenue details, payouts & sales breakdown
+                </Text>
+              </View>
+            </View>
+            <View className="flex-row items-center bg-white/20 px-3 py-1.5 rounded-full">
+              <Text className="text-white font-bold text-xs mr-1">
+                LKR {(profile?.stats?.totalEarnings ?? 0).toLocaleString()}
+              </Text>
+              <Feather name="chevron-right" size={16} color="#FFFFFF" />
+            </View>
+          </TouchableOpacity>
+        </View>
 
         {/* ─── Active Orders Queue ─── */}
         <SectionHeader

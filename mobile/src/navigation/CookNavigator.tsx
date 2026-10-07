@@ -44,12 +44,14 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { CookReviewsScreen } from '../screens/cook/CookReviewsScreen';
 import { ComboDealsScreen } from '../screens/cook/ComboDealsScreen';
 import { AddMealFormScreen } from '../screens/cook/AddMealFormScreen';
+import { EarningDashboardScreen } from '../screens/cook/EarningDashboardScreen';
 
 export type CookStackParamList = {
   CookTabs: undefined;
   CookReviews: undefined;
   ComboDeals: undefined;
   AddMealForm: { mealToEdit?: any } | undefined;
+  EarningDashboard: undefined;
 };
 
 const Stack = createNativeStackNavigator<CookStackParamList>();
@@ -113,6 +115,7 @@ export const CookNavigator = () => {
       <Stack.Screen name="CookReviews" component={CookReviewsScreen} />
       <Stack.Screen name="ComboDeals" component={ComboDealsScreen} />
       <Stack.Screen name="AddMealForm" component={AddMealFormScreen} />
+      <Stack.Screen name="EarningDashboard" component={EarningDashboardScreen} />
     </Stack.Navigator>
   );
 };
