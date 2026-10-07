@@ -42,10 +42,12 @@ const TabIcon = ({
 
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { CookReviewsScreen } from '../screens/cook/CookReviewsScreen';
+import { ComboDealsScreen } from '../screens/cook/ComboDealsScreen';
 
 export type CookStackParamList = {
   CookTabs: undefined;
   CookReviews: undefined;
+  ComboDeals: undefined;
 };
 
 const Stack = createNativeStackNavigator<CookStackParamList>();
@@ -107,6 +109,7 @@ export const CookNavigator = () => {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="CookTabs" component={CookTabNavigator} />
       <Stack.Screen name="CookReviews" component={CookReviewsScreen} />
+      <Stack.Screen name="ComboDeals" component={ComboDealsScreen} />
     </Stack.Navigator>
   );
 };

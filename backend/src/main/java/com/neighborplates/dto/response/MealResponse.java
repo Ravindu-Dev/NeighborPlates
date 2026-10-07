@@ -33,4 +33,8 @@ public class MealResponse {
     private Instant createdAt;
     private Double cookLongitude;
     private Double cookLatitude;
+    private boolean combo;
+    private List<String> includedMealIds;
+    private double originalTotalPrice;
+    private double discountPercentage;
 }

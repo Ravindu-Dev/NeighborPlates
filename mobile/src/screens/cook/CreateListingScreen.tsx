@@ -7,7 +7,7 @@ import { FilterChip } from '../../components/common/FilterChip';
 import { SectionHeader } from '../../components/common/SectionHeader';
 import { Toast } from '../../components/common/Toast';
 import { api } from '../../services/api';
-import { requestGalleryPermission, pickImageFromGallery, uploadImageToImgBB } from '../../services/imageService';
+import { requestGalleryPermission, pickImageFromGallery, uploadImageToImgBB, validateImageSize } from '../../services/imageService';
 import { Ionicons } from '@expo/vector-icons';
 
 const CATEGORIES = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'];
@@ -60,14 +60,17 @@ export const CreateListingScreen: React.FC = () => {
         return;
       }
 
-      const localUri = await pickImageFromGallery();
-      if (!localUri) return; // User cancelled
+      const asset = await pickImageFromGallery();
+      if (!asset) return; // User cancelled
+
+      // Validate file size (< 5 MB)
+      await validateImageSize(asset);
 
       // Show local preview immediately while uploading
-      setImageUrl(localUri);
+      setImageUrl(asset.uri);
       setUploading(true);
 
-      const cdnUrl = await uploadImageToImgBB(localUri);
+      const cdnUrl = await uploadImageToImgBB(asset.uri);
       setImageUrl(cdnUrl);
       setToast({ visible: true, message: '📸 Image uploaded successfully!', type: 'success' });
     } catch (error: any) {
@@ -248,6 +251,37 @@ export const CreateListingScreen: React.FC = () => {
               </TouchableOpacity>
             )}
           </View>
+
+          {/* ─── Combo Deals Button ─── */}
+          {!mealToEdit && (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ComboDeals')}
+              activeOpacity={0.85}
+              className="bg-secondary rounded-3xl py-4 px-5 mb-6 flex-row items-center"
+              style={{
+                shadowColor: '#2D6A4F',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.25,
+                shadowRadius: 10,
+                elevation: 6,
+              }}
+            >
+              <View className="w-12 h-12 rounded-2xl bg-white/20 items-center justify-center mr-4">
+                <Text className="text-2xl">🎁</Text>
+              </View>
+              <View className="flex-1">
+                <Text className="text-white font-extrabold text-sm tracking-wide">
+                  CREATE COMBO DEAL
+                </Text>
+                <Text className="text-white/70 text-[10px] mt-0.5">
+                  AI-powered bundled meal packages • Boost your sales
+                </Text>
+              </View>
+              <View className="bg-white/20 rounded-full w-8 h-8 items-center justify-center">
+                <Ionicons name="sparkles" size={16} color="#FBBF24" />
+              </View>
+            </TouchableOpacity>
+          )}
 
           {/* ─── Meal Image Section ─── */}
           <View className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm mb-6">

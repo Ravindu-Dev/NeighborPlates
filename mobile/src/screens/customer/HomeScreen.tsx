@@ -16,19 +16,23 @@ interface HomeScreenProps {
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [meals, setMeals] = useState<any[]>([]);
+  const [aiCombos, setAiCombos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingAi, setLoadingAi] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'rating' | 'price' | 'none'>('none');
+
   const promos = [
-    { id: '1', title: '50% OFF First Order', desc: 'Use code: NEIGHBOR50', color: 'from-orange-500 to-amber-500', badge: 'SPECIAL' },
-    { id: '2', title: 'Free Cook Delivery', desc: 'On orders above LKR 1000', color: 'from-emerald-600 to-teal-500', badge: 'FREE SHIPPING' },
-    { id: '3', title: 'LKR 150 Flat Discount', desc: 'Support local home chefs today', color: 'from-blue-600 to-indigo-500', badge: 'SUPPORT LOCAL' }
+    { id: 'promo-1', title: '50% OFF First Order', desc: 'Use code: NEIGHBOR50', badge: 'SPECIAL' },
+    { id: 'promo-2', title: 'Free Cook Delivery', desc: 'On orders above LKR 1000', badge: 'FREE SHIPPING' },
+    { id: 'promo-3', title: 'LKR 150 Flat Discount', desc: 'Support local home chefs today', badge: 'SUPPORT LOCAL' }
   ];
 
   const categoriesList = [
     { key: 'ALL', label: 'All', emoji: '🍽️' },
+    { key: 'COMBO', label: 'Combos', emoji: '🎁' },
     { key: 'BREAKFAST', label: 'Breakfast', emoji: '🥞' },
     { key: 'LUNCH', label: 'Lunch', emoji: '🍛' },
     { key: 'DINNER', label: 'Dinner', emoji: '🍜' },
@@ -39,7 +43,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     try {
       const categoryParam = category && category !== 'ALL' ? `?category=${category}` : '';
       const response = await api.get(`/api/meals${categoryParam}`);
-      setMeals(response.data);
+      setMeals(response.data || []);
     } catch (error) {
       console.error('Error fetching meals:', error);
     } finally {
@@ -47,20 +51,66 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
+  const fetchAiCombos = async () => {
+    setLoadingAi(true);
+    try {
+      const response = await api.get('/api/combos/recommendations');
+      if (response.data && response.data.length > 0) {
+        setAiCombos(response.data);
+      } else {
+        // Fallback: fetch all active combos if AI recs is empty
+        const allCombosRes = await api.get('/api/combos');
+        if (allCombosRes.data && allCombosRes.data.length > 0) {
+          const formatted = allCombosRes.data.map((c: any) => ({
+            combo: c,
+            tag: `${c.discountPercentage || 15}% OFF COMBO`,
+            reason: c.description || `Fresh bundled feast package by Chef ${c.cookName}.`,
+          }));
+          setAiCombos(formatted);
+        } else {
+          setAiCombos([]);
+        }
+      }
+    } catch {
+      try {
+        const allCombosRes = await api.get('/api/combos');
+        if (allCombosRes.data && allCombosRes.data.length > 0) {
+          const formatted = allCombosRes.data.map((c: any) => ({
+            combo: c,
+            tag: `${c.discountPercentage || 15}% OFF COMBO`,
+            reason: c.description || `Fresh bundled feast package by Chef ${c.cookName}.`,
+          }));
+          setAiCombos(formatted);
+        }
+      } catch {
+        // Fallback silently
+      }
+    } finally {
+      setLoadingAi(false);
+    }
+  };
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchMeals(selectedCategory);
+    await Promise.all([fetchMeals(selectedCategory), fetchAiCombos()]);
     setRefreshing(false);
   }, [selectedCategory]);
 
+  // Re-fetch category meals when category filter changes
   useEffect(() => {
     fetchMeals(selectedCategory);
+  }, [selectedCategory]);
+
+  // Initial load & screen focus for AI combo recommendations and meals
+  useEffect(() => {
+    fetchMeals(selectedCategory);
+    fetchAiCombos();
 
     const unsubscribe = navigation.addListener('focus', () => {
-      fetchMeals(selectedCategory);
+      fetchAiCombos();
     });
     return unsubscribe;
-  }, [navigation, selectedCategory]);
+  }, [navigation]);
 
   // Extract unique chefs dynamically from the active list of meals
   const getUniqueCooks = (mealsList: any[]) => {
@@ -153,34 +203,132 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       >
         <View className="px-6 pt-6">
           {/* Welcome Info */}
-          <View className="mb-6">
+          <View className="mb-4">
             <Text className="text-textSecondary text-xs font-semibold">Welcome back, neighbor! 👋</Text>
             <Text className="text-textPrimary text-2xl font-black tracking-tight mt-0.5">Discover Home Kitchens</Text>
           </View>
 
-          {/* Marketing Banners Horizontal Carousel */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            className="mb-8"
-            snapToInterval={280}
-            decelerationRate="fast"
-          >
-            {promos.map((item) => (
-              <View 
-                key={item.id}
-                className="w-72 bg-[#1A1A2E] rounded-3xl p-5 mr-4 border border-gray-800 shadow-md relative overflow-hidden h-36"
-              >
-                <View className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-white/5" />
-                <View className="absolute -top-6 -left-6 w-20 h-20 rounded-full bg-white/5" />
-                <View className="bg-white/10 px-2 py-0.5 rounded-md self-start mb-2 border border-white/20">
-                  <Text className="text-white text-[8px] font-black tracking-widest uppercase">{item.badge}</Text>
-                </View>
-                <Text className="text-white font-extrabold text-lg leading-6 mb-1">{item.title}</Text>
-                <Text className="text-white/60 text-xs font-semibold">{item.desc}</Text>
+          {/* ─── 1. SEPARATE COMBO DEALS SECTION AT THE VERY TOP ─── */}
+          <View className="mb-7">
+            <View className="flex-row justify-between items-center mb-3">
+              <View className="flex-row items-center gap-1.5">
+                <Text className="text-base">🎁</Text>
+                <Text className="text-textPrimary font-black text-sm uppercase tracking-wider">
+                  Featured Combo Deals
+                </Text>
               </View>
-            ))}
-          </ScrollView>
+              <TouchableOpacity
+                onPress={() => setSelectedCategory('COMBO')}
+                className="bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-full flex-row items-center gap-1"
+                activeOpacity={0.7}
+              >
+                <Ionicons name="sparkles" size={10} color="#FF6B35" />
+                <Text className="text-primary font-black text-[9px] uppercase tracking-wide">AI Deals</Text>
+              </TouchableOpacity>
+            </View>
+
+            {aiCombos.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={280}
+                decelerationRate="fast"
+              >
+                {aiCombos.map((item, idx) => {
+                  const combo = item.combo;
+                  if (!combo) return null;
+                  const discount = combo.discountPercentage || 15;
+                  const savings = Math.round((combo.originalTotalPrice || combo.price) - combo.price);
+
+                  return (
+                    <TouchableOpacity 
+                      key={combo.id || `combo-${idx}`}
+                      onPress={() => navigation.navigate('MealDetail', { mealId: combo.id })}
+                      activeOpacity={0.88}
+                      className="w-72 bg-[#1A1A2E] rounded-3xl p-5 mr-4 border border-gray-800 shadow-md relative overflow-hidden h-36 justify-between"
+                    >
+                      <View className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-primary/20" />
+                      <View className="absolute -top-6 -left-6 w-20 h-20 rounded-full bg-white/5" />
+                      
+                      <View>
+                        <View className="flex-row items-center justify-between mb-2">
+                          <View className="bg-primary/20 px-2.5 py-0.5 rounded-md self-start border border-primary/40 flex-row items-center gap-1">
+                            <Ionicons name="sparkles" size={8} color="#FF6B35" />
+                            <Text className="text-white text-[8px] font-black tracking-widest uppercase">
+                              {item.tag || `${discount}% OFF COMBO`}
+                            </Text>
+                          </View>
+                          <Text className="text-emerald-400 font-black text-xs">
+                            LKR {Math.round(combo.price)}
+                          </Text>
+                        </View>
+
+                        <Text className="text-white font-extrabold text-base leading-5 mb-1" numberOfLines={1}>
+                          {combo.name}
+                        </Text>
+                        <Text className="text-white/70 text-[11px] font-semibold leading-4" numberOfLines={2}>
+                          {item.reason || combo.description || `Fresh bundled feast by Chef ${combo.cookName}. Save LKR ${savings}!`}
+                        </Text>
+                      </View>
+
+                      <View className="flex-row justify-between items-center pt-1 border-t border-white/10">
+                        <Text className="text-white/50 text-[9px] font-bold uppercase tracking-wider">
+                          Chef {combo.cookName}
+                        </Text>
+                        <View className="flex-row items-center gap-1">
+                          <Text className="text-primary font-black text-[10px]">ORDER NOW</Text>
+                          <Feather name="arrow-right" size={10} color="#FF6B35" />
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            ) : (
+              <View className="w-full bg-[#1A1A2E] rounded-3xl p-5 border border-gray-800 shadow-md relative overflow-hidden h-36 justify-between">
+                <View className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-primary/10" />
+                <View>
+                  <View className="bg-white/10 px-2.5 py-0.5 rounded-md self-start mb-2 border border-white/20">
+                    <Text className="text-white text-[8px] font-black tracking-widest uppercase">AI MEAL BUNDLES</Text>
+                  </View>
+                  <Text className="text-white font-extrabold text-base mb-1">Custom Combo Deals Coming Up</Text>
+                  <Text className="text-white/60 text-xs font-semibold">Home chefs are preparing exciting meal bundles with special discounts for you!</Text>
+                </View>
+                <View className="flex-row items-center gap-1 self-end">
+                  <Text className="text-primary font-bold text-[10px]">CHECK BACK SOON</Text>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* ─── 2. SEPARATE PROMOTIONS SECTION ─── */}
+          <View className="mb-8">
+            <Text className="text-textPrimary font-black text-sm uppercase tracking-wider mb-3">Special Offers</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={280}
+              decelerationRate="fast"
+            >
+              {promos.map((item) => (
+                <View 
+                  key={item.id}
+                  className="w-72 bg-[#1A1A2E] rounded-3xl p-5 mr-4 border border-gray-800 shadow-md relative overflow-hidden h-36 justify-between"
+                >
+                  <View className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-white/5" />
+                  <View className="absolute -top-6 -left-6 w-20 h-20 rounded-full bg-white/5" />
+                  
+                  <View>
+                    <View className="bg-white/10 px-2 py-0.5 rounded-md self-start mb-2 border border-white/20">
+                      <Text className="text-white text-[8px] font-black tracking-widest uppercase">{item.badge}</Text>
+                    </View>
+                    <Text className="text-white font-extrabold text-lg leading-6 mb-1">{item.title}</Text>
+                    <Text className="text-white/60 text-xs font-semibold">{item.desc}</Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
 
           {/* Visual Categories Grid */}
           <View className="mb-8">
@@ -224,7 +372,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                     name={chef.name}
                     rating={chef.rating}
                     specialty={chef.specialty}
-                    onPress={() => setSelectedCategory('')} // Clear to show their meals
+                    onPress={() => setSelectedCategory('')}
                   />
                 ))}
               </ScrollView>
@@ -253,7 +401,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                       )}
                       <View className="absolute top-2 left-2 bg-amber-50 border border-amber-150 px-2 py-0.5 rounded-md shadow-xs flex-row items-center">
                         <Text className="text-[8px] mr-0.5">⭐</Text>
-                        <Text className="text-amber-800 font-extrabold text-[8px]">{meal.avgRating.toFixed(1)}</Text>
+                        <Text className="text-amber-800 font-extrabold text-[8px]">{meal.avgRating?.toFixed(1) || '5.0'}</Text>
                       </View>
                     </View>
                     <Text className="text-textPrimary font-extrabold text-xs mb-0.5" numberOfLines={1}>{meal.name}</Text>
