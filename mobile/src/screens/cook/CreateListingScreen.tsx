@@ -9,12 +9,12 @@ import {
   Image,
   ActivityIndicator,
   Modal,
+  TextInput,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Button } from '../../components/common/Button';
 import { SectionHeader } from '../../components/common/SectionHeader';
 import { Toast } from '../../components/common/Toast';
-import { TextInput } from '../../components/common/TextInput';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -34,6 +34,10 @@ export const CreateListingScreen: React.FC = () => {
   const [cookMeals, setCookMeals] = useState<any[]>([]);
   const [loadingMeals, setLoadingMeals] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
+
+  // Search & Filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
 
   // Portion quick modal and options modal state
   const [portionModalMeal, setPortionModalMeal] = useState<any | null>(null);
@@ -208,6 +212,40 @@ export const CreateListingScreen: React.FC = () => {
     }
   };
 
+  // Category counts
+  const breakfastCount = cookMeals.filter((m) => m.category === 'BREAKFAST').length;
+  const lunchCount = cookMeals.filter((m) => m.category === 'LUNCH').length;
+  const dinnerCount = cookMeals.filter((m) => m.category === 'DINNER').length;
+  const snackCount = cookMeals.filter((m) => m.category === 'SNACK').length;
+
+  const categoryChips = [
+    { key: 'ALL', label: `All (${cookMeals.length})`, icon: '🍽️' },
+    { key: 'BREAKFAST', label: `Breakfast (${breakfastCount})`, icon: '🥞' },
+    { key: 'LUNCH', label: `Lunch (${lunchCount})`, icon: '🍛' },
+    { key: 'DINNER', label: `Dinner (${dinnerCount})`, icon: '🍲' },
+  ];
+  if (snackCount > 0) {
+    categoryChips.push({ key: 'SNACK', label: `Snacks (${snackCount})`, icon: '🍿' });
+  }
+
+  // Filtered Meals logic
+  const filteredMeals = cookMeals.filter((meal) => {
+    const matchesCategory =
+      selectedCategory === 'ALL' || meal.category === selectedCategory;
+
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return matchesCategory;
+
+    const matchesQuery =
+      (meal.name || '').toLowerCase().includes(query) ||
+      (meal.description || '').toLowerCase().includes(query) ||
+      (meal.cuisineType || '').toLowerCase().includes(query) ||
+      (meal.category || '').toLowerCase().includes(query) ||
+      (meal.ingredients || []).some((ing: string) => ing.toLowerCase().includes(query));
+
+    return matchesCategory && matchesQuery;
+  });
+
   return (
     <View className="flex-1 bg-surface-elevated">
       <Toast
@@ -220,7 +258,7 @@ export const CreateListingScreen: React.FC = () => {
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         <View className="px-5 pt-14 pb-6">
           {/* ─── Screen Header ─── */}
-          <View className="flex-row justify-between items-center mb-6">
+          <View className="flex-row justify-between items-center mb-5">
             <View>
               <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider">
                 COOK FOOD MANAGEMENT
@@ -232,7 +270,7 @@ export const CreateListingScreen: React.FC = () => {
           </View>
 
           {/* ─── Combo Deals & Add New Meals Options ─── */}
-          <View className="mb-6">
+          <View className="mb-5">
             {/* Create Combo Deal Banner */}
             <TouchableOpacity
               onPress={() => navigation.navigate('ComboDeals')}
@@ -289,12 +327,62 @@ export const CreateListingScreen: React.FC = () => {
             </View>
           </View>
 
+          {/* ─── Search Bar ─── */}
+          <View className="flex-row items-center bg-white px-4 py-2.5 rounded-2xl border border-gray-200 mb-3.5 shadow-xs">
+            <Feather name="search" size={17} color="#6B7280" style={{ marginRight: 8 }} />
+            <TextInput
+              placeholder="Search meals by name, cuisine, ingredients..."
+              placeholderTextColor="#9CA3AF"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              className="flex-1 text-xs font-semibold text-textPrimary py-1"
+            />
+            {searchQuery.trim().length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} className="p-1">
+                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* ─── Category Filter Chips ─── */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            className="-mx-1 mb-5"
+            contentContainerStyle={{ paddingHorizontal: 2 }}
+          >
+            {categoryChips.map((cat) => {
+              const isSelected = selectedCategory === cat.key;
+              return (
+                <TouchableOpacity
+                  key={cat.key}
+                  onPress={() => setSelectedCategory(cat.key)}
+                  activeOpacity={0.8}
+                  className={`flex-row items-center px-4 py-2 rounded-2xl mr-2.5 border ${
+                    isSelected
+                      ? 'bg-secondary border-secondary shadow-xs'
+                      : 'bg-white border-gray-200 shadow-xs'
+                  }`}
+                >
+                  <Text className="mr-1.5 text-xs">{cat.icon}</Text>
+                  <Text
+                    className={`text-xs font-extrabold ${
+                      isSelected ? 'text-white' : 'text-textPrimary'
+                    }`}
+                  >
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
           {/* ─── All Added Meals Section ─── */}
           <View className="mb-6">
             <SectionHeader
-              title="All Added Meals"
+              title={selectedCategory === 'ALL' ? 'All Added Meals' : `${selectedCategory.charAt(0) + selectedCategory.slice(1).toLowerCase()} Meals`}
               icon="🍛"
-              actionLabel={cookMeals.length > 0 ? `${cookMeals.length} item${cookMeals.length !== 1 ? 's' : ''}` : undefined}
+              actionLabel={filteredMeals.length > 0 ? `${filteredMeals.length} item${filteredMeals.length !== 1 ? 's' : ''}` : undefined}
             />
 
             {loadingMeals ? (
@@ -318,9 +406,30 @@ export const CreateListingScreen: React.FC = () => {
                   <Text className="text-white font-bold text-xs">Add First Meal</Text>
                 </TouchableOpacity>
               </View>
+            ) : filteredMeals.length === 0 ? (
+              <View className="bg-white rounded-3xl p-7 border border-gray-100 shadow-sm items-center text-center">
+                <Text className="text-3xl mb-2">🔍</Text>
+                <Text className="text-textPrimary font-extrabold text-sm text-center mb-1">
+                  No Matching Meals Found
+                </Text>
+                <Text className="text-textSecondary text-xs text-center leading-4 px-4 mb-3">
+                  {searchQuery.trim()
+                    ? `No meals found for "${searchQuery}" in this category.`
+                    : `No meals added under ${selectedCategory} category yet.`}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setSearchQuery('');
+                    setSelectedCategory('ALL');
+                  }}
+                  className="bg-gray-100 px-4 py-2 rounded-xl"
+                >
+                  <Text className="text-textPrimary font-bold text-xs">Clear Filters</Text>
+                </TouchableOpacity>
+              </View>
             ) : (
               <View className="mt-1">
-                {cookMeals.map((meal) => {
+                {filteredMeals.map((meal) => {
                   const isAvailable = Boolean(meal.active);
                   const portionsLeft = meal.portionsRemaining ?? meal.portionLimit ?? 10;
                   const prepTimeText = meal.availability?.servingTime
