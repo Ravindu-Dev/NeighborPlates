@@ -1,93 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Alert, TouchableOpacity, Platform, Image, ActivityIndicator, Modal } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { TextInput } from '../../components/common/TextInput';
+import {
+  View,
+  Text,
+  ScrollView,
+  Alert,
+  TouchableOpacity,
+  Platform,
+  Image,
+  ActivityIndicator,
+  Modal,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Button } from '../../components/common/Button';
-import { Card } from '../../components/common/Card';
-import { Badge } from '../../components/common/Badge';
-import { FilterChip } from '../../components/common/FilterChip';
 import { SectionHeader } from '../../components/common/SectionHeader';
 import { Toast } from '../../components/common/Toast';
+import { TextInput } from '../../components/common/TextInput';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
-import { requestGalleryPermission, pickImageFromGallery, uploadImageToImgBB, validateImageSize } from '../../services/imageService';
 import { Ionicons, Feather } from '@expo/vector-icons';
 
-const CATEGORIES = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'];
 const CATEGORY_ICONS: Record<string, string> = {
   BREAKFAST: '🥞',
   LUNCH: '🍛',
   DINNER: '🍲',
   SNACK: '🍿',
+  COMBO: '🎁',
 };
-
-const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
 export const CreateListingScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const route = useRoute<any>();
-  const mealToEdit = route.params?.mealToEdit;
   const { user } = useAuthStore();
 
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [cuisineType, setCuisineType] = useState('Sri Lankan');
-  const [category, setCategory] = useState('LUNCH');
-  const [imageUrl, setImageUrl] = useState('');
-  const [ingredients, setIngredients] = useState('');
-  const [allergens, setAllergens] = useState('');
-  const [portionLimit, setPortionLimit] = useState('10');
-  const [cutoffTime, setCutoffTime] = useState('09:00');
-  const [servingTime, setServingTime] = useState('12:00');
-  const [selectedDays, setSelectedDays] = useState<string[]>(['MON', 'TUE', 'WED', 'THU', 'FRI']);
-  const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
-  const [uploading, setUploading] = useState(false);
-  const [showForm, setShowForm] = useState(false);
   const [cookMeals, setCookMeals] = useState<any[]>([]);
   const [loadingMeals, setLoadingMeals] = useState(false);
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
 
-  // Portion quick modal and meal options modal state
+  // Portion quick modal and options modal state
   const [portionModalMeal, setPortionModalMeal] = useState<any | null>(null);
   const [newPortionsCount, setNewPortionsCount] = useState<string>('10');
   const [savingPortions, setSavingPortions] = useState<boolean>(false);
   const [optionsModalMeal, setOptionsModalMeal] = useState<any | null>(null);
-
-  const handlePickFromGallery = async () => {
-    try {
-      const hasPermission = await requestGalleryPermission();
-      if (!hasPermission) {
-        setToast({ visible: true, message: 'Gallery permission is required to upload photos.', type: 'error' });
-        return;
-      }
-
-      const asset = await pickImageFromGallery();
-      if (!asset) return; // User cancelled
-
-      // Validate file size (< 5 MB)
-      await validateImageSize(asset);
-
-      // Show local preview immediately while uploading
-      setImageUrl(asset.uri);
-      setUploading(true);
-
-      const cdnUrl = await uploadImageToImgBB(asset.uri);
-      setImageUrl(cdnUrl);
-      setToast({ visible: true, message: '📸 Image uploaded successfully!', type: 'success' });
-    } catch (error: any) {
-      console.error('Image upload error:', error);
-      setImageUrl(''); // Clear the local preview on failure
-      setToast({
-        visible: true,
-        message: error.message || 'Failed to upload image. Please try again.',
-        type: 'error',
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const fetchCookMeals = async () => {
     try {
@@ -96,7 +48,6 @@ export const CreateListingScreen: React.FC = () => {
       const cookId = profRes.data?.id || user?.id;
       if (cookId) {
         const mealsRes = await api.get(`/api/meals/cook/${cookId}`);
-        // Filter non-combo individual meals
         const items = (mealsRes.data || []).filter((m: any) => !m.combo);
         setCookMeals(items);
       }
@@ -115,98 +66,21 @@ export const CreateListingScreen: React.FC = () => {
     return unsubscribe;
   }, [navigation]);
 
-  useEffect(() => {
-    if (mealToEdit) {
-      setShowForm(true);
-      setName(mealToEdit.name || '');
-      setDescription(mealToEdit.description || '');
-      setPrice(mealToEdit.price ? mealToEdit.price.toString() : '');
-      setCuisineType(mealToEdit.cuisineType || 'Sri Lankan');
-      setCategory(mealToEdit.category || 'LUNCH');
-      setImageUrl(mealToEdit.photos?.[0] || '');
-      setIngredients(mealToEdit.ingredients?.join(', ') || '');
-      setAllergens(mealToEdit.allergenTags?.join(', ') || '');
-      setPortionLimit(mealToEdit.portionLimit ? mealToEdit.portionLimit.toString() : '10');
-      if (mealToEdit.availability) {
-        setCutoffTime(mealToEdit.availability.cutoffTime || '09:00');
-        setServingTime(mealToEdit.availability.servingTime || '12:00');
-        setSelectedDays(mealToEdit.availability.days || ['MON', 'TUE', 'WED', 'THU', 'FRI']);
-      }
-    } else {
-      setShowForm(false);
-      clearFormAction();
-    }
-  }, [mealToEdit]);
-
-  const MAX_DESC_LENGTH = 250;
-
-  const toggleDay = (day: string) => {
-    setSelectedDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
-    );
-  };
-
-  const validate = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    if (!name.trim()) newErrors.name = 'Meal name is required';
-    if (!description.trim()) newErrors.description = 'Description is required';
-    if (!price || parseFloat(price) <= 0) newErrors.price = 'Enter a valid price';
-    if (!portionLimit || parseInt(portionLimit) <= 0) newErrors.portionLimit = 'Enter a valid portion limit';
-    if (selectedDays.length === 0) newErrors.days = 'Select at least one available day';
-    if (!cutoffTime.trim()) newErrors.cutoffTime = 'Cutoff time is required';
-    if (!servingTime.trim()) newErrors.servingTime = 'Serving time is required';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const clearFormAction = () => {
-    setName('');
-    setDescription('');
-    setPrice('');
-    setCuisineType('Sri Lankan');
-    setCategory('LUNCH');
-    setImageUrl('');
-    setIngredients('');
-    setAllergens('');
-    setPortionLimit('10');
-    setCutoffTime('09:00');
-    setServingTime('12:00');
-    setSelectedDays(['MON', 'TUE', 'WED', 'THU', 'FRI']);
-    setErrors({});
-  };
-
   const handleAddNewMeal = () => {
-    if (mealToEdit) {
-      navigation.setParams({ mealToEdit: undefined });
-    }
-    clearFormAction();
-    setShowForm(true);
-    setToast({ visible: true, message: '✨ Ready to add a new meal!', type: 'success' });
+    navigation.navigate('AddMealForm');
   };
 
   const handleEditCookMeal = (meal: any) => {
-    setName(meal.name || '');
-    setDescription(meal.description || '');
-    setPrice(meal.price ? meal.price.toString() : '');
-    setCuisineType(meal.cuisineType || 'Sri Lankan');
-    setCategory(meal.category || 'LUNCH');
-    setImageUrl(meal.photos?.[0] || '');
-    setIngredients(meal.ingredients?.join(', ') || '');
-    setAllergens(meal.allergenTags?.join(', ') || '');
-    setPortionLimit(meal.portionLimit ? meal.portionLimit.toString() : '10');
-    if (meal.availability) {
-      setCutoffTime(meal.availability.cutoffTime || '09:00');
-      setServingTime(meal.availability.servingTime || '12:00');
-      setSelectedDays(meal.availability.days || ['MON', 'TUE', 'WED', 'THU', 'FRI']);
-    }
-    navigation.setParams({ mealToEdit: meal });
-    setShowForm(true);
-    setToast({ visible: true, message: `✏️ Editing "${meal.name}"`, type: 'success' });
+    navigation.navigate('AddMealForm', { mealToEdit: meal });
   };
 
   const handleToggleTakingOrders = async (meal: any) => {
     const isCurrentlyActive = Boolean(meal.active);
     const nextActiveState = !isCurrentlyActive;
+    const defaultPortions = (meal.portionsRemaining && meal.portionsRemaining > 0)
+      ? meal.portionsRemaining
+      : (meal.portionLimit && meal.portionLimit > 0 ? meal.portionLimit : 10);
+    const nextPortions = nextActiveState ? defaultPortions : 0;
 
     // Optimistically update UI
     setCookMeals((prev) =>
@@ -215,9 +89,7 @@ export const CreateListingScreen: React.FC = () => {
           ? {
               ...m,
               active: nextActiveState,
-              portionsRemaining: nextActiveState
-                ? ((m.portionsRemaining && m.portionsRemaining > 0) ? m.portionsRemaining : (m.portionLimit || 10))
-                : 0,
+              portionsRemaining: nextPortions,
             }
           : m
       )
@@ -238,7 +110,7 @@ export const CreateListingScreen: React.FC = () => {
           ingredients: meal.ingredients || [],
           allergenTags: meal.allergenTags || [],
           portionLimit: meal.portionLimit || 10,
-          portionsRemaining: nextActiveState ? ((meal.portionsRemaining && meal.portionsRemaining > 0) ? meal.portionsRemaining : (meal.portionLimit || 10)) : 0,
+          portionsRemaining: nextPortions,
           availability: meal.availability || { cutoffTime: '09:00', servingTime: '12:00', days: ['MON', 'TUE', 'WED', 'THU', 'FRI'] },
           active: nextActiveState,
         });
@@ -336,77 +208,6 @@ export const CreateListingScreen: React.FC = () => {
     }
   };
 
-  const clearForm = () => {
-    if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to reset all fields?')) {
-        clearFormAction();
-      }
-    } else {
-      Alert.alert('Clear Form', 'Are you sure you want to reset all fields?', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: clearFormAction,
-        },
-      ]);
-    }
-  };
-
-  const handleCreate = async () => {
-    if (!validate()) {
-      setToast({ visible: true, message: 'Please fix the errors below.', type: 'error' });
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const payload = {
-        name,
-        description,
-        photos: imageUrl.trim() ? [imageUrl.trim()] : [],
-        price: parseFloat(price),
-        category,
-        cuisineType,
-        ingredients: ingredients.split(',').map((s) => s.trim()).filter(Boolean),
-        allergenTags: allergens.split(',').map((s) => s.trim()).filter(Boolean),
-        portionLimit: parseInt(portionLimit),
-        availability: {
-          days: selectedDays,
-          cutoffTime,
-          servingTime,
-        },
-      };
-
-      if (mealToEdit) {
-        await api.put(`/api/meals/${mealToEdit.id}`, payload);
-        setToast({ visible: true, message: '🎉 Meal updated successfully!', type: 'success' });
-      } else {
-        await api.post('/api/meals', payload);
-        setToast({ visible: true, message: '🎉 Meal published successfully!', type: 'success' });
-      }
-
-      fetchCookMeals();
-
-      // Reset form and navigation params after short delay
-      setTimeout(() => {
-        clearFormAction();
-        setShowForm(false);
-        navigation.setParams({ mealToEdit: undefined });
-        fetchCookMeals();
-      }, 1200);
-    } catch (error: any) {
-      console.error(error);
-      setToast({
-        visible: true,
-        message: error.response?.data?.message || 'Failed to publish meal. Try again.',
-        type: 'error',
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
     <View className="flex-1 bg-surface-elevated">
       <Toast
@@ -422,98 +223,73 @@ export const CreateListingScreen: React.FC = () => {
           <View className="flex-row justify-between items-center mb-6">
             <View>
               <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider">
-                {mealToEdit ? 'EDIT LISTING' : 'CREATE LISTING'}
+                COOK FOOD MANAGEMENT
               </Text>
-              <Text className="text-textPrimary font-extrabold text-xl mt-0.5">
-                {mealToEdit ? 'Edit Meal 📝' : 'List a New Meal 📝'}
+              <Text className="text-textPrimary font-extrabold text-2xl mt-0.5">
+                My Meals 🍛
               </Text>
             </View>
-            {mealToEdit ? (
-              <TouchableOpacity
-                onPress={() => {
-                  clearFormAction();
-                  setShowForm(false);
-                  navigation.setParams({ mealToEdit: undefined });
-                  navigation.navigate('Dashboard');
-                }}
-                activeOpacity={0.7}
-              >
-                <Text className="text-red-400 font-semibold text-xs">CANCEL EDIT</Text>
-              </TouchableOpacity>
-            ) : showForm ? (
-              <TouchableOpacity onPress={clearForm} activeOpacity={0.7}>
-                <Text className="text-red-400 font-semibold text-xs">CLEAR ALL</Text>
-              </TouchableOpacity>
-            ) : null}
           </View>
 
           {/* ─── Combo Deals & Add New Meals Options ─── */}
           <View className="mb-6">
-            {!mealToEdit && (
-              <TouchableOpacity
-                onPress={() => navigation.navigate('ComboDeals')}
-                activeOpacity={0.85}
-                className="bg-secondary rounded-3xl py-4 px-5 mb-3 flex-row items-center"
-                style={{
-                  shadowColor: '#2D6A4F',
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.25,
-                  shadowRadius: 10,
-                  elevation: 6,
-                }}
-              >
-                <View className="w-12 h-12 rounded-2xl bg-white/20 items-center justify-center mr-4">
-                  <Text className="text-2xl">🎁</Text>
-                </View>
-                <View className="flex-1">
-                  <Text className="text-white font-extrabold text-sm tracking-wide">
-                    CREATE COMBO DEAL
-                  </Text>
-                  <Text className="text-white/70 text-[10px] mt-0.5">
-                    AI-powered bundled meal packages • Boost your sales
-                  </Text>
-                </View>
-                <View className="bg-white/20 rounded-full w-8 h-8 items-center justify-center">
-                  <Ionicons name="sparkles" size={16} color="#FBBF24" />
-                </View>
-              </TouchableOpacity>
-            )}
+            {/* Create Combo Deal Banner */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ComboDeals')}
+              activeOpacity={0.85}
+              className="bg-secondary rounded-3xl py-4 px-5 mb-3.5 flex-row items-center"
+              style={{
+                shadowColor: '#2D6A4F',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.25,
+                shadowRadius: 10,
+                elevation: 6,
+              }}
+            >
+              <View className="w-12 h-12 rounded-2xl bg-white/20 items-center justify-center mr-4">
+                <Text className="text-2xl">🎁</Text>
+              </View>
+              <View className="flex-1">
+                <Text className="text-white font-extrabold text-sm tracking-wide">
+                  CREATE COMBO DEAL
+                </Text>
+                <Text className="text-white/70 text-[10px] mt-0.5">
+                  AI-powered bundled meal packages • Boost your sales
+                </Text>
+              </View>
+              <View className="bg-white/20 rounded-full w-8 h-8 items-center justify-center">
+                <Ionicons name="sparkles" size={16} color="#FBBF24" />
+              </View>
+            </TouchableOpacity>
 
             {/* Add New Meals Button (Positioned to the right and below) */}
             <View className="flex-row justify-end">
               <TouchableOpacity
-                onPress={() => {
-                  if (showForm && !mealToEdit) {
-                    setShowForm(false);
-                  } else {
-                    handleAddNewMeal();
-                  }
+                onPress={handleAddNewMeal}
+                activeOpacity={0.85}
+                className="flex-row items-center px-4 py-2.5 rounded-2xl shadow-sm bg-primary"
+                style={{
+                  shadowColor: '#FF6B35',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 4,
+                  elevation: 3,
                 }}
-                activeOpacity={0.8}
-                className={`flex-row items-center px-4 py-2.5 rounded-2xl shadow-xs border ${
-                  showForm && !mealToEdit
-                    ? 'bg-primary border-primary'
-                    : 'bg-primary/10 border-primary/30'
-                }`}
               >
                 <Ionicons
-                  name={showForm && !mealToEdit ? "close-circle" : "add-circle"}
-                  size={16}
-                  color={showForm && !mealToEdit ? "#FFFFFF" : "#FF6B35"}
-                  style={{ marginRight: 5 }}
+                  name="add-circle"
+                  size={18}
+                  color="#FFFFFF"
+                  style={{ marginRight: 6 }}
                 />
-                <Text
-                  className={`font-bold text-xs tracking-wide ${
-                    showForm && !mealToEdit ? 'text-white' : 'text-primary'
-                  }`}
-                >
-                  {showForm && !mealToEdit ? 'Hide Form' : 'Add New Meals'}
+                <Text className="font-extrabold text-xs tracking-wide text-white">
+                  Add New Meals
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* ─── All Added Meals Section (Beneath Add New Meals button) ─── */}
+          {/* ─── All Added Meals Section ─── */}
           <View className="mb-6">
             <SectionHeader
               title="All Added Meals"
@@ -527,14 +303,20 @@ export const CreateListingScreen: React.FC = () => {
                 <Text className="text-textMuted text-xs mt-2 font-medium">Loading your meals...</Text>
               </View>
             ) : cookMeals.length === 0 ? (
-              <View className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm items-center text-center">
-                <Text className="text-3xl mb-2">🍽️</Text>
-                <Text className="text-textPrimary font-extrabold text-sm text-center mb-1">
+              <View className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm items-center text-center">
+                <Text className="text-4xl mb-3">🍽️</Text>
+                <Text className="text-textPrimary font-extrabold text-base text-center mb-1">
                   No Meals Added Yet
                 </Text>
-                <Text className="text-textSecondary text-xs text-center leading-4 px-2">
-                  Click 'Add New Meals' above to list your first delicious dish!
+                <Text className="text-textSecondary text-xs text-center leading-4 px-4 mb-4">
+                  Click 'Add New Meals' above to list your first delicious home-cooked dish!
                 </Text>
+                <TouchableOpacity
+                  onPress={handleAddNewMeal}
+                  className="bg-primary px-5 py-2.5 rounded-2xl"
+                >
+                  <Text className="text-white font-bold text-xs">Add First Meal</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               <View className="mt-1">
@@ -723,255 +505,6 @@ export const CreateListingScreen: React.FC = () => {
               </View>
             )}
           </View>
-
-          {/* ─── Conditional Meal Form ─── */}
-          {(showForm || mealToEdit) && (
-            <>
-              {/* ─── Meal Image Section ─── */}
-          <View className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm mb-6">
-            <SectionHeader title="Meal Image" icon="📸" />
-
-            {/* Live Preview Box */}
-            <View className="w-full h-44 rounded-2xl bg-gray-50 border border-gray-200 overflow-hidden items-center justify-center mb-4 relative">
-              {imageUrl.trim() ? (
-                <>
-                  <Image source={{ uri: imageUrl.trim() }} className="w-full h-full" resizeMode="cover" />
-                  {/* Uploading overlay */}
-                  {uploading && (
-                    <View className="absolute inset-0 bg-black/40 items-center justify-center rounded-2xl">
-                      <ActivityIndicator size="large" color="#FFFFFF" />
-                      <Text className="text-white font-bold text-xs mt-2">Uploading...</Text>
-                    </View>
-                  )}
-                  {/* Clear image button */}
-                  {!uploading && (
-                    <TouchableOpacity
-                      onPress={() => setImageUrl('')}
-                      className="absolute top-2 right-2 bg-black/50 rounded-full w-7 h-7 items-center justify-center"
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="close" size={16} color="#FFFFFF" />
-                    </TouchableOpacity>
-                  )}
-                </>
-              ) : (
-                <View className="items-center p-4">
-                  <Text className="text-4xl mb-1">🖼️</Text>
-                  <Text className="text-textSecondary font-semibold text-xs text-center">
-                    No image selected
-                  </Text>
-                  <Text className="text-textMuted text-[10px] text-center mt-0.5">
-                    Upload a photo from your gallery (Max 5 MB)
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {/* Upload from Gallery Button */}
-            <TouchableOpacity
-              onPress={handlePickFromGallery}
-              disabled={uploading}
-              activeOpacity={0.8}
-              className={`flex-row items-center justify-center py-3.5 rounded-2xl border ${
-                uploading
-                  ? 'bg-gray-100 border-gray-200'
-                  : 'bg-primary/10 border-primary/30'
-              }`}
-            >
-              {uploading ? (
-                <ActivityIndicator size="small" color="#FF6B35" className="mr-2" />
-              ) : (
-                <Ionicons name="images-outline" size={18} color="#FF6B35" style={{ marginRight: 8 }} />
-              )}
-              <Text className={`font-bold text-sm ${
-                uploading ? 'text-textMuted' : 'text-primary'
-              }`}>
-                {uploading ? 'Uploading...' : '📷  Upload from Gallery'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* ─── Section 1: Meal Details ─── */}
-          <View className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm mb-5">
-            <SectionHeader title="Meal Details" icon="📋" />
-
-            <TextInput
-              label="MEAL NAME"
-              placeholder="e.g. Traditional Rice & Curry"
-              value={name}
-              onChangeText={(text) => {
-                setName(text);
-                if (errors.name) setErrors({ ...errors, name: '' });
-              }}
-              error={errors.name}
-            />
-            <View>
-              <TextInput
-                label="DESCRIPTION"
-                placeholder="Describe taste, components, side dishes..."
-                value={description}
-                onChangeText={(text) => {
-                  if (text.length <= MAX_DESC_LENGTH) {
-                    setDescription(text);
-                    if (errors.description) setErrors({ ...errors, description: '' });
-                  }
-                }}
-                multiline
-                numberOfLines={3}
-                error={errors.description}
-              />
-              <Text className="text-textMuted text-[10px] text-right -mt-2 mb-2">
-                {description.length}/{MAX_DESC_LENGTH}
-              </Text>
-            </View>
-            <TextInput
-              label="PRICE (LKR)"
-              placeholder="e.g. 450"
-              value={price}
-              onChangeText={(text) => {
-                setPrice(text);
-                if (errors.price) setErrors({ ...errors, price: '' });
-              }}
-              keyboardType="numeric"
-              error={errors.price}
-            />
-            <TextInput
-              label="CUISINE TYPE"
-              placeholder="e.g. Indian, Chinese, Sri Lankan"
-              value={cuisineType}
-              onChangeText={setCuisineType}
-            />
-
-            {/* Category Picker */}
-            <Text className="text-textPrimary font-semibold text-xs mb-2 ml-1">CATEGORY</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-2">
-              {CATEGORIES.map((cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  onPress={() => setCategory(cat)}
-                  activeOpacity={0.8}
-                  className={`flex-row items-center px-4 py-2.5 rounded-full mr-2 border
-                    ${category === cat
-                      ? 'bg-secondary border-secondary'
-                      : 'bg-white border-gray-200'
-                    }
-                  `}
-                >
-                  <Text className="mr-1.5">{CATEGORY_ICONS[cat]}</Text>
-                  <Text
-                    className={`text-xs font-bold
-                      ${category === cat ? 'text-white' : 'text-textSecondary'}
-                    `}
-                  >
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* ─── Section 2: Ingredients & Allergens ─── */}
-          <View className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm mb-5">
-            <SectionHeader title="Ingredients & Allergens" icon="🥗" />
-
-            <TextInput
-              label="INGREDIENTS (comma separated)"
-              placeholder="e.g. Basmati Rice, Chicken, Coconut milk"
-              value={ingredients}
-              onChangeText={setIngredients}
-            />
-            <TextInput
-              label="ALLERGENS (comma separated)"
-              placeholder="e.g. nuts, dairy, gluten"
-              value={allergens}
-              onChangeText={setAllergens}
-              helperText="Help customers with dietary restrictions"
-            />
-            <TextInput
-              label="PORTION BATCH LIMIT"
-              placeholder="e.g. 10"
-              value={portionLimit}
-              onChangeText={(text) => {
-                setPortionLimit(text);
-                if (errors.portionLimit) setErrors({ ...errors, portionLimit: '' });
-              }}
-              keyboardType="numeric"
-              error={errors.portionLimit}
-              helperText="Maximum portions you can prepare per day"
-            />
-          </View>
-
-          {/* ─── Section 3: Availability & Schedule ─── */}
-          <View className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm mb-6">
-            <SectionHeader title="Availability & Schedule" icon="⏰" />
-
-            {/* Day Selector */}
-            <Text className="text-textPrimary font-semibold text-xs mb-2 ml-1">AVAILABLE DAYS</Text>
-            <View className="flex-row flex-wrap mb-3">
-              {DAYS.map((day) => {
-                const isSelected = selectedDays.includes(day);
-                return (
-                  <TouchableOpacity
-                    key={day}
-                    onPress={() => toggleDay(day)}
-                    activeOpacity={0.8}
-                    className={`w-11 h-11 rounded-full items-center justify-center mr-1.5 mb-1.5 border
-                      ${isSelected
-                        ? 'bg-secondary border-secondary'
-                        : 'bg-white border-gray-200'
-                      }
-                    `}
-                  >
-                    <Text
-                      className={`text-[10px] font-bold
-                        ${isSelected ? 'text-white' : 'text-textSecondary'}
-                      `}
-                    >
-                      {day}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {errors.days ? (
-              <Text className="text-red-500 text-xs mb-2 ml-1 font-medium">{errors.days}</Text>
-            ) : null}
-
-            <TextInput
-              label="PRE-ORDER CUTOFF TIME"
-              placeholder="e.g. 09:00"
-              value={cutoffTime}
-              onChangeText={(text) => {
-                setCutoffTime(text);
-                if (errors.cutoffTime) setErrors({ ...errors, cutoffTime: '' });
-              }}
-              error={errors.cutoffTime}
-              helperText="Customers must order before this time"
-            />
-            <TextInput
-              label="SERVING TIME"
-              placeholder="e.g. 12:00"
-              value={servingTime}
-              onChangeText={(text) => {
-                setServingTime(text);
-                if (errors.servingTime) setErrors({ ...errors, servingTime: '' });
-              }}
-              error={errors.servingTime}
-              helperText="When the meal will be ready for pickup/delivery"
-            />
-          </View>
-
-          {/* ─── Action Buttons ─── */}
-          <Button
-            title={mealToEdit ? "🍽️  UPDATE MEAL" : "🍽️  PUBLISH MEAL"}
-            onPress={handleCreate}
-            loading={submitting}
-            variant="secondary"
-            size="lg"
-            className="w-full mb-4"
-          />
-            </>
-          )}
 
           {/* Bottom spacer */}
           <View className="h-8" />

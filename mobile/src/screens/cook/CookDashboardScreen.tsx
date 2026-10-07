@@ -129,7 +129,7 @@ export const CookDashboardScreen: React.FC = () => {
   };
 
   const handleEditMeal = (meal: any) => {
-    navigation.navigate('AddListing', { mealToEdit: meal });
+    navigation.navigate('AddMealForm', { mealToEdit: meal });
   };
 
   const chefName = profile?.profile?.name 
