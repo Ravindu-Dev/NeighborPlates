@@ -8,6 +8,9 @@ import { Platform } from 'react-native';
 const IMGBB_API_KEY = '5ed594bd967f6cbf446be42d4f29a003';
 const IMGBB_UPLOAD_URL = 'https://api.imgbb.com/1/upload';
 
+/** Maximum allowed image size in bytes (5 MB) */
+export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+
 /**
  * Request media-library permissions from the user.
  * Returns true if granted, false otherwise.
@@ -23,7 +26,13 @@ export const requestGalleryPermission = async (): Promise<boolean> => {
  * Open the device gallery and let the user pick a single image.
  * Returns the local file URI, or null if cancelled.
  */
-export const pickImageFromGallery = async (): Promise<string | null> => {
+export interface PickedImageAsset {
+  uri: string;
+  fileSize: number | undefined;
+  fileName: string | undefined;
+}
+
+export const pickImageFromGallery = async (): Promise<PickedImageAsset | null> => {
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     allowsEditing: true,
@@ -35,7 +44,37 @@ export const pickImageFromGallery = async (): Promise<string | null> => {
     return null;
   }
 
-  return result.assets[0].uri;
+  const asset = result.assets[0];
+  return {
+    uri: asset.uri,
+    fileSize: asset.fileSize,
+    fileName: asset.fileName ?? undefined,
+  };
+};
+
+/**
+ * Validate that an image asset is below the max allowed size (5 MB).
+ * Falls back to checking file info via FileSystem if fileSize is unavailable.
+ * @throws Error if the image is too large
+ */
+export const validateImageSize = async (asset: PickedImageAsset): Promise<void> => {
+  let sizeBytes = asset.fileSize;
+
+  // If fileSize wasn't reported by the picker, try to read it via FileSystem (native only)
+  if (sizeBytes == null && Platform.OS !== 'web') {
+    try {
+      const info = await FileSystem.getInfoAsync(asset.uri, { size: true });
+      sizeBytes = (info as any).size;
+    } catch {
+      // Can't determine size — let it through
+      return;
+    }
+  }
+
+  if (sizeBytes != null && sizeBytes > MAX_IMAGE_SIZE_BYTES) {
+    const sizeMB = (sizeBytes / (1024 * 1024)).toFixed(1);
+    throw new Error(`Image is too large (${sizeMB} MB). Please select an image smaller than 5 MB.`);
+  }
 };
 
 /**

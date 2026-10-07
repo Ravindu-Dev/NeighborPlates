@@ -489,7 +489,7 @@ export const UserManagementScreen: React.FC = () => {
                 <Button
                   title="CLOSE DETAILS"
                   onPress={() => setSelectedUser(null)}
-                  variant="neutral"
+                  variant="outline"
                   size="md"
                   className="w-full mt-1"
                 />

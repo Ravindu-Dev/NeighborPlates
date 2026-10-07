@@ -4,5 +4,6 @@ public enum MealCategory {
     BREAKFAST,
     LUNCH,
     DINNER,
-    SNACKS
+    SNACKS,
+    COMBO
 }

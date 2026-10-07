@@ -203,28 +203,32 @@ public class MealService {
             cookLon = cook.getProfile().getLocation().getCoordinates().get(0);
             cookLat = cook.getProfile().getLocation().getCoordinates().get(1);
         }
-        return new MealResponse(
-                meal.getId(),
-                meal.getCookId(),
-                cookName,
-                meal.getName(),
-                meal.getDescription(),
-                meal.getPhotos(),
-                meal.getPrice(),
-                meal.getCategory().name(),
-                meal.getCuisineType(),
-                meal.getIngredients(),
-                meal.getAllergenTags(),
-                meal.getPortionLimit(),
-                meal.getPortionsRemaining(),
-                meal.getAvailability(),
-                meal.getRecentReviews(),
-                meal.getAvgRating(),
-                meal.getTotalOrders(),
-                meal.isActive(),
-                meal.getCreatedAt(),
-                cookLon,
-                cookLat
-        );
+        MealResponse response = new MealResponse();
+        response.setId(meal.getId());
+        response.setCookId(meal.getCookId());
+        response.setCookName(cookName);
+        response.setName(meal.getName());
+        response.setDescription(meal.getDescription());
+        response.setPhotos(meal.getPhotos());
+        response.setPrice(meal.getPrice());
+        response.setCategory(meal.getCategory().name());
+        response.setCuisineType(meal.getCuisineType());
+        response.setIngredients(meal.getIngredients());
+        response.setAllergenTags(meal.getAllergenTags());
+        response.setPortionLimit(meal.getPortionLimit());
+        response.setPortionsRemaining(meal.getPortionsRemaining());
+        response.setAvailability(meal.getAvailability());
+        response.setRecentReviews(meal.getRecentReviews());
+        response.setAvgRating(meal.getAvgRating());
+        response.setTotalOrders(meal.getTotalOrders());
+        response.setActive(meal.isActive());
+        response.setCreatedAt(meal.getCreatedAt());
+        response.setCookLongitude(cookLon);
+        response.setCookLatitude(cookLat);
+        response.setCombo(meal.isCombo());
+        response.setIncludedMealIds(meal.getIncludedMealIds());
+        response.setOriginalTotalPrice(meal.getOriginalTotalPrice());
+        response.setDiscountPercentage(meal.getDiscountPercentage());
+        return response;
     }
 }
