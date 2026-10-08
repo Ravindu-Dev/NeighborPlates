@@ -108,8 +108,11 @@ export const ProfileScreen: React.FC = () => {
   }, [navigation, activeModal, fetchOrders]);
 
   const openModal = (modal: ActiveModal) => {
+    if (modal === 'orders') {
+      navigation.navigate('Orders');
+      return;
+    }
     setActiveModal(modal);
-    if (modal === 'orders') fetchOrders();
     if (modal === 'editProfile') {
       setEditName(profile?.profile?.name || '');
       setEditPhone(profile?.profile?.phone || '');
