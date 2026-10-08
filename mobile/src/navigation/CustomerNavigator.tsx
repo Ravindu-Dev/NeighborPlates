@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { HomeScreen } from '../screens/customer/HomeScreen';
 import { SearchScreen } from '../screens/customer/SearchScreen';
+import { OrdersScreen } from '../screens/customer/OrdersScreen';
 import { CartScreen } from '../screens/customer/CartScreen';
 import { ProfileScreen } from '../screens/customer/ProfileScreen';
 import { MealDetailScreen } from '../screens/customer/MealDetailScreen';
@@ -17,6 +18,7 @@ import { Feather } from '@expo/vector-icons';
 
 export type CustomerStackParamList = {
   HomeTabs: { screen?: string } | undefined;
+  OrdersScreen: undefined;
   MealDetail: { mealId: string };
   Checkout: undefined;
   Payment: {
@@ -37,6 +39,7 @@ export type CustomerStackParamList = {
 export type CustomerTabParamList = {
   Home: undefined;
   Search: undefined;
+  Orders: undefined;
   Cart: undefined;
   Profile: undefined;
 };
@@ -89,6 +92,7 @@ const HomeTabNavigator = () => {
           const icons: Record<string, keyof typeof Feather.glyphMap> = {
             Home: 'home',
             Search: 'search',
+            Orders: 'shopping-bag',
             Cart: 'shopping-cart',
             Profile: 'user',
           };
@@ -99,6 +103,7 @@ const HomeTabNavigator = () => {
     >
       <Tab.Screen name="Home"    component={HomeScreen}    options={{ title: 'Home' }} />
       <Tab.Screen name="Search"  component={SearchScreen}  options={{ title: 'Search' }} />
+      <Tab.Screen name="Orders"  component={OrdersScreen}  options={{ title: 'My Orders' }} />
       <Tab.Screen name="Cart"    component={CartScreen}    options={{ title: 'Cart', tabBarBadge: cartItemCount > 0 ? cartItemCount : undefined }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
     </Tab.Navigator>
@@ -109,6 +114,7 @@ export const CustomerNavigator = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HomeTabs"      component={HomeTabNavigator} />
+      <Stack.Screen name="OrdersScreen"  component={OrdersScreen} />
       <Stack.Screen name="MealDetail"    component={MealDetailScreen} />
       <Stack.Screen name="Checkout"      component={CheckoutScreen} />
       <Stack.Screen name="Payment"       component={PaymentScreen} />
@@ -116,4 +122,3 @@ export const CustomerNavigator = () => {
     </Stack.Navigator>
   );
 };
-
