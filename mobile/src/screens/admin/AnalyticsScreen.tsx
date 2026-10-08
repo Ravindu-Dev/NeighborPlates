@@ -103,7 +103,7 @@ export const AnalyticsScreen: React.FC = () => {
             </Text>
           </Card>
           <Card className="flex-1 ml-2 p-3.5" bordered>
-            <Text className="text-textMuted text-[9px] font-bold uppercase">COMMISSION (10%)</Text>
+            <Text className="text-textMuted text-[9px] font-bold uppercase">COMMISSION (5%)</Text>
             <Text className="text-secondary font-black text-lg mt-0.5">
               LKR {(stats?.totalCommission || 0).toFixed(0)}
             </Text>
