@@ -9,17 +9,17 @@ import Constants from 'expo-constants';
 // - Emulators/Simulators: Fallback to 10.0.2.2 (Android) or localhost (iOS)
 const getBackendUrl = (): string => {
   if (Platform.OS === 'web') {
-    return 'http://localhost:8082';
+    return 'http://localhost:8081';
   }
 
   // hostUri looks like "10.90.111.12:8081"
   const hostUri = Constants.expoConfig?.hostUri;
   if (hostUri) {
     const ip = hostUri.split(':')[0];
-    return `http://${ip}:8082`;
+    return `http://${ip}:8081`;
   }
 
-  return Platform.OS === 'android' ? 'http://10.0.2.2:8082' : 'http://localhost:8082';
+  return Platform.OS === 'android' ? 'http://10.0.2.2:8081' : 'http://localhost:8081';
 };
 
 const BASE_URL = getBackendUrl(); 

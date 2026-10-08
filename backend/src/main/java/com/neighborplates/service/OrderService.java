@@ -132,7 +132,7 @@ public class OrderService {
 
     public List<OrderResponse> getAvailableOrdersForRiders() {
         List<Order> orders = orderRepository.findByStatusInAndRiderIdIsNull(
-                List.of(OrderStatus.READY, OrderStatus.DELIVERING)
+                List.of(OrderStatus.READY)
         );
         return orders.stream()
                 .map(order -> {
