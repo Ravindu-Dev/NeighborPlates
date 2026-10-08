@@ -125,7 +125,7 @@ public class AdminService {
         Meal meal = mealRepository.findById(review.getMealId()).orElse(null);
         if (meal != null) {
             // Remove review from recentReviews list
-            meal.getRecentReviews().removeIf(r -> r.getUserId().equals(review.getCustomerId()) && r.getComment().equals(review.getComment()));
+            meal.getRecentReviews().removeIf(r -> r.getUserId().equals(review.getCustomerId()) && (review.getComment() == null ? r.getComment() == null : review.getComment().equals(r.getComment())));
 
             // Re-calculate meal rating averages
             List<Review> mealReviews = reviewRepository.findByMealIdOrderByCreatedAtDesc(meal.getId());
