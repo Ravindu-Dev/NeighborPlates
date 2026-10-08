@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, FlatList, ActivityIndicator, Alert, TouchableOpacity, RefreshControl, Image } from 'react-native';
 import { api } from '../../services/api';
 import { Card } from '../../components/common/Card';
@@ -12,6 +12,7 @@ export const ContentModerationScreen: React.FC = () => {
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const isFirstLoad = useRef(true);
 
   const fetchMeals = async () => {
     try {
@@ -35,13 +36,15 @@ export const ContentModerationScreen: React.FC = () => {
   };
 
   const fetchData = async () => {
-    setLoading(true);
+    // Only show full-screen spinner on initial mount, not on tab switches
+    if (isFirstLoad.current) setLoading(true);
     if (activeTab === 'meals') {
       await fetchMeals();
     } else {
       await fetchReviews();
     }
     setLoading(false);
+    isFirstLoad.current = false;
   };
 
   const handleRefresh = async () => {
@@ -216,7 +219,7 @@ export const ContentModerationScreen: React.FC = () => {
 
               {item.comment ? (
                 <Text className="text-textSecondary text-xs mt-1 leading-relaxed">
-                  "{item.comment}"
+                  &ldquo;{item.comment}&rdquo;
                 </Text>
               ) : (
                 <Text className="text-textMuted text-xs mt-1 italic">

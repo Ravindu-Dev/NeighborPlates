@@ -34,11 +34,11 @@ export const UserManagementScreen: React.FC = () => {
     try {
       const response = await api.get('/api/admin/users');
       setUsers(response.data);
-      // If modal is open, update selectedUser with latest data
-      if (selectedUser) {
-        const updated = response.data.find((u: any) => u.id === selectedUser.id);
-        if (updated) setSelectedUser(updated);
-      }
+      // Safely update selectedUser with fresh data using functional setState (avoids stale closure)
+      setSelectedUser(prev => {
+        if (!prev) return prev;
+        return response.data.find((u: any) => u.id === prev.id) || prev;
+      });
     } catch (error) {
       console.error(error);
       Alert.alert('Error', 'Failed to fetch users list.');
@@ -350,52 +350,45 @@ export const UserManagementScreen: React.FC = () => {
                 </View>
               </View>
 
-              {/* Address & Location */}
+              {/* Location */}
               <View className="bg-surface-elevated p-4 rounded-2xl border border-gray-150 mb-4">
                 <Text className="font-extrabold text-xs text-textSecondary uppercase tracking-wider mb-2.5">
-                  Address & Location
+                  Location
                 </Text>
 
-                <View className="flex-row items-start gap-2 mb-2">
-                  <Feather name="map-pin" size={14} color="#6B7280" className="mt-0.5" />
-                  <Text className="text-textSecondary text-xs font-semibold">Street:</Text>
-                  <Text className="text-textPrimary text-xs font-bold flex-1">
-                    {selectedUser?.profile?.streetAddress || 'Not specified'}
-                  </Text>
-                </View>
-
-                <View className="flex-row items-center gap-2 mb-2">
-                  <Feather name="globe" size={14} color="#6B7280" />
-                  <Text className="text-textSecondary text-xs font-semibold">City / Zip:</Text>
-                  <Text className="text-textPrimary text-xs font-bold flex-1">
-                    {[selectedUser?.profile?.city, selectedUser?.profile?.zipCode].filter(Boolean).join(', ') || 'Not specified'}
-                  </Text>
-                </View>
-
-                {(selectedUser?.profile?.latitude || selectedUser?.profile?.longitude) && (
-                  <View className="flex-row items-center gap-2">
+                {(selectedUser?.profile?.location?.coordinates?.length === 2 &&
+                  (selectedUser.profile.location.coordinates[0] !== 0 || selectedUser.profile.location.coordinates[1] !== 0)) ? (
+                  <View className="flex-row items-center gap-2 mb-2">
                     <Feather name="navigation" size={14} color="#6B7280" />
-                    <Text className="text-textSecondary text-xs font-semibold">Coordinates:</Text>
+                    <Text className="text-textSecondary text-xs font-semibold">Coordinates (Lat, Lon):</Text>
                     <Text className="text-textPrimary text-xs font-mono flex-1">
-                      {selectedUser?.profile?.latitude}, {selectedUser?.profile?.longitude}
+                      {selectedUser.profile.location.coordinates[1].toFixed(5)}, {selectedUser.profile.location.coordinates[0].toFixed(5)}
+                    </Text>
+                  </View>
+                ) : (
+                  <View className="flex-row items-center gap-2">
+                    <Feather name="map-pin" size={14} color="#9CA3AF" />
+                    <Text className="text-textMuted text-xs">No location configured</Text>
+                  </View>
+                )}
+
+                {selectedUser?.role === 'COOK' && selectedUser?.profile?.deliveryRadius != null && (
+                  <View className="flex-row items-center gap-2 mt-2">
+                    <Feather name="target" size={14} color="#6B7280" />
+                    <Text className="text-textSecondary text-xs font-semibold">Delivery Radius:</Text>
+                    <Text className="text-textPrimary text-xs font-bold flex-1">
+                      {selectedUser.profile.deliveryRadius} km
                     </Text>
                   </View>
                 )}
               </View>
 
-              {/* Role Specific Details */}
+              {/* Cook Role Details */}
               {selectedUser?.role === 'COOK' && (
                 <View className="bg-orange-50/50 p-4 rounded-2xl border border-orange-100 mb-4">
                   <Text className="font-extrabold text-xs text-primary uppercase tracking-wider mb-2.5">
-                    🍳 Cook Kitchen Profile
+                    🍳 Cook Profile
                   </Text>
-
-                  <View className="flex-row items-center gap-2 mb-2">
-                    <Text className="text-xs text-textSecondary font-semibold">Kitchen Name:</Text>
-                    <Text className="text-xs text-textPrimary font-extrabold flex-1">
-                      {selectedUser?.profile?.kitchenName || 'Not configured'}
-                    </Text>
-                  </View>
 
                   <View className="flex-row items-center gap-2 mb-2">
                     <Text className="text-xs text-textSecondary font-semibold">Hygiene Certification:</Text>
@@ -406,25 +399,33 @@ export const UserManagementScreen: React.FC = () => {
                   </View>
 
                   <View className="flex-row items-center gap-2 mb-2">
-                    <Text className="text-xs text-textSecondary font-semibold">Rating:</Text>
+                    <Text className="text-xs text-textSecondary font-semibold">Avg Rating:</Text>
                     <Text className="text-xs text-textPrimary font-bold">
-                      ⭐ {selectedUser?.profile?.rating || '0.0'} ({selectedUser?.profile?.ratingCount || 0} reviews)
+                      ⭐ {(selectedUser?.stats?.avgRating || 0).toFixed(1)} ({selectedUser?.stats?.totalOrders || 0} orders)
+                    </Text>
+                  </View>
+
+                  <View className="flex-row items-center gap-2 mb-2">
+                    <Text className="text-xs text-textSecondary font-semibold">Total Earnings:</Text>
+                    <Text className="text-xs text-textPrimary font-bold">
+                      LKR {(selectedUser?.stats?.totalEarnings || 0).toFixed(2)}
                     </Text>
                   </View>
 
                   {selectedUser?.profile?.bio && (
                     <View className="mt-1 bg-white p-3 rounded-xl border border-orange-100">
                       <Text className="text-[11px] text-textSecondary font-bold mb-1">Bio:</Text>
-                      <Text className="text-xs text-textPrimary italic">"{selectedUser.profile.bio}"</Text>
+                      <Text className="text-xs text-textPrimary italic">&ldquo;{selectedUser.profile.bio}&rdquo;</Text>
                     </View>
                   )}
                 </View>
               )}
 
+              {/* Rider Role Details */}
               {selectedUser?.role === 'RIDER' && (
                 <View className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 mb-4">
                   <Text className="font-extrabold text-xs text-blue-600 uppercase tracking-wider mb-2.5">
-                    🚴 Rider Vehicle & License Info
+                    🚴 Rider Profile
                   </Text>
 
                   <View className="flex-row items-center gap-2 mb-2">
@@ -435,16 +436,17 @@ export const UserManagementScreen: React.FC = () => {
                   </View>
 
                   <View className="flex-row items-center gap-2 mb-2">
-                    <Text className="text-xs text-textSecondary font-semibold">Vehicle Number:</Text>
-                    <Text className="text-xs text-textPrimary font-mono font-bold">
-                      {selectedUser?.profile?.vehicleNumber || 'Not provided'}
-                    </Text>
+                    <Text className="text-xs text-textSecondary font-semibold">Availability:</Text>
+                    <Badge
+                      label={selectedUser?.profile?.isAvailable ? "Online 🟢" : "Offline ⚪"}
+                      variant={selectedUser?.profile?.isAvailable ? "primary" : "neutral"}
+                    />
                   </View>
 
                   <View className="flex-row items-center gap-2 mb-2">
-                    <Text className="text-xs text-textSecondary font-semibold">License Number:</Text>
-                    <Text className="text-xs text-textPrimary font-mono font-bold">
-                      {selectedUser?.profile?.licenseNumber || 'Not provided'}
+                    <Text className="text-xs text-textSecondary font-semibold">Total Deliveries:</Text>
+                    <Text className="text-xs text-textPrimary font-bold">
+                      {selectedUser?.stats?.totalOrders || 0} orders
                     </Text>
                   </View>
 
