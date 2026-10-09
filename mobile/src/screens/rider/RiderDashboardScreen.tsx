@@ -21,82 +21,6 @@ if (Platform.OS !== 'web') {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// High-fidelity fallback/demo jobs matching the reference design
-const DEFAULT_JOBS: (RiderJobItem & { lat: number; lon: number })[] = [
-  {
-    id: 'demo-1',
-    orderNumber: 'NP-2026-8821',
-    cookName: "silva & Sun's",
-    isVerified: true,
-    distancePickup: '1.4 km',
-    estimatedTime: '18 min est.',
-    payoutAmount: 1100.50,
-    payoutTag: {
-      type: 'ready_now',
-      text: 'Ready Now',
-    },
-    pickupDistance: '1.4 km',
-    dropoffDistance: '3.1 km',
-    packageSummary: {
-      label: 'Package',
-      value: '3 Items Hot',
-      isHighlight: false,
-    },
-    highlightDish: '🍲 Delicate Soup Dumplings',
-    imageUrl: 'https://images.unsplash.com/photo-1541696432-82c6da8ce7bf?auto=format&fit=crop&w=400&q=80',
-    lat: 6.9360,
-    lon: 79.8690,
-  },
-  {
-    id: 'demo-2',
-    orderNumber: 'NP-2026-5519',
-    cookName: "Anoma's Biryani Pot",
-    isVerified: true,
-    distancePickup: '2.1 km',
-    estimatedTime: '24 min est.',
-    payoutAmount: 1600.00,
-    payoutTag: {
-      type: 'surge',
-      text: 'Includes Surge',
-    },
-    pickupDistance: '2.1 km',
-    dropoffDistance: '4.5 km',
-    packageSummary: {
-      label: 'Status',
-      value: 'Ready in 5m',
-      isHighlight: true,
-    },
-    highlightDish: '🍱 Large Family Feast (3.2 kg)',
-    imageUrl: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=400&q=80',
-    lat: 6.9150,
-    lon: 79.8730,
-  },
-  {
-    id: 'demo-3',
-    orderNumber: 'NP-2026-3390',
-    cookName: "Kamal's Ramen",
-    isVerified: true,
-    distancePickup: '2.9 km',
-    estimatedTime: '20 min total',
-    payoutAmount: 600.00,
-    payoutTag: {
-      type: 'batch',
-      text: 'Batch x2',
-    },
-    pickupDistance: '2.9 km',
-    dropoffDistance: '2 Drops',
-    packageSummary: {
-      label: 'Items',
-      value: '2 Bento Sets',
-      isHighlight: false,
-    },
-    highlightDish: '🔀 Single pickup, 2 adjacent stops',
-    imageUrl: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=400&q=80',
-    lat: 6.9040,
-    lon: 79.8580,
-  },
-];
-
 type FilterType = 'all' | 'nearby' | 'payout' | 'ready';
 type ViewMode = 'list' | 'map';
 
@@ -278,7 +202,8 @@ export const RiderDashboardScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('nearby');
   const [viewMode, setViewMode] = useState<ViewMode>('list'); // 'list' or 'map'
-  const [jobs, setJobs] = useState<(RiderJobItem & { lat: number; lon: number })[]>(DEFAULT_JOBS);
+  const [jobs, setJobs] = useState<(RiderJobItem & { lat: number; lon: number })[]>([]);
+  const [summary, setSummary] = useState<any>(null);
   const [selectedJob, setSelectedJob] = useState<RiderJobItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [accepting, setAccepting] = useState(false);
@@ -303,68 +228,66 @@ export const RiderDashboardScreen: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const [profileRes, availableRes] = await Promise.allSettled([
+      const [profileRes, availableRes, summaryRes] = await Promise.allSettled([
         api.get('/api/users/profile'),
         api.get('/api/orders/available'),
+        api.get('/api/riders/summary'),
       ]);
 
-      if (profileRes.status === 'fulfilled') {
+      if (profileRes.status === 'fulfilled' && profileRes.value.data) {
         setProfile(profileRes.value.data);
         setIsOnline(profileRes.value.data?.profile?.isAvailable ?? true);
       }
 
+      if (summaryRes.status === 'fulfilled' && summaryRes.value.data) {
+        setSummary(summaryRes.value.data);
+      }
+
       if (
         availableRes.status === 'fulfilled' &&
-        Array.isArray(availableRes.value.data) &&
-        availableRes.value.data.length > 0
+        Array.isArray(availableRes.value.data)
       ) {
         const mappedLiveJobs = availableRes.value.data.map((order: any, idx: number) => {
-          const cookName = order.cookName || 'Home Kitchen';
-          const payout = order.riderEarnings || Math.max(150, Math.round(order.totalAmount * 0.15));
-          const foodName = order.items?.[0]?.name || 'Fresh Hot Meal';
+          const cookName = order.cookName || 'Home Cook';
+          const payout = order.riderEarnings || Math.max(150, Math.round((order.totalAmount || 0) * 0.15));
+          const foodName = order.items?.[0]?.name || 'Prepared Meal';
+          const cookCoords = order.cookCoordinates || [79.8612, 6.9271];
+          const cookLat = typeof cookCoords[1] === 'number' ? cookCoords[1] : (6.9271 + (idx * 0.005));
+          const cookLon = typeof cookCoords[0] === 'number' ? cookCoords[0] : (79.8612 + (idx * 0.005));
+
           return {
             id: order.id,
             orderNumber: order.orderNumber,
             cookName,
             isVerified: true,
-            distancePickup: `${(1.2 + idx * 0.6).toFixed(1)} km`,
-            estimatedTime: `${15 + idx * 5} min est.`,
+            distancePickup: order.cookAddressLabel || 'Home Kitchen',
+            estimatedTime: 'Ready Now',
             payoutAmount: payout,
             payoutTag: {
-              type: (idx === 0 ? 'ready_now' : idx === 1 ? 'surge' : 'batch') as 'ready_now' | 'surge' | 'batch' | 'standard',
-              text: idx === 0 ? 'Ready Now' : idx === 1 ? 'Includes Surge' : 'Batch x2',
+              type: 'ready_now' as const,
+              text: 'Ready Now',
             },
-            pickupDistance: `${(1.2 + idx * 0.6).toFixed(1)} km`,
-            dropoffDistance: `${(2.8 + idx * 0.9).toFixed(1)} km`,
+            pickupDistance: order.cookAddressLabel || 'Home Kitchen',
+            dropoffDistance: order.address?.label ? (order.address.label.length > 18 ? order.address.label.slice(0, 16) + '...' : order.address.label) : 'Customer Address',
             packageSummary: {
-              label: 'Package',
-              value: `${order.items?.length || 2} Items Hot`,
+              label: 'Items',
+              value: `${order.items?.length || 1} Item${(order.items?.length || 1) > 1 ? 's' : ''}`,
               isHighlight: false,
             },
-            highlightDish: `🍲 ${foodName}`,
-            imageUrl:
-              idx === 0
-                ? 'https://images.unsplash.com/photo-1541696432-82c6da8ce7bf?auto=format&fit=crop&w=400&q=80'
-                : idx === 1
-                ? 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=400&q=80'
-                : 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=400&q=80',
-            lat: 6.9271 + (idx === 0 ? 0.009 : idx === 1 ? -0.012 : -0.023),
-            lon: 79.8612 + (idx === 0 ? 0.008 : idx === 1 ? 0.012 : -0.003),
+            highlightDish: `🍲 ${foodName}${order.items?.length > 1 ? ` (+${order.items.length - 1} more)` : ''}`,
+            imageUrl: 'https://images.unsplash.com/photo-1541696432-82c6da8ce7bf?auto=format&fit=crop&w=400&q=80',
+            lat: cookLat,
+            lon: cookLon,
             rawOrder: order,
           };
         });
-
-        if (mappedLiveJobs.length >= 3) {
-          setJobs(mappedLiveJobs);
-        } else {
-          setJobs([...mappedLiveJobs, ...DEFAULT_JOBS.slice(mappedLiveJobs.length)]);
-        }
+        setJobs(mappedLiveJobs);
       } else {
-        setJobs(DEFAULT_JOBS);
+        setJobs([]);
       }
     } catch (err) {
       console.warn('[RiderDashboard] data fetch warning', err);
-      setJobs(DEFAULT_JOBS);
+      setJobs([]);
     } finally {
       setLoading(false);
     }
@@ -414,15 +337,14 @@ export const RiderDashboardScreen: React.FC = () => {
   // Filter jobs logic
   const filteredJobs = jobs.filter((job) => {
     if (activeFilter === 'nearby') {
-      const dist = parseFloat(job.pickupDistance || '1.5');
-      return dist <= 3.0;
+      return true; // All fetched jobs are already in rider's serviceable area
     }
     if (activeFilter === 'payout') {
       const amt =
         typeof job.payoutAmount === 'number'
           ? job.payoutAmount
           : parseFloat(job.payoutAmount);
-      return amt >= 1000;
+      return amt >= 500;
     }
     if (activeFilter === 'ready') {
       return job.payoutTag?.type === 'ready_now';
@@ -436,29 +358,28 @@ export const RiderDashboardScreen: React.FC = () => {
   };
 
   const handleAcceptJob = async (job: RiderJobItem) => {
+    const targetOrderId = job.rawOrder?.id || job.id;
+    if (!targetOrderId) return;
+
     setAccepting(true);
     try {
       if (Platform.OS !== 'web') {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
 
-      if (job.rawOrder?.id) {
-        await api.put(`/api/orders/${job.rawOrder.id}/rider-accept`);
-        setModalVisible(false);
-        navigation.navigate('ActiveDelivery', { orderId: job.rawOrder.id });
-      } else {
-        setModalVisible(false);
-        navigation.navigate('ActiveDelivery', { orderId: job.id });
-      }
+      await api.put(`/api/orders/${targetOrderId}/rider-accept`);
+      setModalVisible(false);
+      navigation.navigate('ActiveDelivery', { orderId: targetOrderId });
     } catch (err: any) {
-      if (err?.response?.status === 409) {
+      const status = err?.response?.status;
+      if (status === 409 || err?.response?.data?.message?.includes('Someone else')) {
         Alert.alert('Order Taken', 'Another rider accepted this job just now.', [
           { text: 'OK' },
         ]);
       } else {
-        setModalVisible(false);
-        navigation.navigate('ActiveDelivery', { orderId: job.id });
+        Alert.alert('Unable to Accept', err?.response?.data?.message || 'Could not accept order.');
       }
+      fetchData();
     } finally {
       setAccepting(false);
     }
@@ -484,7 +405,7 @@ export const RiderDashboardScreen: React.FC = () => {
       const part = emailToUse.split('@')[0];
       return part.charAt(0).toUpperCase() + part.slice(1);
     }
-    return 'Sahan';
+    return 'Rider';
   };
   const riderDisplayName = deriveRiderName();
 
@@ -596,7 +517,7 @@ export const RiderDashboardScreen: React.FC = () => {
                     className="text-textMuted text-xs font-medium mt-0.5"
                     numberOfLines={1}
                   >
-                    Westwood Food Hub
+                    {isOnline ? 'Online • Homely Delivery Network' : 'Offline'}
                   </Text>
                 </View>
               </View>
@@ -620,22 +541,55 @@ export const RiderDashboardScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            {/* Lower Banner: Surge Boost */}
+            {/* Lower Banner: Real Shift Metrics */}
             <View className="bg-[#FFF7ED] border border-[#FFEDD5] p-3 rounded-2xl mt-3.5 flex-row items-center justify-between">
               <View className="flex-row items-center flex-1 mr-2">
-                <Text style={{ fontSize: 14 }}>⚡</Text>
+                <Text style={{ fontSize: 14 }}>📊</Text>
                 <Text className="text-[#7C2D12] text-xs font-extrabold ml-1.5">
-                  Westwood Surge Boost
+                  Today's Delivered: {summary?.today?.deliveryCount ?? 0} trips
                 </Text>
               </View>
 
               <View className="bg-[#7C2D12] px-2.5 py-1 rounded-full">
                 <Text className="text-white text-[11px] font-black">
-                  +RS 250 / job
+                  RS {summary?.today?.earnings ? summary.today.earnings.toFixed(2) : '0.00'}
                 </Text>
               </View>
             </View>
           </View>
+
+          {/* Active Order Banner if rider has order in progress */}
+          {summary?.activeOrder && (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ActiveDelivery', { orderId: summary.activeOrder.id })}
+              activeOpacity={0.9}
+              className="bg-[#EFF6FF] rounded-3xl p-4 mb-4 border border-blue-200 shadow-sm"
+            >
+              <View className="flex-row items-center justify-between mb-2">
+                <View className="flex-row items-center">
+                  <View className="w-2.5 h-2.5 rounded-full bg-blue-600 mr-2" />
+                  <Text className="text-blue-900 font-black text-xs uppercase tracking-wider">
+                    Active Delivery In Progress
+                  </Text>
+                </View>
+                <View className="bg-blue-600 px-2.5 py-0.5 rounded-full">
+                  <Text className="text-white text-[10px] font-black">
+                    {summary.activeOrder.status === 'READY' ? 'READY FOR PICKUP' : summary.activeOrder.status}
+                  </Text>
+                </View>
+              </View>
+              <Text className="text-textPrimary font-extrabold text-base mb-0.5">
+                {summary.activeOrder.cookName} → {summary.activeOrder.customerName}
+              </Text>
+              <Text className="text-textMuted text-xs mb-3">
+                Order #{summary.activeOrder.orderNumber || summary.activeOrder.id.slice(-6)} • RS {summary.activeOrder.riderEarnings ? summary.activeOrder.riderEarnings.toFixed(2) : '150.00'}
+              </Text>
+              <View className="bg-blue-600 py-2.5 px-4 rounded-xl flex-row items-center justify-center">
+                <Feather name="navigation" size={14} color="#FFFFFF" />
+                <Text className="text-white font-extrabold text-xs ml-2">Resume Active Delivery Route →</Text>
+              </View>
+            </TouchableOpacity>
+          )}
 
           {/* ── 3. Filter Chips Row ── */}
           <ScrollView
@@ -821,22 +775,30 @@ export const RiderDashboardScreen: React.FC = () => {
               <Text className="text-textPrimary text-sm font-black mt-4 mb-2">
                 Nearest Delivery Jobs ({filteredJobs.length})
               </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingRight: 8 }}
-                className="flex-row"
-              >
-                {filteredJobs.map((job) => (
-                  <View key={job.id} style={{ width: SCREEN_WIDTH * 0.82 }} className="mr-3">
-                    <RiderOrderCard
-                      job={job}
-                      onAccept={() => handleOpenJob(job)}
-                      accepting={accepting && selectedJob?.id === job.id}
-                    />
-                  </View>
-                ))}
-              </ScrollView>
+              {filteredJobs.length === 0 ? (
+                <View className="bg-white rounded-2xl p-6 border border-gray-150 items-center justify-center my-2 shadow-xs">
+                  <Feather name="inbox" size={24} color="#9CA3AF" />
+                  <Text className="text-textPrimary font-bold text-sm mt-2">No active jobs on map</Text>
+                  <Text className="text-textMuted text-xs text-center mt-1">Ready orders from nearby kitchens will appear as pins on this radar.</Text>
+                </View>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingRight: 8 }}
+                  className="flex-row"
+                >
+                  {filteredJobs.map((job) => (
+                    <View key={job.id} style={{ width: SCREEN_WIDTH * 0.82 }} className="mr-3">
+                      <RiderOrderCard
+                        job={job}
+                        onAccept={() => handleOpenJob(job)}
+                        accepting={accepting && selectedJob?.id === job.id}
+                      />
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
             </View>
           ) : (
             /* Mini Map preview card inside List View */
@@ -913,15 +875,46 @@ export const RiderDashboardScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
-              {/* ── List of Job Cards ── */}
-              {filteredJobs.map((job) => (
-                <RiderOrderCard
-                  key={job.id}
-                  job={job}
-                  onAccept={() => handleOpenJob(job)}
-                  accepting={accepting && selectedJob?.id === job.id}
-                />
-              ))}
+              {/* ── List of Job Cards or Empty/Loading State ── */}
+              {loading ? (
+                <View className="py-12 items-center justify-center">
+                  <ActivityIndicator size="large" color="#EA580C" />
+                  <Text className="text-textMuted text-xs mt-3 font-semibold">Scanning radar for live orders...</Text>
+                </View>
+              ) : filteredJobs.length === 0 ? (
+                <View className="bg-white rounded-3xl p-8 items-center justify-center border border-gray-100 shadow-sm my-2">
+                  <View className="w-16 h-16 rounded-full bg-orange-50 items-center justify-center mb-3">
+                    <Feather name="package" size={28} color="#EA580C" />
+                  </View>
+                  <Text className="text-textPrimary font-extrabold text-base text-center">
+                    {isOnline ? 'No Available Deliveries Right Now' : 'You Are Currently Offline'}
+                  </Text>
+                  <Text className="text-textMuted text-xs text-center mt-1.5 leading-5 max-w-xs">
+                    {isOnline
+                      ? 'When nearby cooks have freshly prepared meals ready for dispatch, they will appear here.'
+                      : 'Toggle your status to "Ready" above to start receiving dispatch requests.'}
+                  </Text>
+                  {isOnline && (
+                    <TouchableOpacity
+                      onPress={onRefresh}
+                      activeOpacity={0.8}
+                      className="mt-4 bg-[#FFF7ED] border border-[#FFEDD5] px-4 py-2 rounded-full flex-row items-center"
+                    >
+                      <Feather name="refresh-cw" size={12} color="#EA580C" />
+                      <Text className="text-[#EA580C] font-bold text-xs ml-1.5">Refresh Radar</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ) : (
+                filteredJobs.map((job) => (
+                  <RiderOrderCard
+                    key={job.id}
+                    job={job}
+                    onAccept={() => handleOpenJob(job)}
+                    accepting={accepting && selectedJob?.id === job.id}
+                  />
+                ))
+              )}
             </>
           )}
 
@@ -976,31 +969,18 @@ export const RiderDashboardScreen: React.FC = () => {
                 Estimated Earnings Breakdown
               </Text>
               <View className="flex-row justify-between mb-1.5">
-                <Text className="text-textSecondary text-xs">Base Delivery Fee</Text>
+                <Text className="text-textSecondary text-xs">Guaranteed Delivery Fee</Text>
                 <Text className="text-textPrimary font-bold text-xs">
-                  RS{' '}
-                  {selectedJob
-                    ? (
-                        (typeof selectedJob.payoutAmount === 'number'
-                          ? selectedJob.payoutAmount
-                          : parseFloat(selectedJob.payoutAmount)) - 250
-                      ).toFixed(2)
-                    : '850.50'}
+                  RS {selectedJob ? (typeof selectedJob.payoutAmount === 'number' ? selectedJob.payoutAmount.toFixed(2) : selectedJob.payoutAmount) : '150.00'}
                 </Text>
               </View>
-              <View className="flex-row justify-between mb-2">
-                <Text className="text-[#C25E00] text-xs font-semibold">
-                  ⚡ Westwood Surge Boost
-                </Text>
-                <Text className="text-[#C25E00] font-bold text-xs">+RS 250.00</Text>
-              </View>
-              <View className="h-px bg-[#FED7AA] mb-2" />
+              <View className="h-px bg-[#FED7AA] my-1.5" />
               <View className="flex-row justify-between items-center">
                 <Text className="text-textPrimary font-extrabold text-sm">
                   Total Guaranteed Payout
                 </Text>
                 <Text className="text-textPrimary font-black text-lg">
-                  RS {selectedJob?.payoutAmount}
+                  RS {selectedJob ? (typeof selectedJob.payoutAmount === 'number' ? selectedJob.payoutAmount.toFixed(2) : selectedJob.payoutAmount) : '150.00'}
                 </Text>
               </View>
             </View>
@@ -1013,10 +993,10 @@ export const RiderDashboardScreen: React.FC = () => {
                 </View>
                 <View className="flex-1">
                   <Text className="text-textMuted text-[10px] font-bold uppercase">
-                    Pickup
+                    Pickup Kitchen
                   </Text>
                   <Text className="text-textPrimary font-bold text-xs">
-                    {selectedJob?.cookName} ({selectedJob?.pickupDistance})
+                    {selectedJob?.cookName} ({selectedJob?.pickupDistance || 'Kitchen'})
                   </Text>
                 </View>
               </View>
@@ -1030,7 +1010,7 @@ export const RiderDashboardScreen: React.FC = () => {
                     Dropoff Destination
                   </Text>
                   <Text className="text-textPrimary font-bold text-xs">
-                    Customer Address ({selectedJob?.dropoffDistance})
+                    {selectedJob?.rawOrder?.address?.label || selectedJob?.dropoffDistance || 'Customer Address'}
                   </Text>
                 </View>
               </View>

@@ -23,7 +23,7 @@ export const DeliveryStepperComponent: React.FC<DeliveryStepperProps> = ({ statu
 
   useEffect(() => {
     // Update progress based on status
-    if (status === 'ACCEPTED') progress.value = withTiming(0, { duration: 500 });
+    if (status === 'ACCEPTED' || status === 'READY') progress.value = withTiming(0, { duration: 500 });
     else if (status === 'DELIVERING') progress.value = withTiming(0.5, { duration: 500 });
     else if (status === 'DELIVERED') progress.value = withTiming(1, { duration: 700 });
 

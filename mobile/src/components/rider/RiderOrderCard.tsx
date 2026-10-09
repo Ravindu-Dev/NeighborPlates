@@ -47,20 +47,22 @@ export const RiderOrderCard: React.FC<RiderOrderCardProps> = ({
     ? (typeof job.payoutAmount === 'number' ? job.payoutAmount.toFixed(job.payoutAmount % 1 === 0 ? 0 : 2) : job.payoutAmount)
     : order?.riderEarnings 
       ? order.riderEarnings.toFixed(2)
-      : Math.max(150, Math.round((order?.totalAmount || 1000) * 0.15)).toFixed(2);
+      : order?.totalAmount
+        ? Math.max(150, Math.round(order.totalAmount * 0.15)).toFixed(2)
+        : '150.00';
 
-  const pickupDistance = job?.pickupDistance || job?.distancePickup || '1.5 km';
-  const dropoffDistance = job?.dropoffDistance || '3.2 km';
-  const estimatedTime = job?.estimatedTime || '18 min est.';
+  const pickupDistance = job?.pickupDistance || job?.distancePickup || (order?.cookAddressLabel ? 'Kitchen' : 'Pickup');
+  const dropoffDistance = job?.dropoffDistance || (order?.address?.label ? (order.address.label.length > 16 ? order.address.label.substring(0, 14) + '...' : order.address.label) : 'Destination');
+  const estimatedTime = job?.estimatedTime || 'Ready Now';
   
-  const packageLabel = job?.packageSummary?.label || 'Package';
-  const packageValue = job?.packageSummary?.value || `${order?.items?.length || 2} Items Hot`;
+  const packageLabel = job?.packageSummary?.label || 'Items';
+  const packageValue = job?.packageSummary?.value || `${order?.items?.length || 1} Item${(order?.items?.length || 1) > 1 ? 's' : ''}`;
   const isHighlightPackage = job?.packageSummary?.isHighlight || false;
 
   const highlightDish = job?.highlightDish || (
     order?.items?.[0]
       ? `🍲 ${order.items[0].name}${order.items.length > 1 ? ` (+${order.items.length - 1} more)` : ''}`
-      : '🍲 Home Cooked Meal'
+      : '🍲 Hot Meal'
   );
 
   const imageUrl = job?.imageUrl || 'https://images.unsplash.com/photo-1541696432-82c6da8ce7bf?auto=format&fit=crop&w=400&q=80';

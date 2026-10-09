@@ -75,8 +75,8 @@ public class User {
         private Boolean hotFoodPriority = true;
         private Boolean autoAcceptRush = true;
         private String navigationApp = "Google";
-        private String payoutMethod = "Chase Debit •••• 4092 (Instant Active)";
-        private String insurancePolicy = "Active policy valid through Nov 2025";
+        private String payoutMethod;
+        private String insurancePolicy;
     }
 
     @Data

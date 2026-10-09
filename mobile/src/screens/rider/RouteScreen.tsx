@@ -7,13 +7,13 @@ import {
   Image,
   Modal,
   TextInput,
-  ScrollView,
   Linking,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { useNavigation, useRoute, useIsFocused } from '@react-navigation/native';
+import { Feather } from '@expo/vector-icons';
 import { SlideToConfirm } from '../../components/rider/SlideToConfirm';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
@@ -25,7 +25,15 @@ if (Platform.OS !== 'web') {
   } catch (e) {}
 }
 
-const getNavigationMapHtml = (stage: 1 | 2) => `
+const getNavigationMapHtml = (
+  cookLat: number,
+  cookLon: number,
+  custLat: number,
+  custLon: number,
+  cookName: string,
+  custName: string,
+  stage: 1 | 2
+) => `
 <!DOCTYPE html>
 <html>
 <head>
@@ -63,48 +71,46 @@ const getNavigationMapHtml = (stage: 1 | 2) => `
 <body>
   <div id="map"></div>
   <script>
-    var cookLat = 6.9320, cookLon = 79.8650;
-    var custLat = 6.9180, custLon = 79.8520;
+    var cookLat = ${cookLat};
+    var cookLon = ${cookLon};
+    var custLat = ${custLat};
+    var custLon = ${custLon};
     var stage = ${stage};
+    var cookLabelText = ${JSON.stringify(cookName)};
+    var custLabelText = ${JSON.stringify(custName)};
 
-    var centerLat = stage === 1 ? (cookLat * 0.7 + 6.9270 * 0.3) : (cookLat + custLat) / 2;
-    var centerLon = stage === 1 ? (cookLon * 0.7 + 79.8600 * 0.3) : (cookLon + custLon) / 2;
+    var centerLat = (cookLat + custLat) / 2;
+    var centerLon = (cookLon + custLon) / 2;
 
-    var map = L.map('map', { zoomControl: false }).setView([centerLat, centerLon], 14);
+    var map = L.map('map', { zoomControl: false }).fitBounds([
+      [cookLat, cookLon],
+      [custLat, custLon]
+    ], { padding: [50, 50] });
+
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
       attribution: '© CartoDB'
     }).addTo(map);
 
-    // Route points from Rider to Cook to Customer
-    var routePointsStage1 = [
-      [6.9240, 79.8580],
-      [6.9270, 79.8605],
-      [6.9295, 79.8630],
-      [cookLat, cookLon]
-    ];
-
-    var routePointsStage2 = [
+    var routePoints = [
       [cookLat, cookLon],
-      [6.9270, 79.8605],
-      [6.9220, 79.8560],
+      [(cookLat * 2 + custLat) / 3, (cookLon * 2 + custLon) / 3],
+      [(cookLat + custLat * 2) / 3, (cookLon + custLon * 2) / 3],
       [custLat, custLon]
     ];
 
-    var activePoints = stage === 1 ? routePointsStage1 : routePointsStage2;
-
     // Glowing Under-Line
-    L.polyline(activePoints, {
+    L.polyline(routePoints, {
       color: '#FB923C',
-      weight: 12,
+      weight: 10,
       opacity: 0.25,
       lineCap: 'round'
     }).addTo(map);
 
     // Main Neon Orange Nav Line
-    L.polyline(activePoints, {
+    L.polyline(routePoints, {
       color: '#EA580C',
-      weight: 5,
+      weight: 4,
       opacity: 0.95,
       dashArray: '8, 8',
       lineCap: 'round'
@@ -112,8 +118,8 @@ const getNavigationMapHtml = (stage: 1 | 2) => `
 
     // Cook Marker
     var cookHtml = '<div style="display:flex;flex-direction:column;align-items:center;">' +
-      '<div class="cook-label">Chef Elena\\'s Hearth</div>' +
-      '<div style="width:30px;height:30px;border-radius:50%;background:#C25E00;border:3px solid #FFF;box-shadow:0 0 16px rgba(234,88,12,0.9);display:flex;align-items:center;justify-content:center;font-size:14px;margin-top:4px;">🍽</div>' +
+      '<div class="cook-label">' + cookLabelText + ' (Pickup)</div>' +
+      '<div style="width:28px;height:28px;border-radius:50%;background:#C25E00;border:3px solid #FFF;box-shadow:0 0 16px rgba(234,88,12,0.9);display:flex;align-items:center;justify-content:center;font-size:13px;margin-top:4px;">🍳</div>' +
       '</div>';
     L.marker([cookLat, cookLon], {
       icon: L.divIcon({ html: cookHtml, className: '', iconSize: [140, 60], iconAnchor: [70, 55] })
@@ -121,52 +127,38 @@ const getNavigationMapHtml = (stage: 1 | 2) => `
 
     // Customer Marker
     var custHtml = '<div style="display:flex;flex-direction:column;align-items:center;">' +
-      '<div class="cust-label">2. David S.</div>' +
+      '<div class="cust-label">' + custLabelText + ' (Dropoff)</div>' +
       '<div style="width:28px;height:28px;border-radius:50%;background:#2563EB;border:3px solid #FFF;box-shadow:0 0 16px rgba(37,99,235,0.9);display:flex;align-items:center;justify-content:center;font-size:13px;margin-top:4px;">📍</div>' +
       '</div>';
     L.marker([custLat, custLon], {
-      icon: L.divIcon({ html: custHtml, className: '', iconSize: [110, 60], iconAnchor: [55, 55] })
+      icon: L.divIcon({ html: custHtml, className: '', iconSize: [140, 60], iconAnchor: [70, 55] })
     }).addTo(map);
 
-    // Nearest Delivery Jobs on Live Map
-    var nearbyDeliveryJobs = [
-      { name: "silva & Sun's", payout: "1100.50", lat: 6.9360, lon: 79.8690 },
-      { name: "Kamal's Ramen", payout: "600.00", lat: 6.9200, lon: 79.8630 }
-    ];
-
-    nearbyDeliveryJobs.forEach(function(nj) {
-      var njHtml = '<div style="display:flex;flex-direction:column;align-items:center;opacity:0.9;">' +
-        '<div style="background:#1E293B;color:#F8FAFC;font-size:9px;font-weight:800;padding:2px 7px;border-radius:8px;border:1px solid #EA580C;box-shadow:0 2px 8px rgba(0,0,0,0.5);">' + nj.name + ' (RS ' + nj.payout + ')</div>' +
-        '<div style="width:18px;height:18px;border-radius:50%;background:#EA580C;border:2px solid #FFF;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:9px;">🍽</div>' +
-        '</div>';
-      L.marker([nj.lat, nj.lon], {
-        icon: L.divIcon({ html: njHtml, className: '', iconSize: [140, 40], iconAnchor: [70, 36] })
-      }).addTo(map);
-    });
-
     // Animated Rider Marker
-    var riderStart = stage === 1 ? [6.9240, 79.8580] : [cookLat, cookLon];
+    var riderStart = stage === 1 ? [cookLat, cookLon] : [cookLat, cookLon];
     var riderEnd = stage === 1 ? [cookLat, cookLon] : [custLat, custLon];
 
     var riderMarker = L.marker(riderStart, {
       icon: L.divIcon({
-        html: '<div style="width:34px;height:34px;border-radius:50%;background:#10B981;border:3px solid #FFF;box-shadow:0 0 18px rgba(16,185,129,0.9);display:flex;align-items:center;justify-content:center;font-size:16px;">🛵</div>',
+        html: '<div style="width:32px;height:32px;border-radius:50%;background:#10B981;border:3px solid #FFF;box-shadow:0 0 16px rgba(16,185,129,0.9);display:flex;align-items:center;justify-content:center;font-size:16px;">🛵</div>',
         className: '',
-        iconSize: [34, 34],
-        iconAnchor: [17, 17]
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
       })
     }).addTo(map);
 
-    var startTime = Date.now();
-    var duration = 22000;
-    function animate() {
-      var progress = ((Date.now() - startTime) % duration) / duration;
-      var curLat = riderStart[0] + (riderEnd[0] - riderStart[0]) * progress;
-      var curLon = riderStart[1] + (riderEnd[1] - riderStart[1]) * progress;
-      riderMarker.setLatLng([curLat, curLon]);
-      requestAnimationFrame(animate);
+    if (stage === 2) {
+      var startTime = Date.now();
+      var duration = 20000;
+      function animate() {
+        var progress = ((Date.now() - startTime) % duration) / duration;
+        var curLat = cookLat + (custLat - cookLat) * progress;
+        var curLon = cookLon + (custLon - cookLon) * progress;
+        riderMarker.setLatLng([curLat, curLon]);
+        requestAnimationFrame(animate);
+      }
+      animate();
     }
-    animate();
   </script>
 </body>
 </html>`;
@@ -174,70 +166,98 @@ const getNavigationMapHtml = (stage: 1 | 2) => `
 export const RouteScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const isFocused = useIsFocused();
   const { user } = useAuthStore();
 
-  // Stage 1 = Arriving at Cook's Home (Pickup)
-  // Stage 2 = En Route to Customer (Dropoff)
+  const [loading, setLoading] = useState(true);
+  const [activeOrder, setActiveOrder] = useState<any>(null);
   const [stage, setStage] = useState<1 | 2>(1);
   const [messageModalVisible, setMessageModalVisible] = useState(false);
   const [customMessage, setCustomMessage] = useState('');
   const [messageSentToast, setMessageSentToast] = useState(false);
-  const [activeOrder, setActiveOrder] = useState<any>(null);
 
-  const orderId = route.params?.orderId || 'HM-8841';
+  const passedOrderId = route.params?.orderId;
 
-  // Fetch real order or sync with backend
-  useEffect(() => {
-    const fetchActiveOrder = async () => {
-      try {
+  const fetchActiveOrder = async () => {
+    try {
+      let order: any = null;
+
+      if (passedOrderId) {
+        try {
+          const res = await api.get(`/api/orders/${passedOrderId}`);
+          order = res.data;
+        } catch {
+          // ignore error and fallback to finding from my orders
+        }
+      }
+
+      if (!order) {
         const res = await api.get('/api/orders/my');
         const inProgress = res.data.find(
-          (o: any) => o.status === 'ACCEPTED' || o.status === 'DELIVERING'
+          (o: any) => o.status === 'READY' || o.status === 'ACCEPTED' || o.status === 'DELIVERING'
         );
         if (inProgress) {
-          setActiveOrder(inProgress);
-          if (inProgress.status === 'DELIVERING') {
-            setStage(2);
-          }
+          order = inProgress;
         }
-      } catch (e) {
-        // Fallback to demo mode
       }
-    };
-    fetchActiveOrder();
-  }, [stage]);
+
+      if (order && (order.status === 'READY' || order.status === 'ACCEPTED' || order.status === 'DELIVERING')) {
+        setActiveOrder(order);
+        setStage(order.status === 'DELIVERING' ? 2 : 1);
+      } else {
+        setActiveOrder(null);
+      }
+    } catch {
+      setActiveOrder(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isFocused) {
+      fetchActiveOrder();
+    }
+  }, [isFocused, passedOrderId]);
 
   // Handle stage transitions
   const handleConfirmArrivalOrPickup = async () => {
+    if (!activeOrder) return;
+
     if (stage === 1) {
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-      // If live backend order, transition to DELIVERING
-      if (activeOrder?.id && !activeOrder.id.startsWith('demo-')) {
-        try {
-          await api.put(`/api/orders/${activeOrder.id}/status?status=DELIVERING`);
-        } catch (e) {}
+      try {
+        const res = await api.put(`/api/orders/${activeOrder.id}/status?status=DELIVERING`);
+        setActiveOrder(res.data);
+        setStage(2);
+      } catch (e: any) {
+        const msg = e?.response?.data?.message || 'Could not update to in-transit status.';
+        Alert.alert('Status Error', msg);
       }
-      setStage(2);
     } else {
-      // Stage 2 complete! Transition to celebration
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-      if (activeOrder?.id && !activeOrder.id.startsWith('demo-')) {
-        try {
-          await api.put(`/api/orders/${activeOrder.id}/status?status=DELIVERED`);
-        } catch (e) {}
+      try {
+        const res = await api.put(`/api/orders/${activeOrder.id}/status?status=DELIVERED`);
+        navigation.replace('DeliveryConfirmation', {
+          orderId: activeOrder.id,
+          earnings: res.data.riderEarnings ?? activeOrder.riderEarnings ?? 0,
+        });
+      } catch (e: any) {
+        const msg = e?.response?.data?.message || 'Could not complete delivery.';
+        Alert.alert('Status Error', msg);
       }
-      navigation.replace('DeliveryConfirmation', {
-        orderId: activeOrder?.id || 'HM-8841',
-        earnings: activeOrder?.riderEarnings || 38.50,
-      });
     }
   };
 
-  const handleCall = (phoneNumber: string) => {
+  const handleCall = (phoneNumber?: string, roleName?: string) => {
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      Alert.alert('Phone Unavailable', `No contact number is registered for this ${roleName || 'contact'}.`);
+      return;
+    }
     if (Platform.OS !== 'web') {
       Linking.openURL(`tel:${phoneNumber}`);
     } else {
@@ -255,23 +275,64 @@ export const RouteScreen: React.FC = () => {
     }, 1200);
   };
 
-  const cookName = activeOrder?.cookName || 'Chef Elena V.';
-  const customerName = activeOrder?.customerName || 'David S.';
-  const orderNumber = activeOrder?.orderNumber || '#HM-8841';
-  const orderItemsCount = activeOrder?.items?.length || 3;
-  const earningsAmount = activeOrder?.riderEarnings 
-    ? `$${activeOrder.riderEarnings.toFixed(2)}`
-    : '$38.50';
+  if (loading) {
+    return (
+      <View className="flex-1 bg-[#0B1120] items-center justify-center">
+        <ActivityIndicator size="large" color="#EA580C" />
+        <Text className="text-gray-400 font-bold text-sm mt-3">Connecting to GPS Dispatch...</Text>
+      </View>
+    );
+  }
+
+  // Empty state when rider has no active delivery
+  if (!activeOrder) {
+    return (
+      <View className="flex-1 bg-[#0B1120] items-center justify-center px-8">
+        <View className="w-20 h-20 rounded-full bg-[#1E293B] border border-gray-700 items-center justify-center mb-6">
+          <Feather name="navigation" size={36} color="#EA580C" />
+        </View>
+        <Text className="text-white font-extrabold text-xl text-center mb-2">
+          No Active Delivery Route
+        </Text>
+        <Text className="text-gray-400 text-sm text-center mb-8 leading-5">
+          You do not have any active orders en route right now. Accept an open delivery job from the radar to start navigation.
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Jobs')}
+          activeOpacity={0.85}
+          className="bg-[#C25E00] px-8 py-4 rounded-2xl flex-row items-center justify-center shadow-lg"
+        >
+          <Feather name="briefcase" size={18} color="#FFFFFF" className="mr-2" />
+          <Text className="text-white font-bold text-base ml-2">Browse Available Jobs</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const cookName = activeOrder.cookName || 'Home Cook';
+  const customerName = activeOrder.customerName || 'Customer';
+  const orderNumber = activeOrder.orderNumber;
+  const orderItemsCount = activeOrder.items?.length || 0;
+  const earningsAmount = `LKR ${(activeOrder.riderEarnings || 0).toFixed(0)}`;
+  const cookAddress = activeOrder.cookAddressLabel || 'Home Kitchen';
+  const customerAddress = activeOrder.address?.label || 'Delivery Address';
+
+  const cookCoords = activeOrder.cookCoordinates || activeOrder.items?.[0]?.cookCoordinates || [79.8612, 6.9271];
+  const custCoords = activeOrder.address?.coordinates || [79.8500, 6.9100];
+  const cookLon = typeof cookCoords[0] === 'number' ? cookCoords[0] : 79.8612;
+  const cookLat = typeof cookCoords[1] === 'number' ? cookCoords[1] : 6.9271;
+  const custLon = typeof custCoords[0] === 'number' ? custCoords[0] : 79.8500;
+  const custLat = typeof custCoords[1] === 'number' ? custCoords[1] : 6.9100;
 
   const riderDisplayName =
     user?.name?.trim() ||
-    (user?.email ? user.email.split('@')[0].charAt(0).toUpperCase() + user.email.split('@')[0].slice(1) : 'Sahan');
+    (user?.email ? user.email.split('@')[0].charAt(0).toUpperCase() + user.email.split('@')[0].slice(1) : 'Rider');
 
   const avatarUrl =
     user?.avatarUrl ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(riderDisplayName)}&background=9A3412&color=fff&bold=true&size=256`;
-  const cookAvatarUrl = 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&w=300&q=80';
-  const customerAvatarUrl = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80';
+  const cookAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(cookName)}&background=C25E00&color=fff&bold=true&size=256`;
+  const customerAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(customerName)}&background=1D4ED8&color=fff&bold=true&size=256`;
 
   return (
     <View className="flex-1 bg-[#0B1120]">
@@ -280,7 +341,7 @@ export const RouteScreen: React.FC = () => {
         <View className="flex-row items-center gap-2.5">
           <View className="bg-[#ECFDF5] border border-[#A7F3D0] px-3 py-1 rounded-full flex-row items-center shadow-md">
             <View className="w-2 h-2 rounded-full bg-[#10B981] mr-1.5" />
-            <Text className="text-[#059669] font-bold text-xs">Ready</Text>
+            <Text className="text-[#059669] font-bold text-xs">On Delivery</Text>
           </View>
 
           <TouchableOpacity
@@ -299,7 +360,9 @@ export const RouteScreen: React.FC = () => {
       <View className="flex-1 relative">
         {WebView ? (
           <WebView
-            source={{ html: getNavigationMapHtml(stage) }}
+            source={{
+              html: getNavigationMapHtml(cookLat, cookLon, custLat, custLon, cookName, customerName, stage),
+            }}
             style={{ flex: 1 }}
             scrollEnabled={false}
           />
@@ -319,9 +382,9 @@ export const RouteScreen: React.FC = () => {
                 stage === 1 ? 'bg-[#C25E00]' : 'bg-[#1E293B]/80 border border-gray-700'
               }`}
             >
-              <Text className="text-white text-xs mr-1">🟠 🍴</Text>
+              <Text className="text-white text-xs mr-1">🍳</Text>
               <Text className="text-white font-extrabold text-xs" numberOfLines={1}>
-                1. Elena's Hearth (P...
+                1. {cookName} (Pickup)
               </Text>
             </View>
 
@@ -334,7 +397,7 @@ export const RouteScreen: React.FC = () => {
             >
               <Text className="text-white text-xs mr-1">📍</Text>
               <Text className="text-white font-extrabold text-xs" numberOfLines={1}>
-                2. David S. (Dropoff)
+                2. {customerName} (Dropoff)
               </Text>
             </View>
           </View>
@@ -357,23 +420,23 @@ export const RouteScreen: React.FC = () => {
               {/* Instructions */}
               <View className="flex-1">
                 <View className="flex-row items-center justify-between mb-0.5">
-                  <Text className="text-white font-black text-xl">
-                    {stage === 1 ? 'In 250 m' : 'In 400 m'}
+                  <Text className="text-white font-black text-base">
+                    {stage === 1 ? 'Stage 1: Pickup' : 'Stage 2: Delivery'}
                   </Text>
                   <View className="bg-[#C25E00] px-2.5 py-0.5 rounded-full">
                     <Text className="text-white text-[10px] font-black tracking-wider">
-                      FAST ROUTE
+                      DIRECT ROUTE
                     </Text>
                   </View>
                 </View>
 
-                <Text className="text-white font-extrabold text-base mb-1" numberOfLines={1}>
-                  {stage === 1 ? 'Turn Right onto Maple Avenue' : 'Turn Left onto Palm Grove'}
+                <Text className="text-white font-extrabold text-sm mb-1" numberOfLines={1}>
+                  {stage === 1 ? `Proceed to ${cookAddress}` : `Proceed to ${customerAddress}`}
                 </Text>
                 <Text className="text-gray-400 text-xs font-medium" numberOfLines={1}>
                   {stage === 1
-                    ? '↑ Then straight 600m to 142 Elm Street'
-                    : '↑ Continue 300m to Apt 4B, Ocean View'}
+                    ? `Collect order items from ${cookName}`
+                    : `Hand over order safely to ${customerName}`}
                 </Text>
               </View>
             </View>
@@ -384,16 +447,16 @@ export const RouteScreen: React.FC = () => {
               <View className="flex-row items-center">
                 <Feather name="clock" size={13} color="#10B981" />
                 <Text className="text-[#10B981] font-bold text-xs ml-1.5">
-                  {stage === 1 ? '8 mins remaining' : '12 mins remaining'}
+                  {stage === 1 ? 'Pickup Ready' : 'Delivery In Transit'}
                 </Text>
               </View>
 
               <Text className="text-gray-400 font-semibold text-xs">
-                • {stage === 1 ? '3.2 km left' : '4.1 km left'}
+                • {orderItemsCount} items
               </Text>
 
               <Text className="text-white font-bold text-xs">
-                • ETA {stage === 1 ? '12:44 PM' : '12:56 PM'}
+                • {earningsAmount} payout
               </Text>
             </View>
           </View>
@@ -423,7 +486,7 @@ export const RouteScreen: React.FC = () => {
 
           <View className="bg-[#EEF2FF] px-2.5 py-1 rounded-full">
             <Text className="text-[#4F46E5] text-xs font-extrabold">
-              Order {orderNumber}
+              {orderNumber}
             </Text>
           </View>
         </View>
@@ -444,16 +507,8 @@ export const RouteScreen: React.FC = () => {
                   <Feather name="check" size={10} color="#FFFFFF" />
                 </View>
               </View>
-              <Text className="text-textSecondary text-xs mt-0.5">
-                {stage === 1 ? (
-                  <>
-                    <Text className="text-[#C25E00] font-bold">★ 4.98</Text> (640+ homemade meals)
-                  </>
-                ) : (
-                  <>
-                    <Text className="text-[#2563EB] font-bold">★ 5.0</Text> Apt 4B, Ocean View
-                  </>
-                )}
+              <Text className="text-textSecondary text-xs mt-0.5" numberOfLines={1}>
+                {stage === 1 ? cookAddress : customerAddress}
               </Text>
             </View>
           </View>
@@ -468,19 +523,19 @@ export const RouteScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Special Instructions Card */}
+        {/* Instructions Card */}
         <View className="bg-[#FFF7ED] rounded-2xl p-3.5 mb-3.5 border border-[#FFEDD5] flex-row items-start">
           <View className="w-8 h-8 rounded-full bg-[#9A3412] items-center justify-center mr-3 mt-0.5">
-            <Feather name="key" size={14} color="#FFFFFF" />
+            <Feather name="info" size={14} color="#FFFFFF" />
           </View>
           <View className="flex-1">
             <Text className="text-textPrimary font-black text-xs mb-1">
-              {stage === 1 ? 'Special Pickup Instructions' : 'Special Dropoff Instructions'}
+              {stage === 1 ? 'Pickup Instructions' : 'Delivery Instructions'}
             </Text>
             <Text className="text-textSecondary text-xs leading-4">
               {stage === 1
-                ? 'Ring bell “Unit 3B” on garden gate or send quick in-app message. Casserole is oven-fresh in insulated carrier, please keep horizontal!'
-                : 'Please leave on front porch bench and ring bell once. Do not knock as dog will bark. Thank you!'}
+                ? 'Check in with home cook, verify all order portions, and secure containers safely in your thermal bag.'
+                : 'Deliver food to customer at destination address. Contact customer directly if assistance is required.'}
             </Text>
           </View>
         </View>
@@ -488,7 +543,7 @@ export const RouteScreen: React.FC = () => {
         {/* Quick Action Buttons: Call & Message */}
         <View className="flex-row gap-3 mb-3.5">
           <TouchableOpacity
-            onPress={() => handleCall(stage === 1 ? '0771234567' : '0779876543')}
+            onPress={() => handleCall(stage === 1 ? activeOrder.cookPhone : activeOrder.customerPhone, stage === 1 ? 'cook' : 'customer')}
             activeOpacity={0.8}
             className="flex-1 bg-[#DBEAFE] py-3 rounded-2xl flex-row items-center justify-center"
           >
@@ -512,7 +567,7 @@ export const RouteScreen: React.FC = () => {
 
         {/* ── Slide to Confirm Arrival / Delivery ── */}
         <SlideToConfirm
-          label={stage === 1 ? 'Slide to Confirm Arrival' : 'Slide to Complete Delivery'}
+          label={stage === 1 ? 'Slide to Confirm Pickup' : 'Slide to Complete Delivery'}
           onConfirm={handleConfirmArrivalOrPickup}
           knobColor="#C25E00"
           backgroundColor="#1E293B"
@@ -543,7 +598,7 @@ export const RouteScreen: React.FC = () => {
             {messageSentToast ? (
               <View className="bg-green-50 border border-green-200 rounded-2xl p-4 items-center mb-4">
                 <Text className="text-green-700 font-extrabold text-sm">
-                  ✓ Message sent instantly!
+                  ✓ Notification sent!
                 </Text>
               </View>
             ) : null}
@@ -555,8 +610,8 @@ export const RouteScreen: React.FC = () => {
               {[
                 'Arrived outside 📍',
                 'Be there in 3 minutes 🛵',
-                'Waiting at the gate 🚪',
-                'Hot & ready in bag! 🍲',
+                'Waiting at the entrance 🚪',
+                'Food secured in bag! 🍲',
               ].map((msg) => (
                 <TouchableOpacity
                   key={msg}
