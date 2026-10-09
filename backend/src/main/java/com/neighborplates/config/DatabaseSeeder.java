@@ -28,6 +28,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         seedAdminUser();
+        seedRiderUser();
     }
 
     private void seedAdminUser() {
@@ -62,6 +63,63 @@ public class DatabaseSeeder implements CommandLineRunner {
             logger.info("Default system administrator seeded successfully with Email: '{}' and Password: 'admin123'", adminEmail);
         } else {
             logger.info("Admin user check: Present.");
+        }
+    }
+
+    private void seedRiderUser() {
+        String riderEmail = "rider@neighborplates.com";
+        if (userRepository.findByEmail(riderEmail).isEmpty()) {
+            logger.info("No default rider user found. Seeding default courier account...");
+
+            User rider = new User();
+            rider.setEmail(riderEmail);
+            rider.setPasswordHash(passwordEncoder.encode("rider123")); // Default rider password
+            rider.setRole(UserRole.RIDER);
+
+            User.UserProfile profile = new User.UserProfile();
+            profile.setName("Farhan Malik");
+            profile.setPhone("+94 77 123 4567");
+            profile.setAvatarUrl("https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80");
+            profile.setRiderVerified(true);
+            profile.setIsAvailable(true);
+            profile.setVehicleType("E-Bike");
+            profile.setVehicleModel("Rad Power E-Bike Pro");
+            profile.setVehiclePlate("#EB-4092");
+            profile.setDeliveryRadius(5.0);
+            profile.setOnTimeRate(98.4);
+            profile.setAcceptanceRate(94.0);
+            profile.setHaccpCertified(true);
+            profile.setThermalBackpack(true);
+            profile.setSpillProofRack(true);
+            profile.setHeatedWarmerPod(true);
+            profile.setHotFoodPriority(true);
+            profile.setAutoAcceptRush(true);
+            profile.setNavigationApp("Google");
+            profile.setPayoutMethod("Chase Debit •••• 4092 (Instant Active)");
+            profile.setInsurancePolicy("Active policy valid through Nov 2025");
+
+            User.GeoJsonPoint point = new User.GeoJsonPoint();
+            point.setType("Point");
+            ArrayList<Double> coords = new ArrayList<>();
+            coords.add(79.8612);
+            coords.add(6.9271);
+            point.setCoordinates(coords);
+            profile.setLocation(point);
+
+            User.UserStats stats = new User.UserStats();
+            stats.setTotalOrders(1420);
+            stats.setAvgRating(4.96);
+            stats.setTotalEarnings(185400.0);
+
+            rider.setProfile(profile);
+            rider.setStats(stats);
+            rider.setCreatedAt(Instant.parse("2023-03-15T10:00:00Z"));
+            rider.setUpdatedAt(Instant.now());
+
+            userRepository.save(rider);
+            logger.info("Default rider seeded successfully with Email: '{}' and Password: 'rider123'", riderEmail);
+        } else {
+            logger.info("Rider user check: Present.");
         }
     }
 }

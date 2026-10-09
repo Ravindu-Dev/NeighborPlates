@@ -35,7 +35,7 @@ export const UserManagementScreen: React.FC = () => {
       const response = await api.get('/api/admin/users');
       setUsers(response.data);
       // Safely update selectedUser with fresh data using functional setState (avoids stale closure)
-      setSelectedUser(prev => {
+      setSelectedUser((prev: any) => {
         if (!prev) return prev;
         return response.data.find((u: any) => u.id === prev.id) || prev;
       });
