@@ -86,8 +86,6 @@ public class DatabaseSeeder implements CommandLineRunner {
             profile.setVehicleModel("Rad Power E-Bike Pro");
             profile.setVehiclePlate("#EB-4092");
             profile.setDeliveryRadius(5.0);
-            profile.setOnTimeRate(98.4);
-            profile.setAcceptanceRate(94.0);
             profile.setHaccpCertified(true);
             profile.setThermalBackpack(true);
             profile.setSpillProofRack(true);
@@ -95,8 +93,6 @@ public class DatabaseSeeder implements CommandLineRunner {
             profile.setHotFoodPriority(true);
             profile.setAutoAcceptRush(true);
             profile.setNavigationApp("Google");
-            profile.setPayoutMethod("Chase Debit •••• 4092 (Instant Active)");
-            profile.setInsurancePolicy("Active policy valid through Nov 2025");
 
             User.GeoJsonPoint point = new User.GeoJsonPoint();
             point.setType("Point");
@@ -107,9 +103,9 @@ public class DatabaseSeeder implements CommandLineRunner {
             profile.setLocation(point);
 
             User.UserStats stats = new User.UserStats();
-            stats.setTotalOrders(1420);
-            stats.setAvgRating(4.96);
-            stats.setTotalEarnings(185400.0);
+            stats.setTotalOrders(0);
+            stats.setAvgRating(0.0);
+            stats.setTotalEarnings(0.0);
 
             rider.setProfile(profile);
             rider.setStats(stats);

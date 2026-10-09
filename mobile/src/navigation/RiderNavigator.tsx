@@ -130,7 +130,7 @@ export const RiderNavigator = () => {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Onboarding" component={RiderOnboardingScreen} />
       <Stack.Screen name="Tabs" component={RiderTabNavigator} />
-      <Stack.Screen name="ActiveDelivery" component={RouteScreen} />
+      <Stack.Screen name="ActiveDelivery" component={ActiveDeliveryScreen} />
       <Stack.Screen name="DeliveryConfirmation" component={DeliveryConfirmationScreen} />
     </Stack.Navigator>
   );

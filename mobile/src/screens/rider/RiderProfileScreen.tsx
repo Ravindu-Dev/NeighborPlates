@@ -33,6 +33,7 @@ export const RiderProfileScreen: React.FC = () => {
 
   const [profile, setProfile] = useState<any>(null);
   const [myOrders, setMyOrders] = useState<any[]>([]);
+  const [summary, setSummary] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -51,13 +52,13 @@ export const RiderProfileScreen: React.FC = () => {
 
   // App Settings
   const [navigationApp, setNavigationApp] = useState<NavigationApp>('Google');
-  const [payoutMethod, setPayoutMethod] = useState('Chase Debit •••• 4092 (Instant Active)');
-  const [insurancePolicy, setInsurancePolicy] = useState('Active policy valid through Nov 2025');
+  const [payoutMethod, setPayoutMethod] = useState('');
+  const [insurancePolicy, setInsurancePolicy] = useState('');
 
   // Modals: Vehicle
   const [vehicleModalVisible, setVehicleModalVisible] = useState(false);
-  const [vehicleModel, setVehicleModel] = useState('Rad Power E-Bike Pro');
-  const [plateNumber, setPlateNumber] = useState('#EB-4092');
+  const [vehicleModel, setVehicleModel] = useState('');
+  const [plateNumber, setPlateNumber] = useState('');
   const [modalVehicleType, setModalVehicleType] = useState<VehicleOption>('E-Bike');
   const [savingVehicle, setSavingVehicle] = useState(false);
 
@@ -81,10 +82,15 @@ export const RiderProfileScreen: React.FC = () => {
   // Fetch logged in rider's real data
   const fetchProfile = async () => {
     try {
-      const [userRes, ordersRes] = await Promise.allSettled([
+      const [userRes, ordersRes, summaryRes] = await Promise.allSettled([
         api.get('/api/users/profile'),
         api.get('/api/orders/my'),
+        api.get('/api/riders/summary'),
       ]);
+
+      if (summaryRes.status === 'fulfilled' && summaryRes.value.data) {
+        setSummary(summaryRes.value.data);
+      }
 
       if (userRes.status === 'fulfilled' && userRes.value.data) {
         const u = userRes.value.data;
@@ -407,12 +413,12 @@ export const RiderProfileScreen: React.FC = () => {
       const part = emailToUse.split('@')[0];
       return part.charAt(0).toUpperCase() + part.slice(1);
     }
-    return 'Sahan';
+    return 'Rider';
   };
 
   const riderName = deriveRiderName();
-  const riderEmail = user?.email || profile?.email || 'sahan@gmail.com';
-  const riderPhone = profile?.profile?.phone || '+94 77 987 6543';
+  const riderEmail = user?.email || profile?.email || '';
+  const riderPhone = profile?.profile?.phone || 'Not set';
   const avatarUrl =
     profile?.profile?.avatarUrl ||
     user?.avatarUrl ||
@@ -421,7 +427,7 @@ export const RiderProfileScreen: React.FC = () => {
   // Member Since date
   const formatPartnerSince = () => {
     const rawDate = profile?.createdAt || (user as any)?.createdAt;
-    if (!rawDate) return 'Homely Partner since August 2026';
+    if (!rawDate) return 'Homely Partner';
     try {
       const d = new Date(rawDate);
       return `Homely Partner since ${d.toLocaleString('en-US', { month: 'long', year: 'numeric' })}`;
@@ -434,26 +440,28 @@ export const RiderProfileScreen: React.FC = () => {
   const isVerified = profile?.profile?.riderVerified !== false;
   const ratingValue =
     profile?.stats?.avgRating && profile.stats.avgRating > 0
-      ? profile.stats.avgRating.toFixed(2)
-      : '4.96';
+      ? profile.stats.avgRating.toFixed(1)
+      : 'New';
 
-  const deliveredCount = myOrders.filter((o: any) => o.status === 'DELIVERED').length;
-  const totalDeliveriesLabel =
-    deliveredCount > 0
-      ? `${deliveredCount.toLocaleString()}+ Deliv.`
-      : profile?.stats?.totalOrders && profile.stats.totalOrders > 0
-      ? `${profile.stats.totalOrders.toLocaleString()}+ Deliv.`
-      : '1,420+ Deliv.';
+  const deliveredCount =
+    summary?.totalDeliveries ??
+    myOrders.filter((o: any) => o.status === 'DELIVERED').length;
+
+  const totalDeliveriesLabel = `${deliveredCount} Deliv.`;
 
   const onTimePercentage =
-    profile?.profile?.onTimeRate != null
-      ? `${profile.profile.onTimeRate.toFixed(1)}%`
-      : '98.4%';
+    summary?.onTimeRate != null
+      ? `${summary.onTimeRate.toFixed(0)}%`
+      : profile?.profile?.onTimeRate != null
+      ? `${profile.profile.onTimeRate.toFixed(0)}%`
+      : '—';
 
   const acceptancePercentage =
-    profile?.profile?.acceptanceRate != null
+    summary?.completionRate != null
+      ? `${summary.completionRate.toFixed(0)}%`
+      : profile?.profile?.acceptanceRate != null
       ? `${Math.round(profile.profile.acceptanceRate)}%`
-      : '94%';
+      : '—';
 
   return (
     <View className="flex-1 bg-[#F8FAFC]">

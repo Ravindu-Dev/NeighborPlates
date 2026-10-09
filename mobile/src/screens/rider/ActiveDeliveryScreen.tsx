@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   Alert, Platform, ActivityIndicator, Linking,
@@ -65,45 +65,9 @@ const getMapHtml = (cookLat: number, cookLon: number, custLat: number, custLon: 
 
 type Props = NativeStackScreenProps<RiderStackParamList, 'ActiveDelivery'>;
 
-const DEMO_ORDERS: Record<string, any> = {
-  'demo-1': {
-    id: 'demo-1',
-    orderNumber: 'NP-2026-8821',
-    cookName: "silva & Sun's",
-    customerName: 'Kavindu Perera',
-    status: 'ACCEPTED',
-    riderEarnings: 1100.50,
-    totalAmount: 2450.00,
-    items: [{ name: 'Delicate Soup Dumplings (12 pcs)', quantity: 2, cookCoordinates: [79.865, 6.932] }],
-    address: { label: 'No 45, Flower Road, Colombo 07', cookAddress: 'Westwood Kitchen Lane 2', coordinates: [79.861, 6.927] }
-  },
-  'demo-2': {
-    id: 'demo-2',
-    orderNumber: 'NP-2026-5519',
-    cookName: "Anoma's Biryani Pot",
-    customerName: 'Sarah Jenkins',
-    status: 'ACCEPTED',
-    riderEarnings: 1600.00,
-    totalAmount: 3800.00,
-    items: [{ name: 'Large Family Feast Chicken Biryani (3.2 kg)', quantity: 1, cookCoordinates: [79.868, 6.935] }],
-    address: { label: 'Apt 12B, Ocean View, Colombo 03', cookAddress: '42 Galle Road, Bambalapitiya', coordinates: [79.852, 6.898] }
-  },
-  'demo-3': {
-    id: 'demo-3',
-    orderNumber: 'NP-2026-3390',
-    cookName: "Kamal's Ramen",
-    customerName: 'Dineth Fernando',
-    status: 'ACCEPTED',
-    riderEarnings: 600.00,
-    totalAmount: 1950.00,
-    items: [{ name: 'Tonkotsu Ramen Bento Sets', quantity: 2, cookCoordinates: [79.862, 6.929] }],
-    address: { label: '18 Horton Place, Colombo 07', cookAddress: '24 Havelock Road', coordinates: [79.868, 6.912] }
-  }
-};
-
 export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => {
   const { orderId } = route.params;
-  const [order, setOrder] = useState<any>(DEMO_ORDERS[orderId] || null);
+  const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -111,20 +75,24 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
 
   const fetchOrder = async () => {
     try {
-      const res = await api.get('/api/orders/my');
-      const found = res.data.find((o: any) => o.id === orderId);
-      if (found) {
-        setOrder(found);
-      } else if (DEMO_ORDERS[orderId]) {
-        setOrder((prev: any) => prev || DEMO_ORDERS[orderId]);
+      let orderData: any = null;
+      try {
+        const res = await api.get(`/api/orders/${orderId}`);
+        orderData = res.data;
+      } catch {
+        const res = await api.get('/api/orders/my');
+        orderData = res.data.find((o: any) => o.id === orderId);
       }
-      setErrorMsg(null);
-    } catch (err) {
-      if (DEMO_ORDERS[orderId]) {
-        setOrder((prev: any) => prev || DEMO_ORDERS[orderId]);
+
+      if (orderData) {
+        setOrder(orderData);
+        setErrorMsg(null);
       } else {
-        setErrorMsg('Couldn\'t load order details. Pull down to retry.');
+        setOrder(null);
+        setErrorMsg('Order not found or no longer active.');
       }
+    } catch {
+      setErrorMsg('Could not load order details. Please pull down to retry.');
     } finally {
       setLoading(false);
     }
@@ -132,7 +100,7 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
 
   useEffect(() => {
     fetchOrder();
-    pollRef.current = setInterval(fetchOrder, 10000);
+    pollRef.current = setInterval(fetchOrder, 8000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [orderId]);
 
@@ -160,44 +128,37 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
         await Haptics.notificationAsync(
           newStatus === 'DELIVERED'
             ? Haptics.NotificationFeedbackType.Success
-            : Haptics.ImpactFeedbackStyle.Medium as any
+            : (Haptics.ImpactFeedbackStyle.Medium as any)
         );
       }
 
-      if (orderId.startsWith('demo-')) {
-        const updated = {
-          ...(order || DEMO_ORDERS[orderId]),
-          status: newStatus,
-        };
-        setOrder(updated);
-        if (newStatus === 'DELIVERED') {
-          if (pollRef.current) clearInterval(pollRef.current);
-          navigation.replace('DeliveryConfirmation', {
-            orderId,
-            earnings: updated.riderEarnings ?? 1100.50,
-          });
-        }
-      } else {
-        const res = await api.put(`/api/orders/${orderId}/status?status=${newStatus}`);
-        setOrder(res.data);
-        if (newStatus === 'DELIVERED') {
-          if (pollRef.current) clearInterval(pollRef.current);
-          navigation.replace('DeliveryConfirmation', {
-            orderId,
-            earnings: res.data.riderEarnings ?? 150,
-          });
-        }
+      const res = await api.put(`/api/orders/${orderId}/status?status=${newStatus}`);
+      setOrder(res.data);
+      if (newStatus === 'DELIVERED') {
+        if (pollRef.current) clearInterval(pollRef.current);
+        navigation.replace('DeliveryConfirmation', {
+          orderId,
+          earnings: res.data.riderEarnings ?? order?.riderEarnings ?? 0,
+        });
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Couldn\'t update status. Try again.';
+      const msg = err?.response?.data?.message || 'Could not update delivery status. Try again.';
       Alert.alert('Update Failed', msg, [{ text: 'OK' }]);
     } finally {
       setUpdating(false);
     }
   };
 
-  const callContact = (phone: string) => {
-    if (Platform.OS !== 'web') Linking.openURL(`tel:${phone}`);
+  const callContact = (phone?: string, roleName?: string) => {
+    if (!phone || phone.trim() === '') {
+      Alert.alert('Phone Unavailable', `No phone number is registered for this ${roleName || 'contact'}.`);
+      return;
+    }
+    if (Platform.OS !== 'web') {
+      Linking.openURL(`tel:${phone}`);
+    } else {
+      Alert.alert('Calling Contact', `Dialing ${phone}...`);
+    }
   };
 
   if (loading) {
@@ -218,27 +179,27 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
       <View className="flex-1 bg-surface-elevated items-center justify-center px-6">
         <Feather name="alert-circle" size={40} color="#EF4444" />
         <Text className="text-textPrimary font-bold text-base mt-4 text-center">
-          Order not found
+          Order Not Found
         </Text>
         <Text className="text-textMuted text-sm mt-2 text-center">
-          {errorMsg || 'We couldn\'t find this order. It may have been cancelled.'}
+          {errorMsg || 'We could not find this order record in the database.'}
         </Text>
         <TouchableOpacity onPress={() => navigation.goBack()} className="mt-6">
-          <Text className="text-indigo-500 font-bold text-sm">← Back to Dashboard</Text>
+          <Text className="text-[#9A3412] font-bold text-sm">← Back to Dashboard</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const cookCoords = order.items?.[0]?.cookCoordinates || [6.9271, 79.8612];
-  const custCoords = order.address?.coordinates || [6.9271, 79.8612];
-  // coords are [lng, lat] in our system
+  const cookCoords = order.cookCoordinates || order.items?.[0]?.cookCoordinates || [79.8612, 6.9271];
+  const custCoords = order.address?.coordinates || [79.8500, 6.9100];
+  // Coordinates are [lng, lat]
   const cookLat = typeof cookCoords[1] === 'number' ? cookCoords[1] : 6.9271;
   const cookLon = typeof cookCoords[0] === 'number' ? cookCoords[0] : 79.8612;
   const custLat = typeof custCoords[1] === 'number' ? custCoords[1] : 6.9100;
   const custLon = typeof custCoords[0] === 'number' ? custCoords[0] : 79.8500;
 
-  const isPickup = order.status === 'ACCEPTED';
+  const isPickup = order.status === 'READY' || order.status === 'ACCEPTED';
   const primaryButtonLabel = isPickup ? 'Confirm Pickup 🛵' : 'Mark Delivered ✓';
   const primaryButtonStatus: 'DELIVERING' | 'DELIVERED' = isPickup ? 'DELIVERING' : 'DELIVERED';
 
@@ -255,7 +216,7 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
         ) : (
           <View className="flex-1 bg-gray-200 items-center justify-center">
             <Feather name="map" size={32} color="#9CA3AF" />
-            <Text className="text-textMuted text-xs mt-2">Map unavailable on web</Text>
+            <Text className="text-textMuted text-xs mt-2">Map preview active</Text>
           </View>
         )}
       </View>
@@ -266,7 +227,7 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
           <View className="flex-row items-center justify-between mb-3">
             <Text className="text-textPrimary font-extrabold text-lg">Active Delivery</Text>
             <TouchableOpacity
-              onPress={() => Alert.alert('Report Issue', 'Contact support@neighborplates.lk or call 011-XXXX-XXX', [{ text: 'OK' }])}
+              onPress={() => Alert.alert('Report Issue', 'Contact rider-support@neighborplates.lk for live dispatch assistance.', [{ text: 'OK' }])}
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel="Report a delivery issue"
@@ -282,6 +243,19 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
             <DeliveryStepperComponent status={order.status} />
           </View>
 
+          {/* ── Turn-by-Turn Route Navigation Link ── */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Tabs', { screen: 'Route' } as any)}
+            className="bg-[#FFF7ED] border border-[#FFEDD5] rounded-2xl py-3 px-4 mb-3 flex-row items-center justify-between"
+            activeOpacity={0.7}
+          >
+            <View className="flex-row items-center">
+              <Feather name="navigation" size={16} color="#9A3412" />
+              <Text className="text-[#9A3412] font-bold text-xs ml-2">Open Live Turn-by-Turn GPS HUD</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color="#9A3412" />
+          </TouchableOpacity>
+
           {/* ── Order Details ── */}
           <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-3">
             <View className="flex-row items-start justify-between mb-2">
@@ -293,7 +267,7 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
               </View>
               <View className="bg-[#FFF7ED] border border-[#FFEDD5] px-3 py-1.5 rounded-full">
                 <Text className="text-[#7C2D12] font-bold text-xs">
-                  LKR {(order.riderEarnings || 0).toFixed(0)} earned
+                  LKR {(order.riderEarnings || 0).toFixed(0)} payout
                 </Text>
               </View>
             </View>
@@ -307,7 +281,7 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
             )}
             <View className="h-px bg-gray-100 mt-3 mb-2" />
             <Text className="text-textPrimary font-bold text-sm">
-              Total: LKR {order.totalAmount?.toFixed(0)}
+              Total Order Value: LKR {order.totalAmount?.toFixed(0)}
             </Text>
           </View>
 
@@ -319,15 +293,17 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
                 <Feather name="user" size={16} color="#FF6B35" />
               </View>
               <View className="flex-1">
-                <Text className="text-textMuted text-[10px] uppercase tracking-wide font-bold">Cook</Text>
-                <Text className="text-textPrimary font-bold text-sm">{order.cookName}</Text>
-                {order.address?.cookAddress ? (
-                  <Text className="text-textMuted text-xs mt-0.5" numberOfLines={1}>{order.address.cookAddress}</Text>
+                <Text className="text-textMuted text-[10px] uppercase tracking-wide font-bold">Cook (Pickup)</Text>
+                <Text className="text-textPrimary font-bold text-sm">{order.cookName || 'Home Cook'}</Text>
+                {order.cookAddressLabel || order.address?.cookAddress ? (
+                  <Text className="text-textMuted text-xs mt-0.5" numberOfLines={1}>
+                    {order.cookAddressLabel || order.address?.cookAddress}
+                  </Text>
                 ) : null}
               </View>
               <View className="flex-row gap-2">
                 <TouchableOpacity
-                  onPress={() => callContact('0771234567')}
+                  onPress={() => callContact(order.cookPhone, 'cook')}
                   className="w-9 h-9 rounded-full bg-green-50 border border-green-200 items-center justify-center"
                   accessibilityRole="button"
                   accessibilityLabel={`Call cook ${order.cookName}`}
@@ -343,15 +319,15 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
                 <Feather name="map-pin" size={16} color="#3B82F6" />
               </View>
               <View className="flex-1">
-                <Text className="text-textMuted text-[10px] uppercase tracking-wide font-bold">Customer</Text>
-                <Text className="text-textPrimary font-bold text-sm">{order.customerName}</Text>
+                <Text className="text-textMuted text-[10px] uppercase tracking-wide font-bold">Customer (Dropoff)</Text>
+                <Text className="text-textPrimary font-bold text-sm">{order.customerName || 'Customer'}</Text>
                 {order.address?.label ? (
                   <Text className="text-textMuted text-xs mt-0.5" numberOfLines={2}>{order.address.label}</Text>
                 ) : null}
               </View>
               <View className="flex-row gap-2">
                 <TouchableOpacity
-                  onPress={() => callContact('0779876543')}
+                  onPress={() => callContact(order.customerPhone, 'customer')}
                   className="w-9 h-9 rounded-full bg-blue-50 border border-blue-200 items-center justify-center"
                   accessibilityRole="button"
                   accessibilityLabel={`Call customer ${order.customerName}`}
