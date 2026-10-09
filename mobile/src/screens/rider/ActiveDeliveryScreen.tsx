@@ -65,9 +65,45 @@ const getMapHtml = (cookLat: number, cookLon: number, custLat: number, custLon: 
 
 type Props = NativeStackScreenProps<RiderStackParamList, 'ActiveDelivery'>;
 
+const DEMO_ORDERS: Record<string, any> = {
+  'demo-1': {
+    id: 'demo-1',
+    orderNumber: 'NP-2026-8821',
+    cookName: "silva & Sun's",
+    customerName: 'Kavindu Perera',
+    status: 'ACCEPTED',
+    riderEarnings: 1100.50,
+    totalAmount: 2450.00,
+    items: [{ name: 'Delicate Soup Dumplings (12 pcs)', quantity: 2, cookCoordinates: [79.865, 6.932] }],
+    address: { label: 'No 45, Flower Road, Colombo 07', cookAddress: 'Westwood Kitchen Lane 2', coordinates: [79.861, 6.927] }
+  },
+  'demo-2': {
+    id: 'demo-2',
+    orderNumber: 'NP-2026-5519',
+    cookName: "Anoma's Biryani Pot",
+    customerName: 'Sarah Jenkins',
+    status: 'ACCEPTED',
+    riderEarnings: 1600.00,
+    totalAmount: 3800.00,
+    items: [{ name: 'Large Family Feast Chicken Biryani (3.2 kg)', quantity: 1, cookCoordinates: [79.868, 6.935] }],
+    address: { label: 'Apt 12B, Ocean View, Colombo 03', cookAddress: '42 Galle Road, Bambalapitiya', coordinates: [79.852, 6.898] }
+  },
+  'demo-3': {
+    id: 'demo-3',
+    orderNumber: 'NP-2026-3390',
+    cookName: "Kamal's Ramen",
+    customerName: 'Dineth Fernando',
+    status: 'ACCEPTED',
+    riderEarnings: 600.00,
+    totalAmount: 1950.00,
+    items: [{ name: 'Tonkotsu Ramen Bento Sets', quantity: 2, cookCoordinates: [79.862, 6.929] }],
+    address: { label: '18 Horton Place, Colombo 07', cookAddress: '24 Havelock Road', coordinates: [79.868, 6.912] }
+  }
+};
+
 export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => {
   const { orderId } = route.params;
-  const [order, setOrder] = useState<any>(null);
+  const [order, setOrder] = useState<any>(DEMO_ORDERS[orderId] || null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -77,10 +113,18 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
     try {
       const res = await api.get('/api/orders/my');
       const found = res.data.find((o: any) => o.id === orderId);
-      if (found) setOrder(found);
+      if (found) {
+        setOrder(found);
+      } else if (DEMO_ORDERS[orderId]) {
+        setOrder((prev: any) => prev || DEMO_ORDERS[orderId]);
+      }
       setErrorMsg(null);
     } catch (err) {
-      setErrorMsg('Couldn\'t load order details. Pull down to retry.');
+      if (DEMO_ORDERS[orderId]) {
+        setOrder((prev: any) => prev || DEMO_ORDERS[orderId]);
+      } else {
+        setErrorMsg('Couldn\'t load order details. Pull down to retry.');
+      }
     } finally {
       setLoading(false);
     }
@@ -88,14 +132,12 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
 
   useEffect(() => {
     fetchOrder();
-    // Poll every 10 seconds for status changes
     pollRef.current = setInterval(fetchOrder, 10000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [orderId]);
 
   const handleStatusUpdate = async (newStatus: 'DELIVERING' | 'DELIVERED') => {
     if (newStatus === 'DELIVERED') {
-      // Confirm before delivering
       if (Platform.OS === 'web') {
         if (!window.confirm('Confirm delivery? The customer will be notified and your earnings credited.')) return;
       } else {
@@ -109,7 +151,6 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
             ]
           )
         ).catch(() => null);
-        // Re-check if actually confirmed
       }
     }
 
@@ -122,15 +163,30 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
             : Haptics.ImpactFeedbackStyle.Medium as any
         );
       }
-      const res = await api.put(`/api/orders/${orderId}/status?status=${newStatus}`);
-      setOrder(res.data);
 
-      if (newStatus === 'DELIVERED') {
-        if (pollRef.current) clearInterval(pollRef.current);
-        navigation.replace('DeliveryConfirmation', {
-          orderId,
-          earnings: res.data.riderEarnings ?? 150,
-        });
+      if (orderId.startsWith('demo-')) {
+        const updated = {
+          ...(order || DEMO_ORDERS[orderId]),
+          status: newStatus,
+        };
+        setOrder(updated);
+        if (newStatus === 'DELIVERED') {
+          if (pollRef.current) clearInterval(pollRef.current);
+          navigation.replace('DeliveryConfirmation', {
+            orderId,
+            earnings: updated.riderEarnings ?? 1100.50,
+          });
+        }
+      } else {
+        const res = await api.put(`/api/orders/${orderId}/status?status=${newStatus}`);
+        setOrder(res.data);
+        if (newStatus === 'DELIVERED') {
+          if (pollRef.current) clearInterval(pollRef.current);
+          navigation.replace('DeliveryConfirmation', {
+            orderId,
+            earnings: res.data.riderEarnings ?? 150,
+          });
+        }
       }
     } catch (err: any) {
       const msg = err?.response?.data?.message || 'Couldn\'t update status. Try again.';
@@ -235,8 +291,8 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
                 </Text>
                 <Text className="text-textPrimary font-bold text-sm">{order.orderNumber}</Text>
               </View>
-              <View className="bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-full">
-                <Text className="text-indigo-700 font-bold text-xs">
+              <View className="bg-[#FFF7ED] border border-[#FFEDD5] px-3 py-1.5 rounded-full">
+                <Text className="text-[#7C2D12] font-bold text-xs">
                   LKR {(order.riderEarnings || 0).toFixed(0)} earned
                 </Text>
               </View>
@@ -320,7 +376,7 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
               onPress={() => handleStatusUpdate(primaryButtonStatus)}
               disabled={updating}
               activeOpacity={0.85}
-              className="bg-indigo-500 rounded-2xl py-4 items-center flex-row justify-center"
+              className="bg-[#9A3412] rounded-2xl py-4 items-center flex-row justify-center"
               style={{ opacity: updating ? 0.7 : 1 }}
               accessibilityRole="button"
               accessibilityLabel={primaryButtonLabel}

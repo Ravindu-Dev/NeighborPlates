@@ -72,7 +72,7 @@ export const DeliveryConfirmationScreen: React.FC<Props> = ({ route, navigation 
       {/* Earnings */}
       <Animated.View style={earningsStyle} className="items-center mb-2">
         <Text className="text-textMuted text-sm mb-1">You earned</Text>
-        <Text className="text-indigo-500 font-extrabold mb-1" style={{ fontSize: 40 }}>
+        <Text className="text-[#9A3412] font-extrabold mb-1" style={{ fontSize: 40 }}>
           LKR {earnings.toFixed(0)}
         </Text>
         <Text style={{ fontSize: 24 }}>🎉</Text>
@@ -89,17 +89,17 @@ export const DeliveryConfirmationScreen: React.FC<Props> = ({ route, navigation 
         <TouchableOpacity
           onPress={() => navigation.replace('Tabs')}
           activeOpacity={0.85}
-          className="bg-indigo-500 rounded-2xl py-4 items-center mb-3 w-full"
+          className="bg-[#9A3412] rounded-2xl py-4 items-center mb-3 w-full"
         >
-          <Text className="text-white font-bold text-base">Back to Dashboard</Text>
+          <Text className="text-white font-bold text-base">Back to Jobs</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => navigation.replace('Tabs', { screen: 'History' } as any)}
+          onPress={() => navigation.replace('Tabs', { screen: 'Earnings' } as any)}
           activeOpacity={0.8}
           className="border border-gray-200 rounded-2xl py-4 items-center w-full"
         >
-          <Text className="text-textSecondary font-semibold text-sm">View Ride History</Text>
+          <Text className="text-textSecondary font-semibold text-sm">View Earnings & History</Text>
         </TouchableOpacity>
 
         <Text className="text-textMuted text-xs text-center mt-5">

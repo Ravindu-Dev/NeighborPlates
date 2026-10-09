@@ -28,15 +28,26 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User profile not found"));
 
         User.UserProfile current = user.getProfile();
-        current.setName(update.getName());
-        current.setPhone(update.getPhone());
-        current.setBio(update.getBio());
-        current.setAvatarUrl(update.getAvatarUrl());
-        current.setKitchenPhotos(update.getKitchenPhotos());
-        current.setDeliveryRadius(update.getDeliveryRadius());
-        if (update.getVehicleType() != null) {
-            current.setVehicleType(update.getVehicleType());
-        }
+        if (update.getName() != null) current.setName(update.getName());
+        if (update.getPhone() != null) current.setPhone(update.getPhone());
+        if (update.getBio() != null) current.setBio(update.getBio());
+        if (update.getAvatarUrl() != null) current.setAvatarUrl(update.getAvatarUrl());
+        if (update.getKitchenPhotos() != null) current.setKitchenPhotos(update.getKitchenPhotos());
+        if (update.getDeliveryRadius() != null) current.setDeliveryRadius(update.getDeliveryRadius());
+        if (update.getVehicleType() != null) current.setVehicleType(update.getVehicleType());
+        if (update.getVehicleModel() != null) current.setVehicleModel(update.getVehicleModel());
+        if (update.getVehiclePlate() != null) current.setVehiclePlate(update.getVehiclePlate());
+        if (update.getOnTimeRate() != null) current.setOnTimeRate(update.getOnTimeRate());
+        if (update.getAcceptanceRate() != null) current.setAcceptanceRate(update.getAcceptanceRate());
+        if (update.getHaccpCertified() != null) current.setHaccpCertified(update.getHaccpCertified());
+        if (update.getThermalBackpack() != null) current.setThermalBackpack(update.getThermalBackpack());
+        if (update.getSpillProofRack() != null) current.setSpillProofRack(update.getSpillProofRack());
+        if (update.getHeatedWarmerPod() != null) current.setHeatedWarmerPod(update.getHeatedWarmerPod());
+        if (update.getHotFoodPriority() != null) current.setHotFoodPriority(update.getHotFoodPriority());
+        if (update.getAutoAcceptRush() != null) current.setAutoAcceptRush(update.getAutoAcceptRush());
+        if (update.getNavigationApp() != null) current.setNavigationApp(update.getNavigationApp());
+        if (update.getPayoutMethod() != null) current.setPayoutMethod(update.getPayoutMethod());
+        if (update.getInsurancePolicy() != null) current.setInsurancePolicy(update.getInsurancePolicy());
 
         if (update.getLocation() != null && update.getLocation().getCoordinates() != null && update.getLocation().getCoordinates().size() == 2) {
             current.setLocation(update.getLocation());
