@@ -311,19 +311,42 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({ visible, o
       } else {
         const expoPrint = require('expo-print');
         const expoSharing = require('expo-sharing');
+        const FileSystem = require('expo-file-system');
 
-        const { uri } = await expoPrint.printToFileAsync({
-          html: htmlContent,
-        });
+        let shared = false;
 
-        if (await expoSharing.isAvailableAsync()) {
-          await expoSharing.shareAsync(uri, {
-            UTI: '.pdf',
-            mimeType: 'application/pdf',
-            dialogTitle: `Receipt_${order.orderNumber || 'order'}`,
+        try {
+          const { uri } = await expoPrint.printToFileAsync({
+            html: htmlContent,
           });
-        } else {
-          Alert.alert('PDF Saved', `Receipt saved to: ${uri}`);
+
+          const filename = `Receipt_${order.orderNumber || order.id || 'order'}.pdf`;
+          const cachePath = `${FileSystem.cacheDirectory}${filename}`;
+
+          try {
+            await FileSystem.deleteAsync(cachePath, { idempotent: true });
+          } catch (_) {}
+
+          await FileSystem.copyAsync({
+            from: uri,
+            to: cachePath,
+          });
+
+          if (await expoSharing.isAvailableAsync()) {
+            await expoSharing.shareAsync(cachePath, {
+              UTI: '.pdf',
+              mimeType: 'application/pdf',
+              dialogTitle: `Receipt #${order.orderNumber || 'order'}`,
+            });
+            shared = true;
+          }
+        } catch (shareErr) {
+          console.warn('Sharing failed, attempting native print/save fallback:', shareErr);
+        }
+
+        // Fallback to native print interface (allows "Save as PDF" directly on Android & iOS)
+        if (!shared) {
+          await expoPrint.printAsync({ html: htmlContent });
         }
       }
     } catch (err: any) {

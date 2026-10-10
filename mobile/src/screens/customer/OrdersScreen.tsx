@@ -12,8 +12,27 @@ type OrdersScreenProp = NativeStackNavigationProp<CustomerStackParamList, 'HomeT
 
 const ACTIVE_STATUSES = ['PLACED', 'ACCEPTED', 'PREPARING', 'READY', 'DELIVERING'];
 
-export const OrdersScreen: React.FC = () => {
-  const navigation = useNavigation<OrdersScreenProp>();
+interface OrdersScreenProps {
+  navigation?: any;
+}
+
+export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavigation }) => {
+  const fallbackNav = useNavigation<any>();
+  const navigation = propNavigation || fallbackNav;
+
+  const safeNavigate = (name: string, params?: any) => {
+    if (!navigation) return;
+    try {
+      navigation.navigate(name, params);
+    } catch (_) {
+      try {
+        navigation.getParent?.()?.navigate(name, params);
+      } catch (err) {
+        console.warn('Navigation failed:', err);
+      }
+    }
+  };
+
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'past'>('all');
@@ -53,6 +72,10 @@ export const OrdersScreen: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!navigation || typeof navigation.addListener !== 'function') {
+      fetchOrders();
+      return;
+    }
     const unsubscribe = navigation.addListener('focus', () => {
       fetchOrders();
     });
@@ -161,11 +184,11 @@ export const OrdersScreen: React.FC = () => {
             <Text className="text-textMuted text-xs text-center leading-relaxed">
               Discover authentic home-cooked meals from local chefs in your neighborhood!
             </Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('HomeTabs', { screen: 'Home' })}
-              className="mt-5 bg-primary px-6 py-3 rounded-2xl shadow-sm"
-              activeOpacity={0.8}
-            >
+              <TouchableOpacity
+                onPress={() => safeNavigate('HomeTabs', { screen: 'Home' })}
+                className="mt-5 bg-primary px-6 py-3 rounded-2xl shadow-sm"
+                activeOpacity={0.8}
+              >
               <Text className="text-white font-black text-xs uppercase tracking-wider">Browse Home Kitchens</Text>
             </TouchableOpacity>
           </View>
@@ -214,7 +237,7 @@ export const OrdersScreen: React.FC = () => {
                     </View>
 
                     <TouchableOpacity
-                      onPress={() => navigation.navigate('OrderTracking', { orderId: activeDeliveryOrder.id })}
+                      onPress={() => safeNavigate('OrderTracking', { orderId: activeDeliveryOrder.id })}
                       className="px-4 py-2.5 rounded-xl bg-primary flex-row items-center gap-1.5 shadow-sm"
                       activeOpacity={0.8}
                     >
@@ -266,7 +289,7 @@ export const OrdersScreen: React.FC = () => {
                   <View className="flex-row items-center gap-2">
                     {ACTIVE_STATUSES.includes(item.status) && (
                       <TouchableOpacity
-                        onPress={() => navigation.navigate('OrderTracking', { orderId: item.id })}
+                        onPress={() => safeNavigate('OrderTracking', { orderId: item.id })}
                         className="px-3.5 py-2.5 rounded-xl border border-primary/30 bg-primary/10 flex-row items-center gap-1.5 shadow-xs"
                         activeOpacity={0.7}
                       >
