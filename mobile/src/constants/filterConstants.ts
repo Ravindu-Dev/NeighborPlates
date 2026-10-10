@@ -12,12 +12,12 @@ export const DIETARY_OPTIONS = [
 export type DietaryPreference = typeof DIETARY_OPTIONS[number];
 
 export const CATEGORIES_LIST = [
-  { key: 'ALL', label: 'All', emoji: '🍽️' },
-  { key: 'BREAKFAST', label: 'Breakfast', emoji: '🥞' },
-  { key: 'LUNCH', label: 'Lunch', emoji: '🍛' },
-  { key: 'DINNER', label: 'Dinner', emoji: '🍜' },
-  { key: 'SNACKS', label: 'Snacks', emoji: '🍩' },
-  { key: 'COMBO', label: 'Combos', emoji: '🎁' },
+  { key: 'ALL', label: 'All', iconName: 'grid' },
+  { key: 'BREAKFAST', label: 'Breakfast', iconName: 'coffee' },
+  { key: 'LUNCH', label: 'Lunch', iconName: 'sun' },
+  { key: 'DINNER', label: 'Dinner', iconName: 'moon' },
+  { key: 'SNACKS', label: 'Snacks', iconName: 'pie-chart' },
+  { key: 'COMBO', label: 'Combos', iconName: 'gift' },
 ] as const;
 
 export interface DistrictTownMap {

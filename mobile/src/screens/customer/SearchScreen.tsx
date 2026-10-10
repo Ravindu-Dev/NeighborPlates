@@ -122,12 +122,12 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
   ];
 
   const popularCraves = [
-    { label: 'Biryani 🍛', query: 'Biryani' },
-    { label: 'Kottu 🍜', query: 'Kottu' },
-    { label: 'Hoppers 🥞', query: 'Hoppers' },
-    { label: 'Pastries 🥐', query: 'Pastry' },
-    { label: 'Desserts 🍨', query: 'Dessert' },
-    { label: 'Spicy 🔥', query: 'Spicy' },
+    { label: 'Biryani', query: 'Biryani' },
+    { label: 'Kottu', query: 'Kottu' },
+    { label: 'Hoppers', query: 'Hoppers' },
+    { label: 'Pastries', query: 'Pastry' },
+    { label: 'Desserts', query: 'Dessert' },
+    { label: 'Spicy', query: 'Spicy' },
   ];
 
   const getUniqueCooksLocations = (mealsList: any[]) => {
@@ -322,7 +322,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
             </View>
           ) : meals.length === 0 ? (
             <View className="bg-white border border-gray-100 rounded-3xl p-8 items-center shadow-sm">
-              <Text className="text-5xl mb-4">🍲</Text>
+              <Feather name="inbox" size={40} color="#9CA3AF" className="mb-3" />
               <Text className="text-textPrimary font-bold text-sm mb-1 text-center">No dishes found near you</Text>
               <Text className="text-textSecondary text-xs text-center leading-relaxed">
                 Try widening your delivery radius or search for different craving keywords.
@@ -340,6 +340,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
                 avgRating={meal.avgRating}
                 portionsRemaining={meal.portionsRemaining}
                 photos={meal.photos}
+                layout="full"
                 onPress={() => navigation.navigate('MealDetail', { mealId: meal.id })}
               />
             ))

@@ -1,13 +1,13 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Image, RefreshControl, ScrollView, TextInput } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, Image, RefreshControl, ScrollView, TextInput, Alert, Platform } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
 import { api } from '../../services/api';
-import { Badge } from '../../components/common/Badge';
-import { ChefCard } from '../../components/customer/ChefCard';
 import { MealCard } from '../../components/customer/MealCard';
 import { FilterModal, FilterState } from '../../components/customer/FilterModal';
 import { Ionicons, Feather } from '@expo/vector-icons';
+import { useAuthStore } from '../../store/authStore';
+import { useCartStore } from '../../store/cartStore';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<CustomerStackParamList, 'HomeTabs'>;
 
@@ -16,6 +16,11 @@ interface HomeScreenProps {
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+  const user = useAuthStore((state) => state.user);
+  const cartItemCount = useCartStore((state) => state.getItemCount());
+  const addItem = useCartStore((state) => state.addItem);
+  const clearCart = useCartStore((state) => state.clearCart);
+
   const [meals, setMeals] = useState<any[]>([]);
   const [aiCombos, setAiCombos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,20 +36,45 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     town: '',
   });
 
-  const promos = [
-    { id: 'promo-1', title: '50% OFF First Order', desc: 'Use code: NEIGHBOR50', badge: 'SPECIAL' },
-    { id: 'promo-2', title: 'Free Cook Delivery', desc: 'On orders above LKR 1000', badge: 'FREE SHIPPING' },
-    { id: 'promo-3', title: 'LKR 150 Flat Discount', desc: 'Support local home chefs today', badge: 'SUPPORT LOCAL' }
-  ];
+  const [showCartToast, setShowCartToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const toastTimeoutRef = useRef<any>(null);
 
-  const categoriesList = [
-    { key: 'ALL', label: 'All', emoji: '🍽️' },
-    { key: 'COMBO', label: 'Combos', emoji: '🎁' },
-    { key: 'BREAKFAST', label: 'Breakfast', emoji: '🥞' },
-    { key: 'LUNCH', label: 'Lunch', emoji: '🍛' },
-    { key: 'DINNER', label: 'Dinner', emoji: '🍜' },
-    { key: 'SNACKS', label: 'Snacks', emoji: '🍩' },
-  ];
+  const handleAddToCart = (meal: any) => {
+    const result = addItem(meal, 1);
+    if (result.success) {
+      setToastMessage(`Added "${meal.name}" to cart`);
+      setShowCartToast(true);
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+      toastTimeoutRef.current = setTimeout(() => {
+        setShowCartToast(false);
+      }, 4000);
+    } else if (result.reason === 'diff_cook') {
+      Alert.alert(
+        'Different Kitchen',
+        'Your cart contains items from another home chef. Would you like to clear your cart and add this dish instead?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Clear Cart & Add',
+            style: 'destructive',
+            onPress: () => {
+              clearCart();
+              addItem(meal, 1);
+              setToastMessage(`Added "${meal.name}" to cart`);
+              setShowCartToast(true);
+              if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+              toastTimeoutRef.current = setTimeout(() => {
+                setShowCartToast(false);
+              }, 4000);
+            },
+          },
+        ]
+      );
+    } else if (result.reason === 'no_portions') {
+      Alert.alert('Out of Stock', 'Sorry, no more portions available for this meal.');
+    }
+  };
 
   const fetchMeals = async (cat: string) => {
     try {
@@ -65,7 +95,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       if (response.data && response.data.length > 0) {
         setAiCombos(response.data);
       } else {
-        // Fallback: fetch all active combos if AI recs is empty
         const allCombosRes = await api.get('/api/combos');
         if (allCombosRes.data && allCombosRes.data.length > 0) {
           const formatted = allCombosRes.data.map((c: any) => ({
@@ -103,12 +132,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setRefreshing(false);
   }, [filters.category]);
 
-  // Re-fetch category meals when category filter changes
   useEffect(() => {
     fetchMeals(filters.category);
   }, [filters.category]);
 
-  // Initial load & screen focus for AI combo recommendations and meals
   useEffect(() => {
     fetchMeals(filters.category);
     fetchAiCombos();
@@ -120,28 +147,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return unsubscribe;
   }, [navigation, filters.category]);
 
-  // Extract unique chefs dynamically from the active list of meals
-  const getUniqueCooks = (mealsList: any[]) => {
-    const cooksMap = new Map();
-    mealsList.forEach(meal => {
-      if (meal.cookId && !cooksMap.has(meal.cookId)) {
-        cooksMap.set(meal.cookId, {
-          id: meal.cookId,
-          name: meal.cookName,
-          rating: meal.avgRating || 4.8,
-          specialty: meal.category === 'LUNCH' ? 'Traditional Sri Lankan' : 'Home-style Delicacies',
-        });
-      }
-    });
-    return Array.from(cooksMap.values());
-  };
-
-  const uniqueCooks = getUniqueCooks(meals);
-
-  // Search & Multi-criteria Filtering Logics
   const getProcessedMeals = () => {
     let processed = meals.filter((meal) => {
-      // 1. Category Filter
       if (
         filters.category &&
         filters.category !== 'ALL' &&
@@ -150,7 +157,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         return false;
       }
 
-      // 2. Dietary Preferences Filter (must contain all selected dietary preferences)
       if (filters.dietaryPreferences && filters.dietaryPreferences.length > 0) {
         const mealDietary: string[] = meal.dietaryPreferences || [];
         const matchesAll = filters.dietaryPreferences.every((pref) =>
@@ -159,21 +165,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         if (!matchesAll) return false;
       }
 
-      // 3. Location District Filter
       if (filters.district) {
         if (!meal.cookDistrict || meal.cookDistrict.toLowerCase() !== filters.district.toLowerCase()) {
           return false;
         }
       }
 
-      // 4. Location Town Filter
       if (filters.town) {
         if (!meal.cookTown || meal.cookTown.toLowerCase() !== filters.town.toLowerCase()) {
           return false;
         }
       }
 
-      // 5. Search Query Filter
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchName = (meal.name || '').toLowerCase().includes(query);
@@ -212,7 +215,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   const processedMeals = getProcessedMeals();
-  const popularMeals = meals.filter(m => (m.avgRating || 0) >= 4.5).slice(0, 5);
 
   return (
     <View className="flex-1 bg-surface-elevated relative">
@@ -232,7 +234,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Premium search bar with Filter button trigger */}
+        {/* Search bar with Filter button trigger */}
         <View className="flex-row items-center gap-3">
           <View className="flex-1 flex-row items-center bg-gray-100 rounded-2xl px-4 py-2.5 border border-gray-200 shadow-inner">
             <Feather name="search" size={16} color="#6B7280" className="mr-2" />
@@ -276,7 +278,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               >
                 <Feather name="sliders" size={16} color={activeCount > 0 ? '#FFFFFF' : '#6B7280'} />
                 {activeCount > 0 && (
-                  <View className="absolute -top-1.5 -right-1.5 bg-secondary rounded-full w-5 h-5 items-center justify-center border-2 border-white">
+                  <View className="absolute -top-1.5 -right-1.5 bg-primary rounded-full w-5 h-5 items-center justify-center border-2 border-white">
                     <Text className="text-white text-[9px] font-black">{activeCount}</Text>
                   </View>
                 )}
@@ -294,17 +296,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         }
       >
         <View className="px-6 pt-6">
-          {/* Welcome Info */}
-          <View className="mb-4">
-            <Text className="text-textSecondary text-xs font-semibold">Welcome back, neighbor! 👋</Text>
-            <Text className="text-textPrimary text-2xl font-black tracking-tight mt-0.5">Discover Home Kitchens</Text>
+          {/* Welcome Info with Registered User Name */}
+          <View className="mb-5">
+            <Text className="text-textSecondary text-xs font-bold uppercase tracking-wider">
+              Welcome back, {user?.name || 'Neighbor'}
+            </Text>
+            <Text className="text-textPrimary text-2xl font-black tracking-tight mt-0.5">
+              Discover Home Kitchens
+            </Text>
           </View>
 
-          {/* ─── 1. SEPARATE COMBO DEALS SECTION AT THE VERY TOP ─── */}
+          {/* ─── FEATURED AI COMBO DEALS SECTION ─── */}
           <View className="mb-7">
             <View className="flex-row justify-between items-center mb-3">
               <View className="flex-row items-center gap-1.5">
-                <Text className="text-base">🎁</Text>
+                <Feather name="gift" size={14} color="#FF6B35" />
                 <Text className="text-textPrimary font-black text-sm uppercase tracking-wider">
                   Featured Combo Deals
                 </Text>
@@ -344,22 +350,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                       className="w-80 rounded-3xl mr-4 border border-white/20 shadow-lg relative overflow-hidden h-44 justify-between p-4"
                       style={{ backgroundColor: '#1A1A2E' }}
                     >
-                      {/* Background Image of the Bundled Meal */}
                       <Image
                         source={{ uri: comboImage }}
                         className="absolute inset-0 w-full h-full"
                         resizeMode="cover"
                       />
-
-                      {/* Dark Gradient Overlay for Maximum Readability */}
-                      <View
-                        className="absolute inset-0"
-                        style={{
-                          backgroundColor: 'rgba(12, 12, 22, 0.70)',
-                        }}
-                      />
+                      <View className="absolute inset-0" style={{ backgroundColor: 'rgba(12, 12, 22, 0.70)' }} />
                       
-                      {/* Top Badges (AI Discount Tag & Price) */}
+                      {/* Top Badges */}
                       <View className="flex-row items-center justify-between z-10">
                         <View className="bg-primary/95 px-2.5 py-1 rounded-full flex-row items-center gap-1 shadow-sm">
                           <Ionicons name="sparkles" size={10} color="#FFFFFF" />
@@ -379,7 +377,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                         </View>
                       </View>
 
-                      {/* Middle Details (Combo Name & Description/Reason) */}
+                      {/* Details */}
                       <View className="z-10 my-auto">
                         <Text className="text-white font-black text-lg leading-6 mb-1 shadow-sm" numberOfLines={1}>
                           {combo.name}
@@ -389,11 +387,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                         </Text>
                       </View>
 
-                      {/* Bottom Footer (Chef & Order CTA) */}
+                      {/* Footer */}
                       <View className="flex-row justify-between items-center pt-2 border-t border-white/20 z-10">
                         <View className="flex-row items-center gap-1.5">
                           <View className="w-5 h-5 rounded-full bg-white/20 items-center justify-center">
-                            <Text className="text-[10px]">👨‍🍳</Text>
+                            <Feather name="user" size={10} color="#FFFFFF" />
                           </View>
                           <Text className="text-white/85 text-[11px] font-bold tracking-wide">
                             Chef {combo.cookName || 'Home Cook'}
@@ -435,120 +433,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             )}
           </View>
 
-          {/* ─── 2. SEPARATE PROMOTIONS SECTION ─── */}
-          <View className="mb-8">
-            <Text className="text-textPrimary font-black text-sm uppercase tracking-wider mb-3">Special Offers</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={280}
-              decelerationRate="fast"
-            >
-              {promos.map((item) => (
-                <View 
-                  key={item.id}
-                  className="w-72 bg-[#1A1A2E] rounded-3xl p-5 mr-4 border border-gray-800 shadow-md relative overflow-hidden h-36 justify-between"
-                >
-                  <View className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-white/5" />
-                  <View className="absolute -top-6 -left-6 w-20 h-20 rounded-full bg-white/5" />
-                  
-                  <View>
-                    <View className="bg-white/10 px-2 py-0.5 rounded-md self-start mb-2 border border-white/20">
-                      <Text className="text-white text-[8px] font-black tracking-widest uppercase">{item.badge}</Text>
-                    </View>
-                    <Text className="text-white font-extrabold text-lg leading-6 mb-1">{item.title}</Text>
-                    <Text className="text-white/60 text-xs font-semibold">{item.desc}</Text>
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* Visual Categories Grid */}
-          <View className="mb-8">
-            <Text className="text-textPrimary font-black text-sm uppercase tracking-wider mb-4">Explore Categories</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="py-1">
-              {categoriesList.map((item) => {
-                const isActive = filters.category === item.key || (item.key === 'ALL' && (!filters.category || filters.category === 'ALL'));
-                return (
-                  <TouchableOpacity
-                    key={item.key}
-                    onPress={() => setFilters(prev => ({ ...prev, category: item.key }))}
-                    className={`mr-3 items-center justify-center rounded-3xl p-3 border shadow-sm w-20 h-20 ${
-                      isActive
-                        ? 'bg-primary border-primary'
-                        : 'bg-white border-gray-100'
-                    }`}
-                    activeOpacity={0.8}
-                  >
-                    <Text className="text-2xl mb-1">{item.emoji}</Text>
-                    <Text className={`text-[10px] font-black uppercase text-center ${isActive ? 'text-white' : 'text-textSecondary'}`}>
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          {/* Horizontal Featured Chefs Section */}
-          {uniqueCooks.length > 0 && (
-            <View className="mb-8">
-              <View className="flex-row justify-between items-center mb-4">
-                <Text className="text-textPrimary font-black text-sm uppercase tracking-wider">Featured Home Chefs</Text>
-                <Text className="text-primary font-bold text-xs uppercase tracking-wide">See All</Text>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="py-1">
-                {uniqueCooks.map((chef: any) => (
-                  <ChefCard
-                    key={chef.id}
-                    cookId={chef.id}
-                    name={chef.name}
-                    rating={chef.rating}
-                    specialty={chef.specialty}
-                    onPress={() => setFilters(prev => ({ ...prev, category: 'ALL' }))}
-                  />
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* Horizontal Popular Near You Carousel */}
-          {popularMeals.length > 0 && (
-            <View className="mb-8">
-              <Text className="text-textPrimary font-black text-sm uppercase tracking-wider mb-4">⭐ Highly Rated Neighbors</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="py-1">
-                {popularMeals.map((meal) => (
-                  <TouchableOpacity
-                    key={meal.id}
-                    onPress={() => navigation.navigate('MealDetail', { mealId: meal.id })}
-                    className="bg-white rounded-3xl border border-gray-150 p-3 mr-4 w-48 shadow-sm"
-                    activeOpacity={0.8}
-                  >
-                    <View className="h-28 rounded-2xl bg-primary/10 overflow-hidden mb-3.5 relative">
-                      {meal.photos && meal.photos.length > 0 ? (
-                        <Image source={{ uri: meal.photos[0] }} className="w-full h-full object-cover" />
-                      ) : (
-                        <View className="w-full h-full items-center justify-center">
-                          <Text className="text-3xl">🍲</Text>
-                        </View>
-                      )}
-                      <View className="absolute top-2 left-2 bg-amber-50 border border-amber-150 px-2 py-0.5 rounded-md shadow-xs flex-row items-center">
-                        <Text className="text-[8px] mr-0.5">⭐</Text>
-                        <Text className="text-amber-800 font-extrabold text-[8px]">{meal.avgRating?.toFixed(1) || '5.0'}</Text>
-                      </View>
-                    </View>
-                    <Text className="text-textPrimary font-extrabold text-xs mb-0.5" numberOfLines={1}>{meal.name}</Text>
-                    <Text className="text-textSecondary text-[9px] mb-2" numberOfLines={1}>By {meal.cookName}</Text>
-                    <Text className="text-primary font-black text-xs">LKR {meal.price}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* Vertical Main Feed Section */}
-          <View className="mb-8">
+          {/* ─── SIDE-BY-SIDE ALL ACTIVE KITCHENS FEED ─── */}
+          <View className="mb-24">
             <View className="flex-row justify-between items-center mb-4">
               <Text className="text-textPrimary font-black text-sm uppercase tracking-wider">All Active Kitchens</Text>
               {sortBy !== 'none' && (
@@ -563,30 +449,64 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 <ActivityIndicator size="large" color="#FF6B35" />
               </View>
             ) : processedMeals.length === 0 ? (
-              <View className="py-12 justify-center items-center">
-                <Text className="text-4xl mb-3">🍲</Text>
+              <View className="py-12 justify-center items-center bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
+                <Feather name="inbox" size={40} color="#9CA3AF" className="mb-3" />
                 <Text className="text-textPrimary font-bold text-sm mb-1 text-center">No matching meals found</Text>
-                <Text className="text-textSecondary text-xs text-center">Try editing your search query or sorting options.</Text>
+                <Text className="text-textSecondary text-xs text-center">Try editing your search query or reset filter options.</Text>
               </View>
             ) : (
-              processedMeals.map((meal) => (
-                <MealCard
-                  key={meal.id}
-                  id={meal.id}
-                  name={meal.name}
-                  price={meal.price}
-                  category={meal.category}
-                  cookName={meal.cookName}
-                  avgRating={meal.avgRating}
-                  portionsRemaining={meal.portionsRemaining}
-                  photos={meal.photos}
-                  onPress={() => navigation.navigate('MealDetail', { mealId: meal.id })}
-                />
-              ))
+              <View className="flex-row flex-wrap justify-between">
+                {processedMeals.map((meal) => (
+                  <MealCard
+                    key={meal.id}
+                    id={meal.id}
+                    name={meal.name}
+                    price={meal.price}
+                    category={meal.category}
+                    cookName={meal.cookName}
+                    avgRating={meal.avgRating}
+                    portionsRemaining={meal.portionsRemaining}
+                    photos={meal.photos}
+                    layout="grid"
+                    onPress={() => navigation.navigate('MealDetail', { mealId: meal.id })}
+                    onAddToCart={() => handleAddToCart(meal)}
+                  />
+                ))}
+              </View>
             )}
           </View>
         </View>
       </ScrollView>
+
+      {/* Modern Floating Toast message for Add to Cart */}
+      {showCartToast && cartItemCount > 0 && (
+        <View className="absolute bottom-20 left-4 right-4 bg-gray-900 rounded-3xl p-4 shadow-2xl flex-row items-center justify-between border border-gray-800 z-50 animate-fade-in">
+          <View className="flex-row items-center gap-3 flex-1 mr-2">
+            <View className="w-10 h-10 rounded-2xl bg-primary items-center justify-center">
+              <Feather name="shopping-bag" size={20} color="#FFFFFF" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-white font-extrabold text-xs" numberOfLines={1}>
+                {toastMessage || 'Item added to cart'}
+              </Text>
+              <Text className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mt-0.5">
+                {cartItemCount} {cartItemCount === 1 ? 'Item' : 'Items'} in Cart
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            onPress={() => (navigation as any).navigate('HomeTabs', { screen: 'Cart' })}
+            className="bg-primary px-3.5 py-2.5 rounded-2xl flex-row items-center gap-1.5 shadow-sm shrink-0"
+            style={{ flexShrink: 0 }}
+            activeOpacity={0.8}
+          >
+            <Text className="text-white font-black text-xs uppercase tracking-wider" numberOfLines={1}>
+              View Cart
+            </Text>
+            <Feather name="arrow-right" size={14} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Pop-up Filter Modal Component */}
       <FilterModal
