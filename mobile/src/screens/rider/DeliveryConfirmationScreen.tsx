@@ -1,38 +1,57 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Platform, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
-  withDelay,
-  withSequence,
-} from 'react-native-reanimated';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RiderStackParamList } from '../../navigation/RiderNavigator';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { RiderStackParamList } from '../../navigation/RiderNavigator';
 import { Feather } from '@expo/vector-icons';
 
 type Props = NativeStackScreenProps<RiderStackParamList, 'DeliveryConfirmation'>;
 
 export const DeliveryConfirmationScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { orderId, earnings } = route.params;
+  const { orderId, earnings } = route.params || {};
 
-  // Animations
-  const checkScale = useSharedValue(0);
-  const earningsOpacity = useSharedValue(0);
-  const earningsTranslate = useSharedValue(20);
-  const cardOpacity = useSharedValue(0);
+  // Built-in Native Animations
+  const checkScale = useRef(new Animated.Value(0)).current;
+  const earningsOpacity = useRef(new Animated.Value(0)).current;
+  const earningsTranslate = useRef(new Animated.Value(20)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    // Sequence: checkmark → earnings → card
-    checkScale.value = withDelay(100, withSpring(1, { damping: 12, stiffness: 180 }));
-    earningsOpacity.value = withDelay(500, withTiming(1, { duration: 400 }));
-    earningsTranslate.value = withDelay(500, withTiming(0, { duration: 400 }));
-    cardOpacity.value = withDelay(900, withTiming(1, { duration: 350 }));
+
+    // Sequence: checkmark -> earnings -> card
+    Animated.sequence([
+      Animated.delay(100),
+      Animated.spring(checkScale, {
+        toValue: 1,
+        friction: 6,
+        tension: 50,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    Animated.parallel([
+      Animated.timing(earningsOpacity, {
+        toValue: 1,
+        duration: 400,
+        delay: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(earningsTranslate, {
+        toValue: 0,
+        duration: 400,
+        delay: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardOpacity, {
+        toValue: 1,
+        duration: 350,
+        delay: 900,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
     // Auto-dismiss after 4 seconds
     const timer = setTimeout(() => {
@@ -42,24 +61,11 @@ export const DeliveryConfirmationScreen: React.FC<Props> = ({ route, navigation 
     return () => clearTimeout(timer);
   }, []);
 
-  const checkStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: checkScale.value }],
-  }));
-
-  const earningsStyle = useAnimatedStyle(() => ({
-    opacity: earningsOpacity.value,
-    transform: [{ translateY: earningsTranslate.value }],
-  }));
-
-  const cardStyle = useAnimatedStyle(() => ({
-    opacity: cardOpacity.value,
-  }));
-
   return (
     <View className="flex-1 bg-surface-elevated items-center justify-center px-8">
       {/* Animated Checkmark */}
       <Animated.View
-        style={[checkStyle]}
+        style={{ transform: [{ scale: checkScale }] }}
         className="w-24 h-24 rounded-full bg-green-500 items-center justify-center mb-6"
       >
         <Feather name="check" size={48} color="#FFFFFF" />
@@ -70,20 +76,26 @@ export const DeliveryConfirmationScreen: React.FC<Props> = ({ route, navigation 
       </Text>
 
       {/* Earnings */}
-      <Animated.View style={earningsStyle} className="items-center mb-2">
+      <Animated.View
+        style={{
+          opacity: earningsOpacity,
+          transform: [{ translateY: earningsTranslate }],
+        }}
+        className="items-center mb-2"
+      >
         <Text className="text-textMuted text-sm mb-1">You earned</Text>
         <Text className="text-[#9A3412] font-extrabold mb-1" style={{ fontSize: 40 }}>
-          LKR {earnings.toFixed(0)}
+          LKR {typeof earnings === 'number' ? earnings.toFixed(0) : (earnings || '0')}
         </Text>
         <Text style={{ fontSize: 24 }}>🎉</Text>
       </Animated.View>
 
       <Text className="text-textMuted text-xs text-center mb-10">
-        Order #{orderId?.slice(-8)?.toUpperCase()}
+        Order #{orderId?.slice(-8)?.toUpperCase() || 'N/A'}
       </Text>
 
       {/* Auto-dismiss note */}
-      <Animated.View style={cardStyle} className="w-full">
+      <Animated.View style={{ opacity: cardOpacity }} className="w-full">
         <View className="h-px bg-gray-200 mb-6" />
 
         <TouchableOpacity
@@ -109,3 +121,6 @@ export const DeliveryConfirmationScreen: React.FC<Props> = ({ route, navigation 
     </View>
   );
 };
+
+export default DeliveryConfirmationScreen;
+

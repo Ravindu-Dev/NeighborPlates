@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RiderStackParamList } from '../../navigation/RiderNavigator';
+import type { RiderStackParamList } from '../../navigation/RiderNavigator';
 import { api } from '../../services/api';
 import { DeliveryStepperComponent } from '../../components/rider/DeliveryStepperComponent';
 import { SkeletonLoader } from '../../components/common/SkeletonLoader';
@@ -32,7 +32,7 @@ const getMapHtml = (cookLat: number, cookLon: number, custLat: number, custLon: 
   <script>
     var map = L.map('map', { zoomControl: false }).fitBounds([[${cookLat},${cookLon}],[${custLat},${custLon}]], { padding: [40,40] });
     L.control.zoom({ position: 'bottomright' }).addTo(map);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+    L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png?api_key=sk-OP85plgYVLRSP0UYseCWtvvDJITdJ3mgrBVjGmh9OzAnaVWL', { maxZoom: 20, attribution: '&copy; Stadia Maps &copy; OpenStreetMap contributors' }).addTo(map);
     // Cook
     L.marker([${cookLat},${cookLon}], {
       icon: L.divIcon({ html: '<div style="background:#FF6B35;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 0 8px rgba(255,107,53,.8)"></div>', className:'m', iconSize:[14,14] })

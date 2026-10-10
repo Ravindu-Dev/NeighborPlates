@@ -1,12 +1,5 @@
-import React, { useEffect } from 'react';
-import { Text } from 'react-native';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withSpring, 
-  withTiming, 
-  runOnJS 
-} from 'react-native-reanimated';
+import React, { useEffect, useRef } from 'react';
+import { Text, Animated } from 'react-native';
 
 interface ToastProps {
   message: string;
@@ -21,33 +14,40 @@ export const Toast: React.FC<ToastProps> = ({
   onDismiss,
   visible,
 }) => {
-  const translateY = useSharedValue(-100);
+  const translateY = useRef(new Animated.Value(-100)).current;
 
   useEffect(() => {
     if (visible) {
       // Slide down with a spring bounce
-      translateY.value = withSpring(40);
-      
+      Animated.spring(translateY, {
+        toValue: 40,
+        friction: 6,
+        tension: 40,
+        useNativeDriver: true,
+      }).start();
+
       const timer = setTimeout(() => {
         // Slide back up after 3 seconds
-        translateY.value = withTiming(-100, {}, (finished) => {
+        Animated.timing(translateY, {
+          toValue: -100,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(({ finished }) => {
           if (finished) {
-            runOnJS(onDismiss)();
+            onDismiss();
           }
         });
       }, 3000);
 
       return () => clearTimeout(timer);
     } else {
-      translateY.value = withTiming(-100);
+      Animated.timing(translateY, {
+        toValue: -100,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
     }
   }, [visible]);
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateY: translateY.value }],
-    };
-  });
 
   if (!visible) return null;
 
@@ -59,10 +59,11 @@ export const Toast: React.FC<ToastProps> = ({
 
   return (
     <Animated.View 
-      style={animatedStyle}
+      style={{ transform: [{ translateY }] }}
       className={`absolute top-0 left-4 right-4 rounded-2xl p-4 shadow-lg z-50 flex-row items-center justify-between ${bgColors[type]}`}
     >
       <Text className="text-white font-extrabold text-sm flex-1">{message}</Text>
     </Animated.View>
   );
 };
+
