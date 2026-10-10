@@ -43,8 +43,13 @@ const getTimeAgo = (dateStr: string): string => {
   return `${diffDays}d ago`;
 };
 
-export const CookOrdersScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+interface CookOrdersScreenProps {
+  navigation?: any;
+}
+
+export const CookOrdersScreen: React.FC<CookOrdersScreenProps> = ({ navigation: propNavigation }) => {
+  const fallbackNav = useNavigation<any>();
+  const navigation = propNavigation || fallbackNav;
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

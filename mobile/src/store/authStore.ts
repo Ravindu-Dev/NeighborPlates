@@ -59,7 +59,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const response = await api.post('/api/auth/login', request);
       const { token, refreshToken, id, name, email, role } = response.data;
-      
+
       await AsyncStorage.setItem('token', token);
       await AsyncStorage.setItem('refreshToken', refreshToken);
       const userObj = { id, name, email, role };
@@ -73,7 +73,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         isLoading: false,
       });
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message 
+      const errorMessage = err.response?.data?.message
         || (err.message === 'Network Error' ? 'Network Error: Cannot connect to backend server. Make sure your PC and phone are on the same Wi-Fi.' : null)
         || 'Authentication failed. Please verify credentials.';
       set({
@@ -89,7 +89,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const response = await api.post('/api/auth/register', request);
       const { token, refreshToken, id, name, email, role } = response.data;
-      
+
       await AsyncStorage.setItem('token', token);
       await AsyncStorage.setItem('refreshToken', refreshToken);
       const userObj = { id, name, email, role };

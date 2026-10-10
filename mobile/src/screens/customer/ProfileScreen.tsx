@@ -35,8 +35,26 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }>
   CANCELLED:  { bg: 'bg-red-50',       text: 'text-red-750',    label: '✕ Cancelled' },
 };
 
-export const ProfileScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+interface ProfileScreenProps {
+  navigation?: any;
+}
+
+export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation: propNavigation }) => {
+  const fallbackNav = useNavigation<any>();
+  const navigation = propNavigation || fallbackNav;
+
+  const safeNavigate = (name: string, params?: any) => {
+    if (!navigation) return;
+    try {
+      navigation.navigate(name, params);
+    } catch (_) {
+      try {
+        navigation.getParent?.()?.navigate(name, params);
+      } catch (err) {
+        console.warn('Navigation failed:', err);
+      }
+    }
+  };
   const { logout } = useAuthStore();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -98,6 +116,7 @@ export const ProfileScreen: React.FC = () => {
 
   useEffect(() => {
     fetchProfile();
+    if (!navigation || typeof navigation.addListener !== 'function') return;
     const unsubscribe = navigation.addListener('focus', () => {
       fetchProfile();
       if (activeModal === 'orders') {
