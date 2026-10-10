@@ -12,4 +12,7 @@ public interface MealRepository extends MongoRepository<Meal, String> {
     List<Meal> findByCookId(String cookId);
     List<Meal> findByActiveTrue();
     List<Meal> findByActiveTrueAndCategory(MealCategory category);
+    List<Meal> findByActiveTrueAndNameContainingIgnoreCase(String name);
+    List<Meal> findByActiveTrueAndPriceLessThanEqual(double maxPrice);
 }
+

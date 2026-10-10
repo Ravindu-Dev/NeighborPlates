@@ -16,6 +16,10 @@ import { useAuthStore } from '../store/authStore';
 
 import { Feather } from '@expo/vector-icons';
 
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AiChatWidget } from '../components/chat/AiChatWidget';
+
 export type CustomerStackParamList = {
   HomeTabs: { screen?: string } | undefined;
   OrdersScreen: undefined;
@@ -111,14 +115,25 @@ const HomeTabNavigator = () => {
 };
 
 export const CustomerNavigator = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<CustomerStackParamList>>();
+
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="HomeTabs"      component={HomeTabNavigator} />
-      <Stack.Screen name="OrdersScreen"  component={OrdersScreen} />
-      <Stack.Screen name="MealDetail"    component={MealDetailScreen} />
-      <Stack.Screen name="Checkout"      component={CheckoutScreen} />
-      <Stack.Screen name="Payment"       component={PaymentScreen} />
-      <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
-    </Stack.Navigator>
+    <View style={{ flex: 1 }}>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="HomeTabs"      component={HomeTabNavigator} />
+        <Stack.Screen name="OrdersScreen"  component={OrdersScreen} />
+        <Stack.Screen name="MealDetail"    component={MealDetailScreen} />
+        <Stack.Screen name="Checkout"      component={CheckoutScreen} />
+        <Stack.Screen name="Payment"       component={PaymentScreen} />
+        <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
+      </Stack.Navigator>
+
+      {/* GLOBAL CUSTOMER AI CHATBOT ASSISTANT */}
+      <AiChatWidget
+        onNavigateMeal={(mealId) => navigation.navigate('MealDetail', { mealId })}
+        onNavigateOrder={(orderId) => navigation.navigate('OrderTracking', { orderId })}
+      />
+    </View>
   );
 };
+
