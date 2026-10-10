@@ -5,7 +5,7 @@ import {
   Modal,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
+  Platform,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { FilterChip } from '../common/FilterChip';
@@ -85,9 +85,34 @@ export const FilterModal: React.FC<FilterModalProps> = ({
     (selectedTown ? 1 : 0);
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <SafeAreaView className="flex-1 bg-black/60 justify-end">
-        <View className="bg-white rounded-t-[36px] max-h-[85%] min-h-[60%] flex-col border-t border-gray-100 shadow-2xl">
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View
+        style={
+          {
+            flex: 1,
+            justifyContent: 'flex-end',
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            ...(Platform.OS === 'web'
+              ? {
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  width: '100vw',
+                  height: '100vh',
+                  zIndex: 99999,
+                }
+              : {}),
+          } as any
+        }
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={onClose}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        />
+        <View className="bg-white rounded-t-[36px] max-h-[85%] min-h-[60%] flex-col border-t border-gray-100 shadow-2xl relative">
           {/* Modal Header */}
           <View className="flex-row items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
             <View className="flex-row items-center gap-2">
@@ -237,7 +262,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             </View>
           </View>
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };
