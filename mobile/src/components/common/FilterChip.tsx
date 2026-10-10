@@ -24,7 +24,7 @@ export const FilterChip: React.FC<FilterChipProps> = ({
       activeOpacity={0.8}
       className={`flex-row items-center px-4 py-2 rounded-full mr-2 border
         ${selected 
-          ? 'bg-secondary border-secondary' 
+          ? 'bg-primary border-primary' 
           : 'bg-white border-gray-200'
         }
         ${className}

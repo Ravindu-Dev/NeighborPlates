@@ -139,9 +139,12 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             {/* ─── 1. Dietary Preferences Filter ─── */}
             <View className="mb-6">
               <View className="flex-row items-center justify-between mb-2">
-                <Text className="text-textPrimary font-black text-xs uppercase tracking-wider">
-                  🌱 Dietary Preferences
-                </Text>
+                <View className="flex-row items-center gap-1.5">
+                  <Ionicons name="leaf-outline" size={13} color="#10B981" />
+                  <Text className="text-textPrimary font-black text-xs uppercase tracking-wider">
+                    Dietary Preferences
+                  </Text>
+                </View>
                 {selectedDietary.length > 0 && (
                   <TouchableOpacity onPress={() => setSelectedDietary([])}>
                     <Text className="text-primary font-bold text-[10px] uppercase">Clear</Text>
@@ -170,9 +173,12 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             {/* ─── 2. Meal Categories Filter ─── */}
             <View className="mb-6">
               <View className="flex-row items-center justify-between mb-2">
-                <Text className="text-textPrimary font-black text-xs uppercase tracking-wider">
-                  🍽️ Meal Category
-                </Text>
+                <View className="flex-row items-center gap-1.5">
+                  <Feather name="grid" size={13} color="#FF6B35" />
+                  <Text className="text-textPrimary font-black text-xs uppercase tracking-wider">
+                    Meal Category
+                  </Text>
+                </View>
                 {selectedCategory !== 'ALL' && (
                   <TouchableOpacity onPress={() => setSelectedCategory('ALL')}>
                     <Text className="text-primary font-bold text-[10px] uppercase">Reset</Text>
@@ -185,7 +191,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                   return (
                     <FilterChip
                       key={cat.key}
-                      label={`${cat.emoji} ${cat.label}`}
+                      label={cat.label}
                       selected={isSelected}
                       onPress={() => setSelectedCategory(cat.key)}
                       className="mr-2 mb-2"
@@ -198,9 +204,12 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             {/* ─── 3. Location Filter (District & Town) ─── */}
             <View className="mb-6">
               <View className="flex-row items-center justify-between mb-2">
-                <Text className="text-textPrimary font-black text-xs uppercase tracking-wider">
-                  📍 Cook Location
-                </Text>
+                <View className="flex-row items-center gap-1.5">
+                  <Feather name="map-pin" size={13} color="#3B82F6" />
+                  <Text className="text-textPrimary font-black text-xs uppercase tracking-wider">
+                    Cook Location
+                  </Text>
+                </View>
                 {(selectedDistrict || selectedTown) ? (
                   <TouchableOpacity
                     onPress={() => {
