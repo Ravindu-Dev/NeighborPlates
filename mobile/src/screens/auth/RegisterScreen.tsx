@@ -314,9 +314,34 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ route, navigatio
       </View>
 
       {/* Select Location Modal Map */}
-      <Modal visible={showMapModal} transparent animationType="slide">
-        <View className="flex-grow flex bg-black/60 justify-end h-full">
-          <View className="bg-white rounded-t-[32px] w-full h-[80%] border-t border-gray-150 flex-col">
+      <Modal visible={showMapModal} transparent animationType="slide" onRequestClose={() => setShowMapModal(false)}>
+        <View
+          style={
+            {
+              flex: 1,
+              justifyContent: 'flex-end',
+              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+              ...(Platform.OS === 'web'
+                ? {
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    zIndex: 99999,
+                  }
+                : {}),
+            } as any
+          }
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setShowMapModal(false)}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          />
+          <View className="bg-white rounded-t-[32px] w-full h-[80%] border-t border-gray-150 flex-col relative">
             {/* Modal Header */}
             <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-100">
               <View>

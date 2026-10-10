@@ -6,7 +6,7 @@ import {
   Modal,
   FlatList,
   TextInput as RNTextInput,
-  SafeAreaView,
+  Platform,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 
@@ -85,9 +85,34 @@ export const DropdownPicker: React.FC<DropdownPickerProps> = ({
       ) : null}
 
       {/* Modal Selection Sheet */}
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <SafeAreaView className="flex-1 bg-black/60 justify-end">
-          <View className="bg-white rounded-t-[32px] max-h-[80%] min-h-[50%] flex-col border-t border-gray-100 shadow-2xl">
+      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
+        <View
+          style={
+            {
+              flex: 1,
+              justifyContent: 'flex-end',
+              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+              ...(Platform.OS === 'web'
+                ? {
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    zIndex: 99999,
+                  }
+                : {}),
+            } as any
+          }
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setModalVisible(false)}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          />
+          <View className="bg-white rounded-t-[32px] max-h-[80%] min-h-[50%] flex-col border-t border-gray-100 shadow-2xl relative">
             {/* Modal Header */}
             <View className="flex-row items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
               <View>
@@ -168,7 +193,7 @@ export const DropdownPicker: React.FC<DropdownPickerProps> = ({
               }
             />
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
     </View>
   );
