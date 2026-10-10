@@ -1,13 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, Text } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withRepeat,
-  withSequence,
-  interpolateColor
-} from 'react-native-reanimated';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, Animated } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 interface DeliveryStepperProps {
@@ -16,32 +8,46 @@ interface DeliveryStepperProps {
 
 export const DeliveryStepperComponent: React.FC<DeliveryStepperProps> = ({ status }) => {
   // 0 = ACCEPTED, 0.5 = DELIVERING, 1 = DELIVERED
-  const progress = useSharedValue(0);
+  const progress = useRef(new Animated.Value(0)).current;
 
   // For the pulse animation on the active step
-  const activePulse = useSharedValue(1);
+  const activePulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     // Update progress based on status
-    if (status === 'ACCEPTED' || status === 'READY') progress.value = withTiming(0, { duration: 500 });
-    else if (status === 'DELIVERING') progress.value = withTiming(0.5, { duration: 500 });
-    else if (status === 'DELIVERED') progress.value = withTiming(1, { duration: 700 });
+    let toValue = 0;
+    if (status === 'DELIVERING') toValue = 0.5;
+    else if (status === 'DELIVERED') toValue = 1;
+
+    Animated.timing(progress, {
+      toValue,
+      duration: 600,
+      useNativeDriver: false, // width interpolation
+    }).start();
 
     // Start pulsing animation
-    activePulse.value = withRepeat(
-      withSequence(
-        withTiming(1.15, { duration: 800 }),
-        withTiming(1, { duration: 800 })
-      ),
-      -1, // infinite
-      true // reverse
+    const pulseAnim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(activePulse, {
+          toValue: 1.15,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(activePulse, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
     );
+    pulseAnim.start();
+
+    return () => pulseAnim.stop();
   }, [status]);
 
-  const lineStyle = useAnimatedStyle(() => {
-    return {
-      width: `${progress.value * 100}%`,
-    };
+  const lineWidth = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
   });
 
   const getStepState = (stepIndex: number) => {
@@ -59,12 +65,6 @@ export const DeliveryStepperComponent: React.FC<DeliveryStepperProps> = ({ statu
     const isCompleted = state === 'completed';
     const isActive = state === 'active';
 
-    const pulseStyle = useAnimatedStyle(() => {
-      return {
-        transform: [{ scale: isActive ? activePulse.value : 1 }]
-      };
-    });
-
     let bgColor = 'bg-gray-200';
     let borderColor = 'border-gray-200';
     let iconColor = '#9CA3AF';
@@ -80,6 +80,7 @@ export const DeliveryStepperComponent: React.FC<DeliveryStepperProps> = ({ statu
       bgColor = 'bg-[#9A3412]';
       borderColor = 'border-[#9A3412]';
       iconColor = '#FFFFFF';
+      iconName = iconName;
       textColor = 'text-[#9A3412] font-bold';
     }
 
@@ -87,7 +88,7 @@ export const DeliveryStepperComponent: React.FC<DeliveryStepperProps> = ({ statu
       <View className="items-center flex-1">
         <Animated.View 
           className={`w-10 h-10 rounded-full border-2 items-center justify-center bg-white z-10 ${borderColor} ${bgColor}`}
-          style={pulseStyle}
+          style={isActive ? { transform: [{ scale: activePulse }] } : undefined}
         >
           <Feather name={iconName} size={18} color={iconColor} />
         </Animated.View>
@@ -108,7 +109,7 @@ export const DeliveryStepperComponent: React.FC<DeliveryStepperProps> = ({ statu
         <View className="absolute top-5 left-10 right-10 h-1 bg-transparent rounded-full overflow-hidden">
            <Animated.View 
              className="h-full bg-[#9A3412]" 
-             style={lineStyle} 
+             style={{ width: lineWidth }} 
            />
         </View>
 
@@ -119,3 +120,4 @@ export const DeliveryStepperComponent: React.FC<DeliveryStepperProps> = ({ statu
     </View>
   );
 };
+

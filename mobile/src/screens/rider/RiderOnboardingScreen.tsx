@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RiderStackParamList } from '../../navigation/RiderNavigator';
+import type { RiderStackParamList } from '../../navigation/RiderNavigator';
 import { Button } from '../../components/common/Button';
 import { Feather } from '@expo/vector-icons';
 import { api } from '../../services/api';
