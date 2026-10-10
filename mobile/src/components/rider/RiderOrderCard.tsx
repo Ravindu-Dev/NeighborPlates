@@ -1,83 +1,174 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Card } from '../common/Card';
+
+export interface RiderJobItem {
+  id: string;
+  orderNumber?: string;
+  cookName: string;
+  isVerified?: boolean;
+  distancePickup?: string;
+  estimatedTime?: string;
+  payoutAmount: number | string;
+  payoutTag?: {
+    type: 'ready_now' | 'surge' | 'batch' | 'standard';
+    text: string;
+  };
+  pickupDistance?: string;
+  dropoffDistance?: string;
+  packageSummary?: {
+    label: string;
+    value: string;
+    isHighlight?: boolean;
+  };
+  highlightDish?: string;
+  imageUrl?: string;
+  rawOrder?: any;
+}
 
 interface RiderOrderCardProps {
-  order: {
-    id: string;
-    orderNumber: string;
-    cookName: string;
-    items: { name: string; quantity: number }[];
-    totalAmount: number;
-    riderEarnings?: number;
-    address?: { label: string };
-  };
+  order?: any;
+  job?: RiderJobItem;
   onAccept: () => void;
-  accepting: boolean;
+  accepting?: boolean;
 }
 
 export const RiderOrderCard: React.FC<RiderOrderCardProps> = ({
   order,
+  job,
   onAccept,
-  accepting,
+  accepting = false,
 }) => {
-  const itemSummary = order.items
-    .slice(0, 2)
-    .map((i) => `${i.quantity}× ${i.name}`)
-    .join(', ') + (order.items.length > 2 ? ` +${order.items.length - 2} more` : '');
+  // Normalize data whether passed as `job` or raw backend `order`
+  const cookName = job?.cookName || order?.cookName || 'Home Kitchen';
+  const orderNumber = job?.orderNumber || order?.orderNumber || '';
+  
+  const payout = job?.payoutAmount !== undefined 
+    ? (typeof job.payoutAmount === 'number' ? job.payoutAmount.toFixed(job.payoutAmount % 1 === 0 ? 0 : 2) : job.payoutAmount)
+    : order?.riderEarnings 
+      ? order.riderEarnings.toFixed(2)
+      : order?.totalAmount
+        ? Math.max(150, Math.round(order.totalAmount * 0.15)).toFixed(2)
+        : '150.00';
 
-  const estimatedEarnings = order.riderEarnings
-    ? order.riderEarnings.toFixed(0)
-    : Math.max(150, Math.round(order.totalAmount * 0.15)).toString();
+  const pickupDistance = job?.pickupDistance || job?.distancePickup || (order?.cookAddressLabel ? 'Kitchen' : 'Pickup');
+  const dropoffDistance = job?.dropoffDistance || (order?.address?.label ? (order.address.label.length > 16 ? order.address.label.substring(0, 14) + '...' : order.address.label) : 'Destination');
+  const estimatedTime = job?.estimatedTime || 'Ready Now';
+  
+  const packageLabel = job?.packageSummary?.label || 'Items';
+  const packageValue = job?.packageSummary?.value || `${order?.items?.length || 1} Item${(order?.items?.length || 1) > 1 ? 's' : ''}`;
+  const isHighlightPackage = job?.packageSummary?.isHighlight || false;
+
+  const highlightDish = job?.highlightDish || (
+    order?.items?.[0]
+      ? `🍲 ${order.items[0].name}${order.items.length > 1 ? ` (+${order.items.length - 1} more)` : ''}`
+      : '🍲 Hot Meal'
+  );
+
+  const imageUrl = job?.imageUrl || 'https://images.unsplash.com/photo-1541696432-82c6da8ce7bf?auto=format&fit=crop&w=400&q=80';
+
+  const payoutTag = job?.payoutTag || {
+    type: 'ready_now',
+    text: 'Ready Now',
+  };
 
   return (
-    <Card elevated bordered className="mb-3">
-      {/* Header */}
-      <View className="flex-row items-start justify-between mb-2">
-        <View className="flex-1 mr-3">
-          <View className="flex-row items-center mb-0.5">
-            <View className="w-2 h-2 rounded-full bg-indigo-500 mr-2" />
-            <Text className="text-textPrimary font-bold text-sm" numberOfLines={1}>
-              {order.cookName}
+    <View className="bg-white rounded-3xl p-4 mb-3.5 border border-gray-100 shadow-sm">
+      {/* ── Top Header Row ── */}
+      <View className="flex-row items-center justify-between">
+        <View className="flex-row items-center flex-1 mr-2">
+          {/* Food / Cook Image */}
+          <Image
+            source={{ uri: imageUrl }}
+            className="w-14 h-14 rounded-2xl bg-gray-100 mr-3"
+            resizeMode="cover"
+          />
+
+          {/* Kitchen Info */}
+          <View className="flex-1">
+            <View className="flex-row items-center">
+              <Text className="text-textPrimary font-extrabold text-base" numberOfLines={1}>
+                {cookName}
+              </Text>
+              {/* Verified Badge */}
+              <View className="ml-1.5 w-4 h-4 rounded-full bg-[#B45309] items-center justify-center">
+                <Feather name="check" size={10} color="#FFFFFF" />
+              </View>
+            </View>
+
+            <Text className="text-textMuted text-xs mt-0.5" numberOfLines={1}>
+              {pickupDistance} to pickup • {estimatedTime}
             </Text>
           </View>
-          <Text className="text-textMuted text-xs ml-4">{order.orderNumber}</Text>
         </View>
-        {/* Earnings Pill */}
-        <View className="bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-full">
-          <Text className="text-indigo-700 font-bold text-xs">
-            LKR {estimatedEarnings}
+
+        {/* Payout & Status Tag */}
+        <View className="items-end">
+          <Text className="text-textPrimary font-black text-lg">
+            RS {payout}
+          </Text>
+
+          {payoutTag.type === 'ready_now' ? (
+            <Text className="text-emerald-600 font-bold text-xs mt-0.5">
+              {payoutTag.text}
+            </Text>
+          ) : payoutTag.type === 'surge' ? (
+            <Text className="text-[#C25E00] font-bold text-xs mt-0.5">
+              {payoutTag.text}
+            </Text>
+          ) : payoutTag.type === 'batch' ? (
+            <View className="bg-indigo-50 px-2 py-0.5 rounded-md mt-0.5">
+              <Text className="text-indigo-600 font-bold text-[10px]">
+                {payoutTag.text}
+              </Text>
+            </View>
+          ) : (
+            <Text className="text-emerald-600 font-bold text-xs mt-0.5">
+              Ready Now
+            </Text>
+          )}
+        </View>
+      </View>
+
+      {/* ── 3-Column Stats Pill Bar ── */}
+      <View className="bg-[#EEF4FF] rounded-2xl p-3 my-3 flex-row justify-between items-center">
+        <View className="flex-1 items-center border-r border-blue-100">
+          <Text className="text-textMuted text-[10px] uppercase font-bold tracking-wider mb-0.5">
+            Pickup
+          </Text>
+          <Text className="text-textPrimary font-black text-sm">
+            {pickupDistance}
+          </Text>
+        </View>
+
+        <View className="flex-1 items-center border-r border-blue-100">
+          <Text className="text-textMuted text-[10px] uppercase font-bold tracking-wider mb-0.5">
+            Dropoff
+          </Text>
+          <Text className="text-textPrimary font-black text-sm">
+            {dropoffDistance}
+          </Text>
+        </View>
+
+        <View className="flex-1 items-center">
+          <Text className="text-textMuted text-[10px] uppercase font-bold tracking-wider mb-0.5">
+            {packageLabel}
+          </Text>
+          <Text
+            className={`font-black text-sm ${
+              isHighlightPackage ? 'text-[#C25E00]' : 'text-textPrimary'
+            }`}
+          >
+            {packageValue}
           </Text>
         </View>
       </View>
 
-      {/* Items */}
-      <Text className="text-textSecondary text-xs mb-3 ml-4" numberOfLines={1}>
-        {itemSummary}
-      </Text>
-
-      {/* Delivery Location */}
-      {order.address?.label ? (
-        <View className="flex-row items-center mb-3 ml-1">
-          <Feather name="map-pin" size={12} color="#9CA3AF" />
-          <Text className="text-textMuted text-xs ml-1.5 flex-1" numberOfLines={1}>
-            {order.address.label}
-          </Text>
-        </View>
-      ) : null}
-
-      {/* Divider */}
-      <View className="h-px bg-gray-100 mb-3" />
-
-      {/* Order total + Accept button */}
-      <View className="flex-row items-center justify-between">
-        <View>
-          <Text className="text-textMuted text-[10px] uppercase tracking-wide font-bold">
-            Order Total
-          </Text>
-          <Text className="text-textPrimary font-bold text-sm">
-            LKR {order.totalAmount.toFixed(0)}
+      {/* ── Bottom Action Row ── */}
+      <View className="flex-row items-center justify-between pt-0.5">
+        <View className="flex-row items-center flex-1 mr-3">
+          <Text className="text-textSecondary text-xs font-semibold" numberOfLines={1}>
+            {highlightDish}
           </Text>
         </View>
 
@@ -86,20 +177,19 @@ export const RiderOrderCard: React.FC<RiderOrderCardProps> = ({
           disabled={accepting}
           activeOpacity={0.8}
           accessibilityRole="button"
-          accessibilityLabel={`Accept delivery from ${order.cookName}`}
-          className="bg-indigo-500 flex-row items-center px-5 py-3 rounded-xl"
+          accessibilityLabel={`View and accept order from ${cookName}`}
+          className="bg-[#E0EAFF] px-4 py-2.5 rounded-xl flex-row items-center"
           style={{ opacity: accepting ? 0.7 : 1 }}
         >
           {accepting ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <ActivityIndicator size="small" color="#1D4ED8" />
           ) : (
-            <>
-              <Feather name="truck" size={14} color="#FFFFFF" />
-              <Text className="text-white font-bold text-sm ml-2">Accept</Text>
-            </>
+            <Text className="text-[#1D4ED8] font-black text-xs">
+              View & Accept
+            </Text>
           )}
         </TouchableOpacity>
       </View>
-    </Card>
+    </View>
   );
 };

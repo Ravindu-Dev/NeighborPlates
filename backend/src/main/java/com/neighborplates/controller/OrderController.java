@@ -33,6 +33,12 @@ public class OrderController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<OrderResponse> getOrderById(@PathVariable String id, Principal principal) {
+        OrderResponse response = orderService.getOrderById(principal.getName(), id);
+        return ResponseEntity.ok(response);
+    }
+
     @PutMapping("/{id}/status")
     public ResponseEntity<OrderResponse> updateStatus(
             @PathVariable String id,

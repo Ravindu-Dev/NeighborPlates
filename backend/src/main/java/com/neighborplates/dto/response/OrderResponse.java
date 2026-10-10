@@ -37,4 +37,10 @@ public class OrderResponse {
     private Double riderEarnings;
     private Instant pickedUpAt;
     private Instant deliveredAt;
+    // Contact & Location fields for delivery navigation
+    private String customerPhone;
+    private String cookPhone;
+    private String cookAddressLabel;
+    private List<Double> cookCoordinates;
 }
+

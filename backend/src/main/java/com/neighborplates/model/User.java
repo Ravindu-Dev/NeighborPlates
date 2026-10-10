@@ -62,8 +62,21 @@ public class User {
         private GeoJsonPoint location = new GeoJsonPoint();
         private Double deliveryRadius; // km, Cook only
         private Boolean isAvailable = false; // Rider only: indicates if online
-        private String vehicleType; // Rider only: e.g. "Motorcycle"
+        private String vehicleType; // Rider only: e.g. "Motorcycle", "E-Bike", "Bicycle", "Car"
         private boolean riderVerified = false; // Rider verification status
+        private String vehicleModel;
+        private String vehiclePlate;
+        private Double onTimeRate;
+        private Double acceptanceRate;
+        private Boolean haccpCertified = true;
+        private Boolean thermalBackpack = true;
+        private Boolean spillProofRack = true;
+        private Boolean heatedWarmerPod = true;
+        private Boolean hotFoodPriority = true;
+        private Boolean autoAcceptRush = true;
+        private String navigationApp = "Google";
+        private String payoutMethod;
+        private String insurancePolicy;
     }
 
     @Data
