@@ -31,6 +31,8 @@ public class UserService {
         if (update.getName() != null) current.setName(update.getName());
         if (update.getPhone() != null) current.setPhone(update.getPhone());
         if (update.getBio() != null) current.setBio(update.getBio());
+        if (update.getDistrict() != null) current.setDistrict(update.getDistrict());
+        if (update.getTown() != null) current.setTown(update.getTown());
         if (update.getAvatarUrl() != null) current.setAvatarUrl(update.getAvatarUrl());
         if (update.getKitchenPhotos() != null) current.setKitchenPhotos(update.getKitchenPhotos());
         if (update.getDeliveryRadius() != null) current.setDeliveryRadius(update.getDeliveryRadius());

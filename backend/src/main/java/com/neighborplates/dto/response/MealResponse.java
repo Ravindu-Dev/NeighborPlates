@@ -23,6 +23,7 @@ public class MealResponse {
     private String cuisineType;
     private List<String> ingredients;
     private List<String> allergenTags;
+    private List<String> dietaryPreferences;
     private int portionLimit;
     private int portionsRemaining;
     private Meal.MealAvailability availability;
@@ -33,6 +34,8 @@ public class MealResponse {
     private Instant createdAt;
     private Double cookLongitude;
     private Double cookLatitude;
+    private String cookDistrict;
+    private String cookTown;
     private boolean combo;
     private List<String> includedMealIds;
     private double originalTotalPrice;

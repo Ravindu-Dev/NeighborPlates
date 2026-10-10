@@ -49,6 +49,8 @@ public class AuthService {
         profile.setName(request.getName());
         profile.setPhone(request.getPhone());
         profile.setBio(request.getBio());
+        profile.setDistrict(request.getDistrict());
+        profile.setTown(request.getTown());
         profile.setDeliveryRadius(request.getDeliveryRadius());
         profile.setHygieneVerified(false);
 

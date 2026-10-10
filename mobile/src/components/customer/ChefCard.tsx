@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 interface ChefCardProps {
   cookId: string;
@@ -68,8 +69,8 @@ export const ChefCard: React.FC<ChefCardProps> = ({
 
       {/* Rating badge */}
       <View className="flex-row items-center bg-amber-50 border border-amber-150 px-2 py-0.5 rounded-full shadow-xs">
-        <Text className="text-[10px] mr-0.5">⭐</Text>
-        <Text className="text-amber-800 font-extrabold text-[9px]">
+        <Ionicons name="star" size={10} color="#F59E0B" className="mr-0.5" />
+        <Text className="text-amber-800 font-extrabold text-[9px] ml-0.5">
           {rating > 0 ? rating.toFixed(1) : 'New'}
         </Text>
       </View>

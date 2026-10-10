@@ -36,6 +36,10 @@ public class RegisterRequest {
 
     private String bio;
 
+    private String district;
+
+    private String town;
+
     private List<Double> coordinates; // [longitude, latitude] for location tracking
 
     private Double deliveryRadius; // km, Cook only
