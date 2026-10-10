@@ -47,14 +47,14 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
   if (!meal) {
     return (
       <View className="flex-1 justify-center items-center bg-surface-elevated p-6">
-        <Text className="text-4xl mb-3">🍽️</Text>
-        <Text className="text-textPrimary text-lg font-bold text-center mb-1">Meal No Longer Available</Text>
+        <Feather name="info" size={44} color="#9CA3AF" className="mb-3" />
+        <Text className="text-textPrimary text-lg font-extrabold text-center mb-1">Meal No Longer Available</Text>
         <Text className="text-textMuted text-xs text-center mb-6">This meal listing may have been removed by the home chef.</Text>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           className="bg-primary px-6 py-3 rounded-2xl shadow-sm"
         >
-          <Text className="text-white font-bold text-sm">Explore Other Meals</Text>
+          <Text className="text-white font-bold text-sm uppercase tracking-wider">Explore Other Meals</Text>
         </TouchableOpacity>
       </View>
     );
@@ -69,7 +69,7 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
     const res = useCartStore.getState().addItem(meal, quantity);
     if (res.success) {
       Alert.alert(
-        'Added to Cart 🎉',
+        'Added to Cart',
         `Successfully added ${quantity} portion(s) of "${meal.name}" to your cart.`,
         [
           {
@@ -115,27 +115,32 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
     <View className="flex-1 bg-surface-elevated">
       <ScrollView className="flex-1 pb-24" showsVerticalScrollIndicator={false}>
         {/* Banner Cover Image */}
-        <View className="w-full h-72 bg-primary/10 relative">
+        <View className="w-full h-80 bg-primary/10 relative">
           {meal.photos && meal.photos.length > 0 ? (
             <Image source={{ uri: meal.photos[0] }} className="w-full h-full object-cover" />
           ) : (
-            <View className="w-full h-full items-center justify-center">
-              <Text className="text-6xl">🍛</Text>
+            <View className="w-full h-full items-center justify-center bg-gray-100">
+              <Feather name="coffee" size={48} color="#FF6B35" />
             </View>
           )}
 
-          {/* Top Actions Overlay */}
-          <View className="absolute top-12 left-6 right-6 flex-row justify-between items-center">
+          {/* Gradient Overlay for Readability */}
+          <View className="absolute inset-0 bg-black/20" />
+
+          {/* Top Floating Actions Overlay */}
+          <View className="absolute top-12 left-6 right-6 flex-row justify-between items-center z-10">
             <TouchableOpacity
               onPress={() => navigation.goBack()}
-              className="w-10 h-10 rounded-full bg-white/95 items-center justify-center shadow-md border border-gray-100"
+              className="w-10 h-10 rounded-full bg-white/90 items-center justify-center shadow-md border border-white/50"
+              activeOpacity={0.8}
             >
               <Feather name="arrow-left" size={20} color="#1A1A2E" />
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => setIsFavorite(prev => !prev)}
-              className="w-10 h-10 rounded-full bg-white/95 items-center justify-center shadow-md border border-gray-100"
+              className="w-10 h-10 rounded-full bg-white/90 items-center justify-center shadow-md border border-white/50"
+              activeOpacity={0.8}
             >
               <Ionicons 
                 name={isFavorite ? "heart" : "heart-outline"} 
@@ -146,44 +151,51 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
           </View>
         </View>
 
-        {/* Content Box */}
-        <View className="p-6 -mt-6 bg-surface-elevated rounded-t-[32px] shadow-lg border-t border-gray-100">
-          {/* Category Badge & Title */}
+        {/* Main Details Sheet */}
+        <View className="p-6 -mt-8 bg-surface-elevated rounded-t-[36px] shadow-2xl border-t border-gray-100">
+          {/* Category Badge & Rating */}
           <View className="flex-row items-center justify-between mb-3">
-            <Badge label={meal.category} variant="primary" />
-            <View className="flex-row items-center bg-amber-50 border border-amber-150 px-2.5 py-0.5 rounded-full shadow-xs">
-              <Text className="text-xs mr-0.5">⭐</Text>
-              <Text className="text-amber-800 font-extrabold text-xs">
+            <Badge label={meal.category || 'Meal'} variant="primary" />
+            <View className="flex-row items-center bg-amber-50 border border-amber-150 px-3 py-1 rounded-full shadow-xs">
+              <Ionicons name="star" size={12} color="#F59E0B" className="mr-1" />
+              <Text className="text-amber-800 font-extrabold text-xs ml-1">
                 {meal.avgRating > 0 ? meal.avgRating.toFixed(1) : 'New'}
               </Text>
             </View>
           </View>
 
+          {/* Title & Price Line */}
           <View className="flex-row justify-between items-start mb-4">
-            <Text className="text-textPrimary font-black text-2xl flex-1 mr-4 leading-8">{meal.name}</Text>
+            <Text className="text-textPrimary font-black text-2xl flex-1 mr-4 leading-8">
+              {meal.name}
+            </Text>
             <View className="items-end">
-              <Text className="text-textSecondary text-[10px] font-bold uppercase mb-0.5">PRICE</Text>
-              <Text className="text-primary font-black text-xl">LKR {meal.price}</Text>
+              <Text className="text-textSecondary text-[9px] font-black uppercase tracking-wider mb-0.5">PRICE PER PORTION</Text>
+              <Text className="text-primary font-black text-2xl">LKR {meal.price}</Text>
             </View>
           </View>
 
-          {/* Divider */}
+          {/* Divider Line */}
           <View className="h-[1px] bg-gray-200/60 w-full mb-5" />
 
-          {/* Cook/Chef details container */}
+          {/* Cook/Chef details Card */}
           <View className="bg-white rounded-3xl p-4 border border-gray-150 shadow-sm flex-row items-center justify-between mb-6">
             <View className="flex-row items-center flex-1 mr-2">
-              <View className="w-11 h-11 rounded-full bg-orange-100 border border-orange-200 items-center justify-center shadow-inner mr-3">
-                <Text className="text-primary-dark font-black text-base">{getInitials(meal.cookName)}</Text>
+              <View className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 items-center justify-center shadow-inner mr-3 relative">
+                <Text className="text-primary font-black text-lg">{getInitials(meal.cookName)}</Text>
+                <View className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-white" />
               </View>
               <View className="flex-1">
-                <Text className="text-textSecondary text-[9px] font-black uppercase tracking-wider">HOME CHEF</Text>
-                <Text className="text-textPrimary font-extrabold text-sm mt-0.5">{meal.cookName}</Text>
+                <View className="flex-row items-center gap-1">
+                  <Text className="text-textMuted text-[9px] font-black uppercase tracking-wider">HOME CHEF</Text>
+                  <Feather name="check-circle" size={10} color="#10B981" />
+                </View>
+                <Text className="text-textPrimary font-extrabold text-base mt-0.5">{meal.cookName}</Text>
               </View>
             </View>
-            <View className="border border-gray-150 bg-gray-50 rounded-xl px-3 py-1.5 items-center">
-              <Text className="text-textSecondary text-[8px] font-black uppercase">PORTIONS</Text>
-              <Text className={`text-xs font-black mt-0.5 ${meal.portionsRemaining > 0 ? 'text-secondary' : 'text-red-500'}`}>
+            <View className="border border-gray-150 bg-gray-50 rounded-2xl px-3 py-2 items-center">
+              <Text className="text-textMuted text-[8px] font-black uppercase tracking-wider">PORTIONS</Text>
+              <Text className={`text-xs font-black mt-0.5 ${meal.portionsRemaining > 0 ? 'text-green-600' : 'text-red-500'}`}>
                 {meal.portionsRemaining > 0 ? `${meal.portionsRemaining} Left` : 'Sold Out'}
               </Text>
             </View>
@@ -193,15 +205,23 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
           {meal.portionsRemaining > 0 && (
             <View className="bg-white border border-gray-100 rounded-3xl p-5 mb-6 flex-row justify-between items-center shadow-xs">
               <View>
-                <Text className="text-textSecondary text-[10px] font-black uppercase tracking-wide">Select Portions</Text>
-                <Text className="text-textPrimary font-bold text-xs mt-0.5">Adjust order size</Text>
+                <Text className="text-textMuted text-[10px] font-black uppercase tracking-wide">Select Quantity</Text>
+                <Text className="text-textPrimary font-extrabold text-xs mt-0.5">Adjust order portions</Text>
               </View>
-              <View className="flex-row items-center border border-gray-200 rounded-2xl px-4 py-1.5 bg-gray-50 shadow-inner">
-                <TouchableOpacity onPress={() => setQuantity(Math.max(1, quantity - 1))} className="px-2">
+              <View className="flex-row items-center border border-gray-200 rounded-2xl px-4 py-2 bg-gray-50 shadow-inner">
+                <TouchableOpacity 
+                  onPress={() => setQuantity(Math.max(1, quantity - 1))} 
+                  className="px-2"
+                  activeOpacity={0.7}
+                >
                   <Feather name="minus" size={16} color="#1A1A2E" />
                 </TouchableOpacity>
-                <Text className="font-extrabold text-textPrimary text-base px-4">{quantity}</Text>
-                <TouchableOpacity onPress={() => setQuantity(Math.min(meal.portionsRemaining, quantity + 1))} className="px-2">
+                <Text className="font-black text-textPrimary text-base px-4">{quantity}</Text>
+                <TouchableOpacity 
+                  onPress={() => setQuantity(Math.min(meal.portionsRemaining, quantity + 1))} 
+                  className="px-2"
+                  activeOpacity={0.7}
+                >
                   <Feather name="plus" size={16} color="#1A1A2E" />
                 </TouchableOpacity>
               </View>
@@ -209,14 +229,18 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
           )}
 
           {/* Description Section */}
-          <Text className="text-textPrimary font-black text-sm uppercase tracking-wider mb-2">About this dish</Text>
-          <Text className="text-textSecondary text-sm mb-6 leading-relaxed font-medium">{meal.description}</Text>
+          <View className="mb-6">
+            <Text className="text-textPrimary font-black text-sm uppercase tracking-wider mb-2">About this dish</Text>
+            <Text className="text-textSecondary text-sm leading-relaxed font-medium">
+              {meal.description || 'Prepared fresh with high-quality local ingredients by your neighbor chef.'}
+            </Text>
+          </View>
 
-          {/* Ingredients & Allergens in Grid */}
+          {/* Ingredients & Allergens Grid */}
           <View className="flex-row gap-4 mb-6">
             <View className="flex-1 bg-white border border-gray-100 rounded-3xl p-4 shadow-xs">
-              <View className="flex-row items-center gap-1 mb-2">
-                <Text className="text-xs">🥕</Text>
+              <View className="flex-row items-center gap-1.5 mb-2.5">
+                <Feather name="list" size={14} color="#FF6B35" />
                 <Text className="text-textPrimary font-extrabold text-xs uppercase tracking-wider">Ingredients</Text>
               </View>
               {meal.ingredients && meal.ingredients.length > 0 ? (
@@ -224,13 +248,13 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
                   <Text key={index} className="text-textSecondary text-xs mb-1 font-medium">• {item}</Text>
                 ))
               ) : (
-                <Text className="text-textMuted text-xs italic">Not specified</Text>
+                <Text className="text-textMuted text-xs italic">Fresh home ingredients</Text>
               )}
             </View>
             
             <View className="flex-1 bg-white border border-gray-100 rounded-3xl p-4 shadow-xs">
-              <View className="flex-row items-center gap-1 mb-2">
-                <Text className="text-xs">⚠️</Text>
+              <View className="flex-row items-center gap-1.5 mb-2.5">
+                <Feather name="alert-circle" size={14} color="#EF4444" />
                 <Text className="text-textPrimary font-extrabold text-xs uppercase tracking-wider">Allergens</Text>
               </View>
               {meal.allergenTags && meal.allergenTags.length > 0 ? (
@@ -240,53 +264,58 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
                   </View>
                 ))
               ) : (
-                <Text className="text-textMuted text-xs italic">No allergens listed</Text>
+                <Text className="text-textMuted text-xs italic">No major allergens listed</Text>
               )}
             </View>
           </View>
 
-          {/* Reviews list */}
-          <Text className="text-textPrimary font-black text-sm uppercase tracking-wider mb-4">Neighbor Feedback</Text>
-          {meal.recentReviews && meal.recentReviews.length > 0 ? (
-            meal.recentReviews.map((item: any, index: number) => (
-              <View key={index} className="bg-white border border-gray-100 rounded-2xl p-4 mb-3 shadow-xs">
-                <View className="flex-row justify-between items-center mb-1.5">
-                  <View className="flex-row items-center">
-                    <View className="w-6 h-6 rounded-full bg-gray-100 items-center justify-center mr-2 border border-gray-200">
-                      <Text className="text-[10px] font-bold text-gray-600">{getInitials(item.userName)}</Text>
+          {/* Neighbor Reviews Section */}
+          <View className="mb-6">
+            <Text className="text-textPrimary font-black text-sm uppercase tracking-wider mb-4">Neighbor Feedback</Text>
+            {meal.recentReviews && meal.recentReviews.length > 0 ? (
+              meal.recentReviews.map((item: any, index: number) => (
+                <View key={index} className="bg-white border border-gray-100 rounded-2xl p-4 mb-3 shadow-xs">
+                  <View className="flex-row justify-between items-center mb-1.5">
+                    <View className="flex-row items-center">
+                      <View className="w-7 h-7 rounded-full bg-gray-100 items-center justify-center mr-2 border border-gray-200">
+                        <Text className="text-[10px] font-black text-gray-700">{getInitials(item.userName)}</Text>
+                      </View>
+                      <Text className="text-textPrimary font-extrabold text-xs">{item.userName}</Text>
                     </View>
-                    <Text className="text-textPrimary font-extrabold text-xs">{item.userName}</Text>
+                    <View className="flex-row items-center gap-0.5">
+                      {Array.from({ length: item.rating }).map((_, i) => (
+                        <Ionicons key={i} name="star" size={10} color="#F59E0B" />
+                      ))}
+                    </View>
                   </View>
-                  <View className="flex-row">
-                    {Array.from({ length: item.rating }).map((_, i) => (
-                      <Text key={i} className="text-accent text-[10px]">⭐</Text>
-                    ))}
-                  </View>
+                  {item.comment ? (
+                    <Text className="text-textSecondary text-xs leading-relaxed font-medium mb-1">{item.comment}</Text>
+                  ) : null}
+                  {item.photoUrl ? (
+                    <Image source={{ uri: item.photoUrl }} className="w-full h-40 rounded-xl mt-2 bg-gray-50" resizeMode="cover" />
+                  ) : null}
                 </View>
-                {item.comment ? (
-                  <Text className="text-textSecondary text-xs leading-relaxed font-medium mb-1">{item.comment}</Text>
-                ) : null}
-                {item.photoUrl ? (
-                  <Image source={{ uri: item.photoUrl }} className="w-full h-40 rounded-xl mt-2 bg-gray-50" resizeMode="cover" />
-                ) : null}
+              ))
+            ) : (
+              <View className="bg-white border border-gray-100 rounded-2xl p-5 items-center">
+                <Feather name="message-square" size={24} color="#9CA3AF" className="mb-2" />
+                <Text className="text-textMuted text-xs font-medium text-center">No reviews submitted yet. Be the first neighbor to review!</Text>
               </View>
-            ))
-          ) : (
-            <Text className="text-textMuted text-xs italic mb-6">No reviews submitted yet. Be the first to order and review!</Text>
-          )}
+            )}
+          </View>
         </View>
       </ScrollView>
 
-      {/* Sticky Bottom Actions Bar (Uber Eats Style) */}
+      {/* Sticky Bottom Bar */}
       <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-150 px-6 py-4 flex-row items-center justify-between shadow-2xl z-20">
         <View>
-          <Text className="text-textSecondary text-[10px] font-bold uppercase">ORDER TOTAL</Text>
-          <Text className="text-textPrimary font-black text-lg">LKR {totalPrice}</Text>
+          <Text className="text-textMuted text-[9px] font-black uppercase tracking-wider">TOTAL AMOUNT</Text>
+          <Text className="text-textPrimary font-black text-xl">LKR {totalPrice}</Text>
         </View>
         
         <View className="w-48">
           <Button
-            title={meal.portionsRemaining > 0 ? "ADD TO CART 🛒" : "SOLD OUT"}
+            title={meal.portionsRemaining > 0 ? "ADD TO CART" : "SOLD OUT"}
             onPress={handleOrder}
             disabled={meal.portionsRemaining <= 0}
             variant="primary"
