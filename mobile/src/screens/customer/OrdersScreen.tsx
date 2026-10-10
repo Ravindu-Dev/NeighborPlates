@@ -157,34 +157,64 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
         {/* Premium Segmented Toggle Bar */}
         <View className="bg-gray-100 p-1.5 rounded-2xl border border-gray-200 flex-row mb-5 shadow-inner">
           <TouchableOpacity
+            key="tab-all"
             onPress={() => setActiveTab('all')}
-            className={`flex-1 py-2.5 rounded-xl items-center justify-center flex-row gap-2 ${
-              activeTab === 'all' ? 'bg-white shadow-sm border border-gray-200/60' : 'bg-transparent'
-            }`}
+            style={{
+              backgroundColor: activeTab === 'all' ? '#FFFFFF' : 'transparent',
+              borderColor: activeTab === 'all' ? '#E5E7EB' : 'transparent',
+              borderWidth: 1,
+            }}
+            className="flex-1 py-2.5 rounded-xl items-center justify-center flex-row gap-2 shadow-xs"
             activeOpacity={0.8}
           >
-            <Text className={`text-xs font-black ${activeTab === 'all' ? 'text-primary' : 'text-textSecondary'}`}>
+            <Text
+              style={{ color: activeTab === 'all' ? '#FF6B35' : '#6B7280' }}
+              className="text-xs font-black"
+            >
               All Orders
             </Text>
-            <View className={`px-2 py-0.5 rounded-full ${activeTab === 'all' ? 'bg-primary/10' : 'bg-gray-200/60'}`}>
-              <Text className={`text-[10px] font-black ${activeTab === 'all' ? 'text-primary' : 'text-textMuted'}`}>
+            <View
+              style={{
+                backgroundColor: activeTab === 'all' ? 'rgba(255, 107, 53, 0.12)' : 'rgba(229, 231, 235, 0.7)',
+              }}
+              className="px-2 py-0.5 rounded-full"
+            >
+              <Text
+                style={{ color: activeTab === 'all' ? '#FF6B35' : '#9CA3AF' }}
+                className="text-[10px] font-black"
+              >
                 {orders.length}
               </Text>
             </View>
           </TouchableOpacity>
 
           <TouchableOpacity
+            key="tab-past"
             onPress={() => setActiveTab('past')}
-            className={`flex-1 py-2.5 rounded-xl items-center justify-center flex-row gap-2 ${
-              activeTab === 'past' ? 'bg-white shadow-sm border border-gray-200/60' : 'bg-transparent'
-            }`}
+            style={{
+              backgroundColor: activeTab === 'past' ? '#FFFFFF' : 'transparent',
+              borderColor: activeTab === 'past' ? '#E5E7EB' : 'transparent',
+              borderWidth: 1,
+            }}
+            className="flex-1 py-2.5 rounded-xl items-center justify-center flex-row gap-2 shadow-xs"
             activeOpacity={0.8}
           >
-            <Text className={`text-xs font-black ${activeTab === 'past' ? 'text-primary' : 'text-textSecondary'}`}>
+            <Text
+              style={{ color: activeTab === 'past' ? '#FF6B35' : '#6B7280' }}
+              className="text-xs font-black"
+            >
               Past Orders
             </Text>
-            <View className={`px-2 py-0.5 rounded-full ${activeTab === 'past' ? 'bg-primary/10' : 'bg-gray-200/60'}`}>
-              <Text className={`text-[10px] font-black ${activeTab === 'past' ? 'text-primary' : 'text-textMuted'}`}>
+            <View
+              style={{
+                backgroundColor: activeTab === 'past' ? 'rgba(255, 107, 53, 0.12)' : 'rgba(229, 231, 235, 0.7)',
+              }}
+              className="px-2 py-0.5 rounded-full"
+            >
+              <Text
+                style={{ color: activeTab === 'past' ? '#FF6B35' : '#9CA3AF' }}
+                className="text-[10px] font-black"
+              >
                 {pastOrdersCount}
               </Text>
             </View>
@@ -192,27 +222,27 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
         </View>
 
         {loading ? (
-          <View className="flex-1 justify-center items-center">
+          <View key="state-loading" className="flex-1 justify-center items-center">
             <ActivityIndicator size="large" color="#FF6B35" />
             <Text className="text-textMuted text-xs font-semibold mt-3">Fetching your orders...</Text>
           </View>
         ) : orders.length === 0 ? (
-          <View className="flex-1 justify-center items-center p-6">
+          <View key="state-empty-all" className="flex-1 justify-center items-center p-6">
             <Text className="text-5xl mb-4">🍽️</Text>
             <Text className="text-textPrimary font-black text-base text-center mb-1">No orders placed yet</Text>
             <Text className="text-textMuted text-xs text-center leading-relaxed">
               Discover authentic home-cooked meals from local chefs in your neighborhood!
             </Text>
-              <TouchableOpacity
-                onPress={() => safeNavigate('HomeTabs', { screen: 'Home' })}
-                className="mt-5 bg-primary px-6 py-3 rounded-2xl shadow-sm"
-                activeOpacity={0.8}
-              >
+            <TouchableOpacity
+              onPress={() => safeNavigate('HomeTabs', { screen: 'Home' })}
+              className="mt-5 bg-primary px-6 py-3 rounded-2xl shadow-sm"
+              activeOpacity={0.8}
+            >
               <Text className="text-white font-black text-xs uppercase tracking-wider">Browse Home Kitchens</Text>
             </TouchableOpacity>
           </View>
         ) : filteredOrders.length === 0 ? (
-          <View className="flex-1 justify-center items-center p-6">
+          <View key="state-empty-past" className="flex-1 justify-center items-center p-6">
             <Text className="text-4xl mb-3">📦</Text>
             <Text className="text-textPrimary font-black text-base text-center mb-1">No past orders found</Text>
             <Text className="text-textMuted text-xs text-center">
@@ -221,6 +251,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
           </View>
         ) : (
           <FlatList
+            key="orders-flatlist"
             data={filteredOrders}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
@@ -228,12 +259,20 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
             ListHeaderComponent={
               /* Active Delivery Banner at top of All Orders tab */
               activeTab === 'all' && activeDeliveryOrder ? (
-                <View className="bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-orange-500/5 border border-primary/30 rounded-3xl p-5 mb-5 shadow-sm relative overflow-hidden">
+                <View
+                  style={{ backgroundColor: 'rgba(255, 107, 53, 0.08)' }}
+                  className="border border-primary/30 rounded-3xl p-5 mb-5 shadow-sm relative overflow-hidden"
+                >
                   <View className="flex-row justify-between items-center mb-3">
                     <View className="flex-row items-center gap-2">
                       <Animated.View
-                        style={{ opacity: pulseAnim }}
-                        className="w-3 h-3 rounded-full bg-primary shadow-xs"
+                        style={{
+                          opacity: pulseAnim,
+                          width: 12,
+                          height: 12,
+                          borderRadius: 6,
+                          backgroundColor: '#FF6B35',
+                        }}
                       />
                       <Text className="text-primary font-black text-xs uppercase tracking-wider">
                         Active Delivery In Progress
@@ -242,7 +281,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
                     <Badge label={activeDeliveryOrder.status} variant={getVariant(activeDeliveryOrder.status)} />
                   </View>
 
-                  <View className="flex-row justify-between items-center bg-white/90 rounded-2xl p-3.5 border border-primary/10">
+                  <View className="flex-row justify-between items-center bg-white/95 rounded-2xl p-3.5 border border-primary/10">
                     <View className="flex-1 mr-3">
                       <Text className="text-textPrimary font-black text-sm">
                         #{activeDeliveryOrder.orderNumber || activeDeliveryOrder.id.slice(-6).toUpperCase()}
@@ -308,6 +347,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
                   <View className="flex-row items-center gap-2">
                     {ACTIVE_STATUSES.includes(item.status) && (
                       <TouchableOpacity
+                        key="btn-track"
                         onPress={() => safeNavigate('OrderTracking', { orderId: item.id })}
                         className="px-3.5 py-2.5 rounded-xl border border-primary/30 bg-primary/10 flex-row items-center gap-1.5 shadow-xs"
                         activeOpacity={0.7}
@@ -318,6 +358,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
                     )}
                     {item.status === 'DELIVERED' && (
                       <TouchableOpacity
+                        key="btn-reorder"
                         onPress={() => handleReorder(item)}
                         className="px-3.5 py-2.5 rounded-xl bg-primary flex-row items-center gap-1.5 shadow-xs"
                         activeOpacity={0.7}
@@ -327,6 +368,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
                       </TouchableOpacity>
                     )}
                     <TouchableOpacity
+                      key="btn-receipt"
                       onPress={() => setSelectedReceiptOrder(item)}
                       className="px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50 flex-row items-center gap-1.5 shadow-xs"
                       activeOpacity={0.7}
