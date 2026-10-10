@@ -6,6 +6,7 @@ import { api } from '../../services/api';
 import { Badge } from '../../components/common/Badge';
 import { ChefCard } from '../../components/customer/ChefCard';
 import { MealCard } from '../../components/customer/MealCard';
+import { FilterModal, FilterState } from '../../components/customer/FilterModal';
 import { Ionicons, Feather } from '@expo/vector-icons';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<CustomerStackParamList, 'HomeTabs'>;
@@ -20,9 +21,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [loadingAi, setLoadingAi] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'rating' | 'price' | 'none'>('none');
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [filters, setFilters] = useState<FilterState>({
+    category: 'ALL',
+    dietaryPreferences: [],
+    district: '',
+    town: '',
+  });
 
   const promos = [
     { id: 'promo-1', title: '50% OFF First Order', desc: 'Use code: NEIGHBOR50', badge: 'SPECIAL' },
@@ -39,9 +46,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     { key: 'SNACKS', label: 'Snacks', emoji: '🍩' },
   ];
 
-  const fetchMeals = async (category: string) => {
+  const fetchMeals = async (cat: string) => {
     try {
-      const categoryParam = category && category !== 'ALL' ? `?category=${category}` : '';
+      const categoryParam = cat && cat !== 'ALL' ? `?category=${cat}` : '';
       const response = await api.get(`/api/meals${categoryParam}`);
       setMeals(response.data || []);
     } catch (error) {
@@ -92,26 +99,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([fetchMeals(selectedCategory), fetchAiCombos()]);
+    await Promise.all([fetchMeals(filters.category), fetchAiCombos()]);
     setRefreshing(false);
-  }, [selectedCategory]);
+  }, [filters.category]);
 
   // Re-fetch category meals when category filter changes
   useEffect(() => {
-    fetchMeals(selectedCategory);
-  }, [selectedCategory]);
+    fetchMeals(filters.category);
+  }, [filters.category]);
 
   // Initial load & screen focus for AI combo recommendations and meals
   useEffect(() => {
-    fetchMeals(selectedCategory);
+    fetchMeals(filters.category);
     fetchAiCombos();
 
     const unsubscribe = navigation.addListener('focus', () => {
-      fetchMeals(selectedCategory);
+      fetchMeals(filters.category);
       fetchAiCombos();
     });
     return unsubscribe;
-  }, [navigation, selectedCategory]);
+  }, [navigation, filters.category]);
 
   // Extract unique chefs dynamically from the active list of meals
   const getUniqueCooks = (mealsList: any[]) => {
@@ -131,13 +138,69 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const uniqueCooks = getUniqueCooks(meals);
 
-  // Search & Sorting Filter Logics
+  // Search & Multi-criteria Filtering Logics
   const getProcessedMeals = () => {
-    let processed = meals.filter(meal => 
-      (meal.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (meal.cookName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (meal.category || '').toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    let processed = meals.filter((meal) => {
+      // 1. Category Filter
+      if (
+        filters.category &&
+        filters.category !== 'ALL' &&
+        meal.category !== filters.category
+      ) {
+        return false;
+      }
+
+      // 2. Dietary Preferences Filter (must contain all selected dietary preferences)
+      if (filters.dietaryPreferences && filters.dietaryPreferences.length > 0) {
+        const mealDietary: string[] = meal.dietaryPreferences || [];
+        const matchesAll = filters.dietaryPreferences.every((pref) =>
+          mealDietary.some((dp) => dp.toLowerCase() === pref.toLowerCase())
+        );
+        if (!matchesAll) return false;
+      }
+
+      // 3. Location District Filter
+      if (filters.district) {
+        if (!meal.cookDistrict || meal.cookDistrict.toLowerCase() !== filters.district.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // 4. Location Town Filter
+      if (filters.town) {
+        if (!meal.cookTown || meal.cookTown.toLowerCase() !== filters.town.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // 5. Search Query Filter
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matchName = (meal.name || '').toLowerCase().includes(query);
+        const matchCook = (meal.cookName || '').toLowerCase().includes(query);
+        const matchCat = (meal.category || '').toLowerCase().includes(query);
+        const matchCuisine = (meal.cuisineType || '').toLowerCase().includes(query);
+        const matchTown = (meal.cookTown || '').toLowerCase().includes(query);
+        const matchDistrict = (meal.cookDistrict || '').toLowerCase().includes(query);
+        const matchDietary = (meal.dietaryPreferences || []).some((dp: string) =>
+          dp.toLowerCase().includes(query)
+        );
+
+        if (
+          !matchName &&
+          !matchCook &&
+          !matchCat &&
+          !matchCuisine &&
+          !matchTown &&
+          !matchDistrict &&
+          !matchDietary
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
 
     if (sortBy === 'rating') {
       processed.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
@@ -169,12 +232,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Premium search bar */}
+        {/* Premium search bar with Filter button trigger */}
         <View className="flex-row items-center gap-3">
           <View className="flex-1 flex-row items-center bg-gray-100 rounded-2xl px-4 py-2.5 border border-gray-200 shadow-inner">
             <Feather name="search" size={16} color="#6B7280" className="mr-2" />
             <TextInput
-              placeholder="Search dishes, home chefs, kitchens..."
+              placeholder="Search dishes, home chefs, towns..."
               placeholderTextColor="#9CA3AF"
               className="flex-1 text-xs text-textPrimary p-0"
               value={searchQuery}
@@ -186,12 +249,40 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </TouchableOpacity>
             )}
           </View>
+
+          {/* Quick Sort Toggle Button */}
           <TouchableOpacity 
             onPress={() => setSortBy(prev => prev === 'rating' ? 'price' : prev === 'price' ? 'none' : 'rating')}
-            className={`p-3 rounded-2xl border ${sortBy !== 'none' ? 'bg-primary border-primary' : 'bg-gray-100 border-gray-200'}`}
+            className={`p-3 rounded-2xl border ${sortBy !== 'none' ? 'bg-primary/10 border-primary/30' : 'bg-gray-100 border-gray-200'}`}
           >
-            <Feather name="sliders" size={16} color={sortBy !== 'none' ? '#FFFFFF' : '#6B7280'} />
+            <Feather name="arrow-down" size={16} color={sortBy !== 'none' ? '#FF6B35' : '#6B7280'} />
           </TouchableOpacity>
+
+          {/* Main Pop-up Filter Trigger Button */}
+          {(() => {
+            const activeCount =
+              (filters.category !== 'ALL' && filters.category !== '' ? 1 : 0) +
+              filters.dietaryPreferences.length +
+              (filters.district ? 1 : 0) +
+              (filters.town ? 1 : 0);
+
+            return (
+              <TouchableOpacity
+                onPress={() => setFilterModalVisible(true)}
+                className={`p-3 rounded-2xl border relative ${
+                  activeCount > 0 ? 'bg-primary border-primary' : 'bg-gray-100 border-gray-200'
+                }`}
+                activeOpacity={0.8}
+              >
+                <Feather name="sliders" size={16} color={activeCount > 0 ? '#FFFFFF' : '#6B7280'} />
+                {activeCount > 0 && (
+                  <View className="absolute -top-1.5 -right-1.5 bg-secondary rounded-full w-5 h-5 items-center justify-center border-2 border-white">
+                    <Text className="text-white text-[9px] font-black">{activeCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })()}
         </View>
       </View>
 
@@ -219,7 +310,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 </Text>
               </View>
               <TouchableOpacity
-                onPress={() => setSelectedCategory('COMBO')}
+                onPress={() => setFilters(prev => ({ ...prev, category: 'COMBO' }))}
                 className="bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-full flex-row items-center gap-1"
                 activeOpacity={0.7}
               >
@@ -378,11 +469,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Text className="text-textPrimary font-black text-sm uppercase tracking-wider mb-4">Explore Categories</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} className="py-1">
               {categoriesList.map((item) => {
-                const isActive = selectedCategory === item.key || (item.key === 'ALL' && selectedCategory === '');
+                const isActive = filters.category === item.key || (item.key === 'ALL' && (!filters.category || filters.category === 'ALL'));
                 return (
                   <TouchableOpacity
                     key={item.key}
-                    onPress={() => setSelectedCategory(item.key === 'ALL' ? '' : item.key)}
+                    onPress={() => setFilters(prev => ({ ...prev, category: item.key }))}
                     className={`mr-3 items-center justify-center rounded-3xl p-3 border shadow-sm w-20 h-20 ${
                       isActive
                         ? 'bg-primary border-primary'
@@ -415,7 +506,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                     name={chef.name}
                     rating={chef.rating}
                     specialty={chef.specialty}
-                    onPress={() => setSelectedCategory('')}
+                    onPress={() => setFilters(prev => ({ ...prev, category: 'ALL' }))}
                   />
                 ))}
               </ScrollView>
@@ -496,6 +587,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
       </ScrollView>
+
+      {/* Pop-up Filter Modal Component */}
+      <FilterModal
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        filters={filters}
+        onApplyFilters={(newFilters) => setFilters(newFilters)}
+        onResetFilters={() =>
+          setFilters({
+            category: 'ALL',
+            dietaryPreferences: [],
+            district: '',
+            town: '',
+          })
+        }
+      />
     </View>
   );
 };

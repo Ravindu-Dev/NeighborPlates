@@ -4,6 +4,8 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
 import { TextInput } from '../../components/common/TextInput';
 import { Button } from '../../components/common/Button';
+import { DropdownPicker } from '../../components/common/DropdownPicker';
+import { DISTRICT_TOWN_DATA } from '../../constants/filterConstants';
 import { useAuthStore } from '../../store/authStore';
 import { Feather } from '@expo/vector-icons';
 
@@ -108,6 +110,8 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ route, navigatio
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [bio, setBio] = useState('');
+  const [district, setDistrict] = useState('');
+  const [town, setTown] = useState('');
   const [radius, setRadius] = useState('5'); // default 5km for cooks
   const [longitude, setLongitude] = useState('79.8612');
   const [latitude, setLatitude] = useState('6.9271');
@@ -141,6 +145,10 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ route, navigatio
       Alert.alert('Validation Error', 'Please complete all required fields.');
       return;
     }
+    if (role === 'COOK' && (!district || !town)) {
+      Alert.alert('Validation Error', 'Please select your kitchen District and Town.');
+      return;
+    }
     try {
       const regData = {
         name: name.trim(),
@@ -149,6 +157,8 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ route, navigatio
         role,
         phone: phone.trim(),
         bio: role === 'COOK' ? bio : undefined,
+        district: role === 'COOK' ? district : undefined,
+        town: role === 'COOK' ? town : undefined,
         deliveryRadius: role === 'COOK' ? parseFloat(radius) : undefined,
         coordinates: role === 'COOK' 
           ? [parseFloat(longitude) || 79.8612, parseFloat(latitude) || 6.9271] 
@@ -215,6 +225,26 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ route, navigatio
                 onChangeText={setBio}
                 multiline
                 numberOfLines={3}
+              />
+              <DropdownPicker
+                label="DISTRICT *"
+                placeholder="Select District..."
+                selectedValue={district}
+                onValueChange={(val) => {
+                  setDistrict(val);
+                  setTown(''); // Reset town on district change
+                }}
+                options={Object.keys(DISTRICT_TOWN_DATA)}
+                iconName="map-pin"
+              />
+              <DropdownPicker
+                label="TOWN / NEIGHBORHOOD *"
+                placeholder={district ? "Select Town..." : "Select District first..."}
+                selectedValue={town}
+                onValueChange={setTown}
+                options={district ? DISTRICT_TOWN_DATA[district] || [] : []}
+                disabled={!district}
+                iconName="navigation"
               />
               <TextInput
                 label="DELIVERY RADIUS (KM)"

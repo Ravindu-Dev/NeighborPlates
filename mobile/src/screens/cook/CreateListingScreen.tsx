@@ -113,6 +113,7 @@ export const CreateListingScreen: React.FC = () => {
           photos: meal.photos || [],
           ingredients: meal.ingredients || [],
           allergenTags: meal.allergenTags || [],
+          dietaryPreferences: meal.dietaryPreferences || [],
           portionLimit: meal.portionLimit || 10,
           portionsRemaining: nextPortions,
           availability: meal.availability || { cutoffTime: '09:00', servingTime: '12:00', days: ['MON', 'TUE', 'WED', 'THU', 'FRI'] },

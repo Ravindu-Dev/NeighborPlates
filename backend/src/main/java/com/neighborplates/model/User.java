@@ -59,6 +59,8 @@ public class User {
         private String bio; // Cook only
         private List<String> kitchenPhotos = new ArrayList<>(); // Cook only
         private boolean hygieneVerified = false; // Cook verification status
+        private String district;
+        private String town;
         private GeoJsonPoint location = new GeoJsonPoint();
         private Double deliveryRadius; // km, Cook only
         private Boolean isAvailable = false; // Rider only: indicates if online
