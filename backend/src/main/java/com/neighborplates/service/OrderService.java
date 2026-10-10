@@ -132,7 +132,7 @@ public class OrderService {
 
     public List<OrderResponse> getAvailableOrdersForRiders() {
         List<Order> orders = orderRepository.findByStatusInAndRiderIdIsNull(
-                List.of(OrderStatus.READY)
+                List.of(OrderStatus.READY, OrderStatus.PREPARING, OrderStatus.ACCEPTED, OrderStatus.PLACED)
         );
         return orders.stream()
                 .map(order -> {
@@ -158,8 +158,8 @@ public class OrderService {
             throw new IllegalArgumentException("Someone else got there first");
         }
 
-        if (order.getStatus() != OrderStatus.READY && order.getStatus() != OrderStatus.DELIVERING) {
-            throw new IllegalArgumentException("Only READY or IN TRANSIT orders can be accepted by a rider");
+        if (order.getStatus() != OrderStatus.READY && order.getStatus() != OrderStatus.PREPARING && order.getStatus() != OrderStatus.ACCEPTED && order.getStatus() != OrderStatus.PLACED && order.getStatus() != OrderStatus.DELIVERING) {
+            throw new IllegalArgumentException("Only active or preparing orders can be accepted by a rider");
         }
 
         // Assign rider to order and calculate fair rider earnings (15% of total amount or 150 min)

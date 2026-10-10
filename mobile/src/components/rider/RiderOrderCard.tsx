@@ -51,7 +51,7 @@ export const RiderOrderCard: React.FC<RiderOrderCardProps> = ({
         ? Math.max(150, Math.round(order.totalAmount * 0.15)).toFixed(2)
         : '150.00';
 
-  const pickupDistance = job?.pickupDistance || job?.distancePickup || (order?.cookAddressLabel ? 'Kitchen' : 'Pickup');
+  const pickupDistance = job?.pickupDistance || job?.distancePickup || order?.pickupDistance || order?.distancePickup || (order?.cookAddressLabel ? 'Kitchen' : 'Pickup');
   const dropoffDistance = job?.dropoffDistance || (order?.address?.label ? (order.address.label.length > 16 ? order.address.label.substring(0, 14) + '...' : order.address.label) : 'Destination');
   const estimatedTime = job?.estimatedTime || 'Ready Now';
   
