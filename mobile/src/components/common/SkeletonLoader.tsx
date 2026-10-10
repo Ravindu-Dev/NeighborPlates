@@ -1,12 +1,5 @@
-import React, { useEffect } from 'react';
-import { View } from 'react-native';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withRepeat, 
-  withSequence, 
-  withTiming 
-} from 'react-native-reanimated';
+import React, { useEffect, useRef } from 'react';
+import { Animated } from 'react-native';
 
 interface SkeletonLoaderProps {
   width?: number | string;
@@ -21,30 +14,40 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
   borderRadius = 8,
   className = '',
 }) => {
-  const opacity = useSharedValue(0.3);
+  const opacity = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
     // Pulse opacity animation sequence
-    opacity.value = withRepeat(
-      withSequence(
-        withTiming(0.7, { duration: 850 }),
-        withTiming(0.3, { duration: 850 })
-      ),
-      -1, // Loop indefinitely
-      true // Reverse direction
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.7,
+          duration: 850,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 850,
+          useNativeDriver: true,
+        }),
+      ])
     );
-  }, []);
+    pulse.start();
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: opacity.value,
-    };
-  });
+    return () => pulse.stop();
+  }, []);
 
   return (
     <Animated.View
-      style={[{ width, height, borderRadius, backgroundColor: '#E5E7EB' }, animatedStyle] as any}
+      style={{
+        width: typeof width === 'number' ? width : (width as any),
+        height,
+        borderRadius,
+        backgroundColor: '#E5E7EB',
+        opacity,
+      }}
       className={className}
     />
   );
 };
+

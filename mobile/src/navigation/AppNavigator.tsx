@@ -15,17 +15,13 @@ export const AppNavigator = () => {
     checkAuth();
   }, []);
 
-  if (isLoading) {
-    return (
-      <View className="flex-1 justify-center items-center bg-surface-elevated">
-        <ActivityIndicator size="large" color="#FF6B35" />
-      </View>
-    );
-  }
-
   return (
     <NavigationContainer>
-      {!isAuthenticated || !user ? (
+      {isLoading ? (
+        <View className="flex-1 justify-center items-center bg-surface-elevated">
+          <ActivityIndicator size="large" color="#FF6B35" />
+        </View>
+      ) : !isAuthenticated || !user ? (
         <AuthNavigator />
       ) : user.role === 'CUSTOMER' ? (
         <CustomerNavigator />
