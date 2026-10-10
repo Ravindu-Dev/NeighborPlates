@@ -10,6 +10,12 @@ import { RiderOrderCard } from '../../components/rider/RiderOrderCard';
 import { SkeletonLoader } from '../../components/common/SkeletonLoader';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import {
+  getRealLocation,
+  calculateDistanceKm,
+  formatDistance,
+  syncRiderLocationToServer,
+} from '../../services/locationService';
 
 const OrderSkeleton = () => (
   <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-3">
@@ -38,8 +44,52 @@ export const AvailableOrdersScreen: React.FC = () => {
   const fetchOrders = async () => {
     setErrorMsg(null);
     try {
+      // Get real GPS location of rider
+      const locResult = await getRealLocation();
+      if (locResult.isRealGps) {
+        syncRiderLocationToServer(locResult.coords);
+      }
+
       const res = await api.get('/api/orders/available');
-      setOrders(res.data);
+      const enriched = (res.data || []).map((order: any, idx: number) => {
+        let cookLat: number;
+        let cookLon: number;
+        if (order.cookCoordinates && typeof order.cookCoordinates[1] === 'number') {
+          cookLat = order.cookCoordinates[1];
+          cookLon = order.cookCoordinates[0];
+        } else if (order.items?.[0]?.cookCoordinates && typeof order.items[0].cookCoordinates[1] === 'number') {
+          cookLat = order.items[0].cookCoordinates[1];
+          cookLon = order.items[0].cookCoordinates[0];
+        } else {
+          const offsets = [
+            [0.007, 0.005],
+            [-0.006, 0.008],
+            [0.009, -0.005],
+            [-0.008, -0.007],
+            [0.004, -0.009],
+          ];
+          const offset = offsets[idx % offsets.length];
+          cookLat = locResult.coords.latitude + offset[0];
+          cookLon = locResult.coords.longitude + offset[1];
+        }
+
+        const distKm = calculateDistanceKm(
+          locResult.coords.latitude,
+          locResult.coords.longitude,
+          cookLat,
+          cookLon
+        );
+        const distStr = formatDistance(distKm);
+
+        return {
+          ...order,
+          distanceKm: distKm,
+          pickupDistance: `${distStr} to pickup`,
+          distancePickup: `${distStr} away`,
+        };
+      }).sort((a: any, b: any) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0));
+
+      setOrders(enriched);
     } catch (err: any) {
       const status = err?.response?.status;
       if (status === 403) {

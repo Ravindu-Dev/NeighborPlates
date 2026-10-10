@@ -17,6 +17,15 @@ import { Feather } from '@expo/vector-icons';
 import { SlideToConfirm } from '../../components/rider/SlideToConfirm';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
+import {
+  getRealLocation,
+  watchRealLocation,
+  calculateDistanceKm,
+  formatDistance,
+  syncRiderLocationToServer,
+  DEFAULT_COORDINATES,
+  Coordinates,
+} from '../../services/locationService';
 
 let WebView: any = null;
 if (Platform.OS !== 'web') {
@@ -26,13 +35,16 @@ if (Platform.OS !== 'web') {
 }
 
 const getNavigationMapHtml = (
+  riderLat: number,
+  riderLon: number,
   cookLat: number,
   cookLon: number,
   custLat: number,
   custLon: number,
   cookName: string,
   custName: string,
-  stage: 1 | 2
+  stage: 1 | 2,
+  isRealGps: boolean = false
 ) => `
 <!DOCTYPE html>
 <html>
@@ -66,11 +78,26 @@ const getNavigationMapHtml = (
       border: 1px solid rgba(255,255,255,0.25);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
+    .rider-pulse {
+      position: absolute;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.25);
+      border: 2px solid #10B981;
+      animation: pulsate 2s infinite ease-out;
+    }
+    @keyframes pulsate {
+      0% { transform: scale(0.2); opacity: 0.8; }
+      100% { transform: scale(1.3); opacity: 0; }
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
   <script>
+    var riderLat = ${riderLat};
+    var riderLon = ${riderLon};
     var cookLat = ${cookLat};
     var cookLon = ${cookLon};
     var custLat = ${custLat};
@@ -79,13 +106,16 @@ const getNavigationMapHtml = (
     var cookLabelText = ${JSON.stringify(cookName)};
     var custLabelText = ${JSON.stringify(custName)};
 
-    var centerLat = (cookLat + custLat) / 2;
-    var centerLon = (cookLon + custLon) / 2;
+    // In Stage 1: focus from Rider to Cook. In Stage 2: focus from Rider to Customer
+    var startLat = riderLat;
+    var startLon = riderLon;
+    var destLat = stage === 1 ? cookLat : custLat;
+    var destLon = stage === 1 ? cookLon : custLon;
 
     var map = L.map('map', { zoomControl: false }).fitBounds([
-      [cookLat, cookLon],
-      [custLat, custLon]
-    ], { padding: [50, 50] });
+      [startLat, startLon],
+      [destLat, destLon]
+    ], { padding: [60, 60] });
 
     L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key=sk-OP85plgYVLRSP0UYseCWtvvDJITdJ3mgrBVjGmh9OzAnaVWL', {
       maxZoom: 20,
@@ -93,23 +123,23 @@ const getNavigationMapHtml = (
     }).addTo(map);
 
     var routePoints = [
-      [cookLat, cookLon],
-      [(cookLat * 2 + custLat) / 3, (cookLon * 2 + custLon) / 3],
-      [(cookLat + custLat * 2) / 3, (cookLon + custLon * 2) / 3],
-      [custLat, custLon]
+      [startLat, startLon],
+      [(startLat * 2 + destLat) / 3, (startLon * 2 + destLon) / 3],
+      [(startLat + destLat * 2) / 3, (startLon + destLon * 2) / 3],
+      [destLat, destLon]
     ];
 
     // Glowing Under-Line
-    L.polyline(routePoints, {
-      color: '#FB923C',
+    var glowLine = L.polyline(routePoints, {
+      color: stage === 1 ? '#FB923C' : '#60A5FA',
       weight: 10,
       opacity: 0.25,
       lineCap: 'round'
     }).addTo(map);
 
     // Main Neon Orange Nav Line
-    L.polyline(routePoints, {
-      color: '#EA580C',
+    var navLine = L.polyline(routePoints, {
+      color: stage === 1 ? '#EA580C' : '#2563EB',
       weight: 4,
       opacity: 0.95,
       dashArray: '8, 8',
@@ -134,31 +164,33 @@ const getNavigationMapHtml = (
       icon: L.divIcon({ html: custHtml, className: '', iconSize: [140, 60], iconAnchor: [70, 55] })
     }).addTo(map);
 
-    // Animated Rider Marker
-    var riderStart = stage === 1 ? [cookLat, cookLon] : [cookLat, cookLon];
-    var riderEnd = stage === 1 ? [cookLat, cookLon] : [custLat, custLon];
-
-    var riderMarker = L.marker(riderStart, {
+    // Live Real-Time Rider Marker
+    var riderMarker = L.marker([riderLat, riderLon], {
       icon: L.divIcon({
-        html: '<div style="width:32px;height:32px;border-radius:50%;background:#10B981;border:3px solid #FFF;box-shadow:0 0 16px rgba(16,185,129,0.9);display:flex;align-items:center;justify-content:center;font-size:16px;">🛵</div>',
+        html: '<div style="position:relative;display:flex;align-items:center;justify-content:center;">' +
+          '<div class="rider-pulse"></div>' +
+          '<div style="width:34px;height:34px;border-radius:50%;background:#10B981;border:3px solid #FFF;box-shadow:0 0 16px rgba(16,185,129,0.9);display:flex;align-items:center;justify-content:center;font-size:16px;">🛵</div>' +
+          '</div>',
         className: '',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
+        iconSize: [48, 48],
+        iconAnchor: [24, 24]
       })
-    }).addTo(map);
+    }).addTo(map).bindPopup('<b>Live GPS Position</b><br/>GPS tracking active');
 
-    if (stage === 2) {
-      var startTime = Date.now();
-      var duration = 20000;
-      function animate() {
-        var progress = ((Date.now() - startTime) % duration) / duration;
-        var curLat = cookLat + (custLat - cookLat) * progress;
-        var curLon = cookLon + (custLon - cookLon) * progress;
-        riderMarker.setLatLng([curLat, curLon]);
-        requestAnimationFrame(animate);
+    // Function callable from React Native webViewRef.injectJavaScript
+    window.updateRiderLocation = function(newLat, newLon) {
+      if (riderMarker) {
+        riderMarker.setLatLng([newLat, newLon]);
+        var updatedRoute = [
+          [newLat, newLon],
+          [(newLat * 2 + destLat) / 3, (newLon * 2 + destLon) / 3],
+          [(newLat + destLat * 2) / 3, (newLon + destLon * 2) / 3],
+          [destLat, destLon]
+        ];
+        if (glowLine) glowLine.setLatLngs(updatedRoute);
+        if (navLine) navLine.setLatLngs(updatedRoute);
       }
-      animate();
-    }
+    };
   </script>
 </body>
 </html>`;
@@ -176,7 +208,42 @@ export const RouteScreen: React.FC = () => {
   const [customMessage, setCustomMessage] = useState('');
   const [messageSentToast, setMessageSentToast] = useState(false);
 
+  // Real GPS Location state
+  const [riderCoords, setRiderCoords] = useState<Coordinates>(DEFAULT_COORDINATES);
+  const [isRealGps, setIsRealGps] = useState<boolean>(false);
+  const webViewRef = useRef<any>(null);
+
   const passedOrderId = route.params?.orderId;
+
+  // Real-time location watching
+  useEffect(() => {
+    let watcher: { remove: () => void } | null = null;
+    (async () => {
+      // Get immediate real location
+      const init = await getRealLocation();
+      setRiderCoords(init.coords);
+      setIsRealGps(init.isRealGps);
+      if (init.isRealGps) {
+        syncRiderLocationToServer(init.coords);
+      }
+
+      // Continuously watch location as rider travels
+      watcher = await watchRealLocation((newCoords) => {
+        setRiderCoords(newCoords);
+        setIsRealGps(true);
+        syncRiderLocationToServer(newCoords);
+        if (webViewRef.current) {
+          webViewRef.current.injectJavaScript(
+            `if (window.updateRiderLocation) { window.updateRiderLocation(${newCoords.latitude}, ${newCoords.longitude}); }; true;`
+          );
+        }
+      });
+    })();
+
+    return () => {
+      if (watcher) watcher.remove();
+    };
+  }, []);
 
   const fetchActiveOrder = async () => {
     try {
@@ -324,6 +391,17 @@ export const RouteScreen: React.FC = () => {
   const custLon = typeof custCoords[0] === 'number' ? custCoords[0] : 79.8500;
   const custLat = typeof custCoords[1] === 'number' ? custCoords[1] : 6.9100;
 
+  // Real-time remaining distance calculation to current target
+  const targetLat = stage === 1 ? cookLat : custLat;
+  const targetLon = stage === 1 ? cookLon : custLon;
+  const distanceRemainingKm = calculateDistanceKm(
+    riderCoords.latitude,
+    riderCoords.longitude,
+    targetLat,
+    targetLon
+  );
+  const distanceRemainingStr = formatDistance(distanceRemainingKm);
+
   const riderDisplayName =
     user?.name?.trim() ||
     (user?.email ? user.email.split('@')[0].charAt(0).toUpperCase() + user.email.split('@')[0].slice(1) : 'Rider');
@@ -334,10 +412,40 @@ export const RouteScreen: React.FC = () => {
   const cookAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(cookName)}&background=C25E00&color=fff&bold=true&size=256`;
   const customerAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(customerName)}&background=1D4ED8&color=fff&bold=true&size=256`;
 
+  const handleOpenGoogleMaps = () => {
+    const destLat = stage === 1 ? cookLat : custLat;
+    const destLon = stage === 1 ? cookLon : custLon;
+    const url = Platform.select({
+      ios: `maps://app?saddr=${riderCoords.latitude},${riderCoords.longitude}&daddr=${destLat},${destLon}&dirflg=d`,
+      android: `google.navigation:q=${destLat},${destLon}&mode=d`,
+      default: `https://www.google.com/maps/dir/?api=1&origin=${riderCoords.latitude},${riderCoords.longitude}&destination=${destLat},${destLon}`,
+    });
+
+    if (url) {
+      Linking.canOpenURL(url).then((supported) => {
+        if (supported) {
+          Linking.openURL(url);
+        } else {
+          Linking.openURL(
+            `https://www.google.com/maps/dir/?api=1&origin=${riderCoords.latitude},${riderCoords.longitude}&destination=${destLat},${destLon}`
+          );
+        }
+      });
+    }
+  };
+
   return (
     <View className="flex-1 bg-[#0B1120]">
       {/* ── Top Header (Ready Badge + Rider Avatar) ── */}
-      <View className="absolute top-12 left-0 right-0 z-30 px-5 flex-row items-center justify-end">
+      <View className="absolute top-12 left-0 right-0 z-30 px-5 flex-row items-center justify-between">
+        {/* GPS Tracking Status Pill */}
+        <View className={`border px-3 py-1.5 rounded-full flex-row items-center shadow-md ${isRealGps ? 'bg-[#ECFDF5] border-[#A7F3D0]' : 'bg-[#FEF3C7] border-[#FDE68A]'}`}>
+          <View className={`w-2 h-2 rounded-full mr-1.5 ${isRealGps ? 'bg-[#10B981]' : 'bg-[#F59E0B]'}`} />
+          <Text className={`font-bold text-xs ${isRealGps ? 'text-[#059669]' : 'text-[#D97706]'}`}>
+            {isRealGps ? 'Live GPS Active' : 'Locating GPS...'}
+          </Text>
+        </View>
+
         <View className="flex-row items-center gap-2.5">
           <View className="bg-[#ECFDF5] border border-[#A7F3D0] px-3 py-1 rounded-full flex-row items-center shadow-md">
             <View className="w-2 h-2 rounded-full bg-[#10B981] mr-1.5" />
@@ -360,8 +468,20 @@ export const RouteScreen: React.FC = () => {
       <View className="flex-1 relative">
         {WebView ? (
           <WebView
+            ref={webViewRef}
             source={{
-              html: getNavigationMapHtml(cookLat, cookLon, custLat, custLon, cookName, customerName, stage),
+              html: getNavigationMapHtml(
+                riderCoords.latitude,
+                riderCoords.longitude,
+                cookLat,
+                cookLon,
+                custLat,
+                custLon,
+                cookName,
+                customerName,
+                stage,
+                isRealGps
+              ),
             }}
             style={{ flex: 1 }}
             scrollEnabled={false}
@@ -445,9 +565,9 @@ export const RouteScreen: React.FC = () => {
             <View className="h-px bg-gray-700/60 my-3" />
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center">
-                <Feather name="clock" size={13} color="#10B981" />
+                <Feather name="navigation" size={13} color="#10B981" />
                 <Text className="text-[#10B981] font-bold text-xs ml-1.5">
-                  {stage === 1 ? 'Pickup Ready' : 'Delivery In Transit'}
+                  {distanceRemainingStr} remaining
                 </Text>
               </View>
 
@@ -539,6 +659,18 @@ export const RouteScreen: React.FC = () => {
             </Text>
           </View>
         </View>
+
+        {/* Turn-by-Turn Navigation Button (Google Maps / Waze) */}
+        <TouchableOpacity
+          onPress={handleOpenGoogleMaps}
+          activeOpacity={0.85}
+          className="bg-[#059669] py-3.5 rounded-2xl flex-row items-center justify-center mb-3 shadow-md"
+        >
+          <Feather name="navigation" size={16} color="#FFFFFF" />
+          <Text className="text-white font-black text-sm ml-2">
+            Open Turn-by-Turn Navigation ({distanceRemainingStr})
+          </Text>
+        </TouchableOpacity>
 
         {/* Quick Action Buttons: Call & Message */}
         <View className="flex-row gap-3 mb-3.5">
