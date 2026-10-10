@@ -7,6 +7,7 @@ import { api } from '../../services/api';
 import { Badge } from '../../components/common/Badge';
 import { OrderReceiptModal } from '../../components/customer/OrderReceiptModal';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { useCartStore } from '../../store/cartStore';
 
 type OrdersScreenProp = NativeStackNavigationProp<CustomerStackParamList, 'HomeTabs'>;
 
@@ -69,6 +70,24 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleReorder = (order: any) => {
+    if (!order || !order.items || order.items.length === 0) return;
+
+    const cartItems = order.items.map((item: any) => ({
+      mealId: item.mealId || item.id,
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity || 1,
+      cookId: order.cookId || '',
+      cookName: order.cookName || 'Home Kitchen',
+      photos: item.photos || [],
+      portionsRemaining: 99,
+    }));
+
+    useCartStore.setState({ items: cartItems });
+    safeNavigate('Checkout');
   };
 
   useEffect(() => {
@@ -295,6 +314,16 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
                       >
                         <Feather name="navigation" size={13} color="#FF6B35" />
                         <Text className="text-primary font-extrabold text-xs">Track Order</Text>
+                      </TouchableOpacity>
+                    )}
+                    {item.status === 'DELIVERED' && (
+                      <TouchableOpacity
+                        onPress={() => handleReorder(item)}
+                        className="px-3.5 py-2.5 rounded-xl bg-primary flex-row items-center gap-1.5 shadow-xs"
+                        activeOpacity={0.7}
+                      >
+                        <Feather name="refresh-cw" size={13} color="#FFFFFF" />
+                        <Text className="text-white font-extrabold text-xs">Reorder</Text>
                       </TouchableOpacity>
                     )}
                     <TouchableOpacity
