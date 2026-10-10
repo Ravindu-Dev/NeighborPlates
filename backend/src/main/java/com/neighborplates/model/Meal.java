@@ -38,6 +38,8 @@ public class Meal {
 
     private List<String> allergenTags = new ArrayList<>(); // "dairy", "nuts", "gluten", etc.
 
+    private List<String> dietaryPreferences = new ArrayList<>(); // "Vegetarian", "Halal", "Gluten-Free", etc.
+
     private int portionLimit = 0;
 
     private int portionsRemaining = 0;

@@ -37,6 +37,8 @@ public class CreateMealRequest {
 
     private List<String> allergenTags;
 
+    private List<String> dietaryPreferences;
+
     @Min(value = 1, message = "Portion limit must be at least 1")
     private int portionLimit;
 

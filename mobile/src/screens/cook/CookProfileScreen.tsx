@@ -17,6 +17,8 @@ import { StatCard } from '../../components/common/StatCard';
 import { SectionHeader } from '../../components/common/SectionHeader';
 import { Toast } from '../../components/common/Toast';
 import { SkeletonLoader } from '../../components/common/SkeletonLoader';
+import { DropdownPicker } from '../../components/common/DropdownPicker';
+import { DISTRICT_TOWN_DATA } from '../../constants/filterConstants';
 import { useAuthStore } from '../../store/authStore';
 import { useNavigation } from '@react-navigation/native';
 import { api } from '../../services/api';
@@ -151,6 +153,8 @@ export const CookProfileScreen: React.FC = () => {
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editBio, setEditBio] = useState('');
+  const [editDistrict, setEditDistrict] = useState('');
+  const [editTown, setEditTown] = useState('');
   const [editRadius, setEditRadius] = useState('');
   const [editLon, setEditLon] = useState('');
   const [editLat, setEditLat] = useState('');
@@ -171,6 +175,8 @@ export const CookProfileScreen: React.FC = () => {
     setEditName(data?.profile?.name || '');
     setEditPhone(data?.profile?.phone || '');
     setEditBio(data?.profile?.bio || '');
+    setEditDistrict(data?.profile?.district || '');
+    setEditTown(data?.profile?.town || '');
     setEditRadius(data?.profile?.deliveryRadius?.toString() || '');
     setEditLon(data?.profile?.location?.coordinates?.[0]?.toString() || '');
     setEditLat(data?.profile?.location?.coordinates?.[1]?.toString() || '');
@@ -200,6 +206,8 @@ export const CookProfileScreen: React.FC = () => {
         name: editName.trim(),
         phone: editPhone.trim(),
         bio: editBio.trim(),
+        district: editDistrict,
+        town: editTown,
         deliveryRadius: parseFloat(editRadius) || 0,
         // Preserve existing fields
         avatarUrl: profile?.profile?.avatarUrl,
@@ -385,6 +393,26 @@ export const CookProfileScreen: React.FC = () => {
                   multiline
                   numberOfLines={3}
                 />
+                <DropdownPicker
+                  label="DISTRICT"
+                  placeholder="Select District..."
+                  selectedValue={editDistrict}
+                  onValueChange={(val) => {
+                    setEditDistrict(val);
+                    setEditTown('');
+                  }}
+                  options={Object.keys(DISTRICT_TOWN_DATA)}
+                  iconName="map-pin"
+                />
+                <DropdownPicker
+                  label="TOWN / NEIGHBORHOOD"
+                  placeholder={editDistrict ? "Select Town..." : "Select District first..."}
+                  selectedValue={editTown}
+                  onValueChange={setEditTown}
+                  options={editDistrict ? DISTRICT_TOWN_DATA[editDistrict] || [] : []}
+                  disabled={!editDistrict}
+                  iconName="navigation"
+                />
                  <TextInput
                   label="DELIVERY RADIUS (km)"
                   placeholder="e.g. 5"
@@ -463,7 +491,19 @@ export const CookProfileScreen: React.FC = () => {
                   </Text>
                 </View>
                 <View className="flex-row justify-between items-center py-3 border-b border-gray-50">
-                  <Text className="text-textSecondary text-xs">Kitchen Location</Text>
+                  <Text className="text-textSecondary text-xs">District</Text>
+                  <Text className="text-textPrimary font-bold text-xs">
+                    {profile?.profile?.district || 'Not set'}
+                  </Text>
+                </View>
+                <View className="flex-row justify-between items-center py-3 border-b border-gray-50">
+                  <Text className="text-textSecondary text-xs">Town / Area</Text>
+                  <Text className="text-textPrimary font-bold text-xs">
+                    {profile?.profile?.town || 'Not set'}
+                  </Text>
+                </View>
+                <View className="flex-row justify-between items-center py-3 border-b border-gray-50">
+                  <Text className="text-textSecondary text-xs">Kitchen Location Pin</Text>
                   <Text className="text-textPrimary font-bold text-xs">
                     {profile?.profile?.location?.coordinates 
                       ? `${profile.profile.location.coordinates[1].toFixed(4)}, ${profile.profile.location.coordinates[0].toFixed(4)}`

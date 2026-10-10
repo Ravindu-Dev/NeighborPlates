@@ -50,6 +50,7 @@ public class MealService {
         meal.setCuisineType(request.getCuisineType());
         meal.setIngredients(request.getIngredients() != null ? request.getIngredients() : new ArrayList<>());
         meal.setAllergenTags(request.getAllergenTags() != null ? request.getAllergenTags() : new ArrayList<>());
+        meal.setDietaryPreferences(request.getDietaryPreferences() != null ? request.getDietaryPreferences() : new ArrayList<>());
         meal.setPortionLimit(request.getPortionLimit());
         meal.setPortionsRemaining(request.getPortionLimit());
 
@@ -91,6 +92,9 @@ public class MealService {
         meal.setCuisineType(request.getCuisineType());
         meal.setIngredients(request.getIngredients() != null ? request.getIngredients() : new ArrayList<>());
         meal.setAllergenTags(request.getAllergenTags() != null ? request.getAllergenTags() : new ArrayList<>());
+        if (request.getDietaryPreferences() != null) {
+            meal.setDietaryPreferences(request.getDietaryPreferences());
+        }
         
         // Reset limits if portion limit changes
         if (meal.getPortionLimit() != request.getPortionLimit()) {
@@ -293,6 +297,9 @@ public class MealService {
             cookLon = cook.getProfile().getLocation().getCoordinates().get(0);
             cookLat = cook.getProfile().getLocation().getCoordinates().get(1);
         }
+        String cookDistrict = (cook != null && cook.getProfile() != null) ? cook.getProfile().getDistrict() : null;
+        String cookTown = (cook != null && cook.getProfile() != null) ? cook.getProfile().getTown() : null;
+
         MealResponse response = new MealResponse();
         response.setId(meal.getId());
         response.setCookId(meal.getCookId());
@@ -305,6 +312,7 @@ public class MealService {
         response.setCuisineType(meal.getCuisineType());
         response.setIngredients(meal.getIngredients());
         response.setAllergenTags(meal.getAllergenTags());
+        response.setDietaryPreferences(meal.getDietaryPreferences() != null ? meal.getDietaryPreferences() : new ArrayList<>());
         response.setPortionLimit(meal.getPortionLimit());
         response.setPortionsRemaining(meal.getPortionsRemaining());
         response.setAvailability(meal.getAvailability());
@@ -315,6 +323,8 @@ public class MealService {
         response.setCreatedAt(meal.getCreatedAt());
         response.setCookLongitude(cookLon);
         response.setCookLatitude(cookLat);
+        response.setCookDistrict(cookDistrict);
+        response.setCookTown(cookTown);
         response.setCombo(meal.isCombo());
         response.setIncludedMealIds(meal.getIncludedMealIds());
         response.setOriginalTotalPrice(meal.getOriginalTotalPrice());

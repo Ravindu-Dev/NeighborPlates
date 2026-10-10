@@ -22,6 +22,7 @@ import {
   uploadImageToImgBB,
   validateImageSize,
 } from '../../services/imageService';
+import { DIETARY_OPTIONS } from '../../constants/filterConstants';
 import { Ionicons, Feather } from '@expo/vector-icons';
 
 const CATEGORIES = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'];
@@ -40,6 +41,7 @@ export const AddMealFormScreen: React.FC = () => {
   const [imageUrl, setImageUrl] = useState('');
   const [ingredients, setIngredients] = useState('');
   const [allergens, setAllergens] = useState('');
+  const [dietaryPreferences, setDietaryPreferences] = useState<string[]>([]);
   const [portionLimit, setPortionLimit] = useState('10');
   const [cutoffTime, setCutoffTime] = useState('09:00');
   const [servingTime, setServingTime] = useState('12:00');
@@ -51,19 +53,38 @@ export const AddMealFormScreen: React.FC = () => {
 
   useEffect(() => {
     if (mealToEdit) {
-      setName(mealToEdit.name || '');
-      setDescription(mealToEdit.description || '');
-      setPrice(mealToEdit.price ? mealToEdit.price.toString() : '');
-      setCuisineType(mealToEdit.cuisineType || 'Sri Lankan');
-      setCategory(mealToEdit.category || 'LUNCH');
-      setImageUrl(mealToEdit.photos?.[0] || '');
-      setIngredients(mealToEdit.ingredients?.join(', ') || '');
-      setAllergens(mealToEdit.allergenTags?.join(', ') || '');
-      setPortionLimit(mealToEdit.portionLimit ? mealToEdit.portionLimit.toString() : '10');
-      if (mealToEdit.availability) {
-        setCutoffTime(mealToEdit.availability.cutoffTime || '09:00');
-        setServingTime(mealToEdit.availability.servingTime || '12:00');
-        setSelectedDays(mealToEdit.availability.days || ['MON', 'TUE', 'WED', 'THU', 'FRI']);
+      // Set initial values from route params
+      const populateFields = (m: any) => {
+        setName(m.name || '');
+        setDescription(m.description || '');
+        setPrice(m.price ? m.price.toString() : '');
+        setCuisineType(m.cuisineType || 'Sri Lankan');
+        setCategory(m.category || 'LUNCH');
+        setImageUrl(m.photos?.[0] || '');
+        setIngredients(m.ingredients?.join(', ') || '');
+        setAllergens(m.allergenTags?.join(', ') || '');
+        setDietaryPreferences(m.dietaryPreferences || []);
+        setPortionLimit(m.portionLimit ? m.portionLimit.toString() : '10');
+        if (m.availability) {
+          setCutoffTime(m.availability.cutoffTime || '09:00');
+          setServingTime(m.availability.servingTime || '12:00');
+          setSelectedDays(m.availability.days || ['MON', 'TUE', 'WED', 'THU', 'FRI']);
+        }
+      };
+
+      populateFields(mealToEdit);
+
+      // Also fetch fresh copy from backend API to guarantee DB sync
+      if (mealToEdit.id) {
+        api.get(`/api/meals/${mealToEdit.id}`)
+          .then((res) => {
+            if (res.data) {
+              populateFields(res.data);
+            }
+          })
+          .catch((err) => {
+            console.log('Error fetching fresh meal details:', err);
+          });
       }
     }
   }, [mealToEdit]);
@@ -142,6 +163,7 @@ export const AddMealFormScreen: React.FC = () => {
         allergenTags: allergens
           ? allergens.split(',').map((s) => s.trim()).filter(Boolean)
           : [],
+        dietaryPreferences,
         portionLimit: parseInt(portionLimit, 10),
         availability: {
           days: selectedDays,
@@ -204,6 +226,7 @@ export const AddMealFormScreen: React.FC = () => {
             setImageUrl('');
             setIngredients('');
             setAllergens('');
+            setDietaryPreferences([]);
             setPortionLimit('10');
           }}
           activeOpacity={0.7}
@@ -363,6 +386,32 @@ export const AddMealFormScreen: React.FC = () => {
             onChangeText={setAllergens}
             helperText="Let customers know about potential allergens"
           />
+
+          {/* Dietary Preferences Chip Group */}
+          <Text className="text-textSecondary text-xs font-bold uppercase tracking-wider mb-2 mt-4">
+            DIETARY PREFERENCES
+          </Text>
+          <Text className="text-textMuted text-[10px] mb-2 font-medium">
+            Select all that apply to help customers filter your meal
+          </Text>
+          <View className="flex-row flex-wrap">
+            {DIETARY_OPTIONS.map((pref) => {
+              const selected = dietaryPreferences.includes(pref);
+              return (
+                <FilterChip
+                  key={pref}
+                  label={pref}
+                  selected={selected}
+                  onPress={() => {
+                    setDietaryPreferences((prev) =>
+                      prev.includes(pref) ? prev.filter((p) => p !== pref) : [...prev, pref]
+                    );
+                  }}
+                  className="mr-2 mb-2"
+                />
+              );
+            })}
+          </View>
         </View>
 
         {/* ─── Portions & Capacity ─── */}
