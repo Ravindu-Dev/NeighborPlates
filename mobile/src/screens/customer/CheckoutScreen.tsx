@@ -104,7 +104,8 @@ type CheckoutScreenProps = NativeStackScreenProps<CustomerStackParamList, 'Check
 export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) => {
   const { items: cartItems, getCartTotal } = useCartStore();
 
-  const [deliveryMethod, setDeliveryMethod] = useState<'COOK_DELIVERY' | 'PICKUP'>('COOK_DELIVERY');
+  const [deliveryMethod, setDeliveryMethod] = useState<'COOK_DELIVERY' | 'PICKUP' | null>(null);
+  const [showWarningModal, setShowWarningModal] = useState(false);
   const [streetAddress, setStreetAddress] = useState('');
   const [instructions, setInstructions] = useState('');
   const [timeSlot, setTimeSlot] = useState<'ASAP' | 'SCHEDULED'>('ASAP');
@@ -207,6 +208,11 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
   const total = subtotal - promoDiscount + deliveryFee;
 
   const handleContinueToPayment = () => {
+    if (deliveryMethod === null) {
+      setShowWarningModal(true);
+      return;
+    }
+
     let isValid = true;
 
     if (deliveryMethod === 'COOK_DELIVERY' && !streetAddress.trim()) {
@@ -263,7 +269,15 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
       <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
         {/* Delivery Method Selection */}
         <View className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm mb-5">
-          <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider mb-4">DELIVERY PREFERENCE</Text>
+          <View className="flex-row justify-between items-center mb-4">
+            <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider">DELIVERY PREFERENCE *</Text>
+            {deliveryMethod === null && (
+              <View className="bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-200/80 flex-row items-center gap-1">
+                <Ionicons name="alert-circle-outline" size={11} color="#D97706" />
+                <Text className="text-amber-800 font-extrabold text-[9px] uppercase tracking-wider">Selection Required</Text>
+              </View>
+            )}
+          </View>
           <View className="flex-row gap-4">
             <TouchableOpacity
               onPress={() => setDeliveryMethod('COOK_DELIVERY')}
@@ -451,7 +465,9 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
             )}
             <View className="flex-row justify-between items-center mb-2">
               <Text className="text-textSecondary text-xs font-semibold">Delivery Fee</Text>
-              <Text className="text-textSecondary text-xs font-extrabold">LKR {deliveryFee}</Text>
+              <Text className="text-textSecondary text-xs font-extrabold">
+                {deliveryMethod === null ? 'Select option above' : `LKR ${deliveryFee}`}
+              </Text>
             </View>
             <View className="h-[1px] bg-gray-150/50 w-full my-2.5" />
             <View className="flex-row justify-between items-center">
@@ -461,12 +477,22 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
           </View>
         </View>
 
-        <Button
-          title="CONTINUE TO PAYMENT"
+        <TouchableOpacity
           onPress={handleContinueToPayment}
-          variant="primary"
-          className="w-full mb-12"
-        />
+          activeOpacity={0.8}
+          className={`w-full py-4 rounded-2xl flex-row items-center justify-center gap-2 mb-12 shadow-sm ${
+            deliveryMethod === null
+              ? 'bg-gray-300 border border-gray-300'
+              : 'bg-primary border border-primary'
+          }`}
+        >
+          <Text className={`font-black text-sm uppercase tracking-wider ${
+            deliveryMethod === null ? 'text-gray-600' : 'text-white'
+          }`}>
+            CONTINUE TO PAYMENT
+          </Text>
+          <Feather name="arrow-right" size={16} color={deliveryMethod === null ? '#4B5563' : '#FFFFFF'} />
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Select Location Modal Map */}
@@ -532,6 +558,60 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
                 className="w-full"
               />
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Warning Selection Popup Modal */}
+      <Modal visible={showWarningModal} transparent animationType="fade" onRequestClose={() => setShowWarningModal(false)}>
+        <View className="flex-1 bg-black/60 justify-center items-center p-6">
+          <View className="bg-white rounded-3xl p-6 w-full max-w-sm border border-gray-150 shadow-2xl items-center">
+            <View className="w-14 h-14 rounded-full bg-amber-100 items-center justify-center mb-4 border border-amber-200">
+              <Ionicons name="warning-outline" size={28} color="#D97706" />
+            </View>
+
+            <Text className="text-textPrimary font-black text-lg text-center mb-2">
+              Selection Required ⚠️
+            </Text>
+
+            <Text className="text-textSecondary text-xs text-center leading-relaxed mb-6">
+              Please select whether you want <Text className="font-extrabold text-primary">Delivery</Text> or <Text className="font-extrabold text-primary">Self Pickup</Text> at the top before continuing to payment.
+            </Text>
+
+            {/* Direct Quick Selection inside Warning Popup */}
+            <View className="w-full gap-3 mb-3">
+              <TouchableOpacity
+                onPress={() => {
+                  setDeliveryMethod('COOK_DELIVERY');
+                  setShowWarningModal(false);
+                }}
+                className="w-full py-3.5 bg-primary/10 border border-primary/30 rounded-2xl flex-row items-center justify-center gap-2"
+                activeOpacity={0.8}
+              >
+                <Feather name="truck" size={15} color="#FF6B35" />
+                <Text className="text-primary font-black text-xs uppercase tracking-wider">Select Delivery 🚚</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setDeliveryMethod('PICKUP');
+                  setShowWarningModal(false);
+                }}
+                className="w-full py-3.5 bg-secondary/10 border border-secondary/30 rounded-2xl flex-row items-center justify-center gap-2"
+                activeOpacity={0.8}
+              >
+                <Feather name="shopping-bag" size={15} color="#2D6A4F" />
+                <Text className="text-secondary font-black text-xs uppercase tracking-wider">Select Self Pickup 🍱</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setShowWarningModal(false)}
+              className="w-full py-2.5 bg-gray-100 rounded-xl items-center mt-1"
+              activeOpacity={0.7}
+            >
+              <Text className="text-textMuted font-bold text-xs">Got it, choose at top</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
