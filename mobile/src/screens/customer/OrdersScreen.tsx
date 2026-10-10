@@ -121,6 +121,39 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
     }
   };
 
+  const getActiveStep = (status: string) => {
+    switch (status) {
+      case 'PLACED':
+      case 'ACCEPTED':
+        return 1;
+      case 'PREPARING':
+        return 2;
+      case 'READY':
+        return 3;
+      case 'DELIVERING':
+        return 4;
+      default:
+        return 1;
+    }
+  };
+
+  const getStatusSubtitle = (status: string) => {
+    switch (status) {
+      case 'PLACED':
+        return 'Order placed • Waiting for confirmation';
+      case 'ACCEPTED':
+        return 'Order confirmed • Preparing to cook';
+      case 'PREPARING':
+        return 'Kitchen is cooking your meal fresh 🍳';
+      case 'READY':
+        return 'Food is prepared & packed for delivery';
+      case 'DELIVERING':
+        return 'Rider is on the way to your doorstep 🛵';
+      default:
+        return 'Delivery in progress';
+    }
+  };
+
   // Compute filtered list based on active tab
   const filteredOrders = orders.filter((order) => {
     if (activeTab === 'past') {
@@ -260,47 +293,169 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
               /* Active Delivery Banner at top of All Orders tab */
               activeTab === 'all' && activeDeliveryOrder ? (
                 <View
-                  style={{ backgroundColor: 'rgba(255, 107, 53, 0.08)' }}
-                  className="border border-primary/30 rounded-3xl p-5 mb-5 shadow-sm relative overflow-hidden"
+                  style={{
+                    backgroundColor: '#FFF7F2',
+                    borderColor: '#FFD6C4',
+                    borderWidth: 1.5,
+                    borderRadius: 24,
+                    padding: 16,
+                    marginBottom: 20,
+                    shadowColor: '#FF6B35',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.12,
+                    shadowRadius: 10,
+                    elevation: 3,
+                  }}
                 >
-                  <View className="flex-row justify-between items-center mb-3">
-                    <View className="flex-row items-center gap-2">
-                      <Animated.View
+                  {/* Top Bar: Pulsing indicator + Title & Status Badge */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                      {/* Pulse Live Dot */}
+                      <View style={{ width: 18, height: 18, justifyContent: 'center', alignItems: 'center', marginRight: 6 }}>
+                        <Animated.View
+                          style={{
+                            position: 'absolute',
+                            width: 18,
+                            height: 18,
+                            borderRadius: 9,
+                            backgroundColor: '#FF6B35',
+                            opacity: pulseAnim,
+                          }}
+                        />
+                        <View
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 4,
+                            backgroundColor: '#FF6B35',
+                          }}
+                        />
+                      </View>
+                      <Text
                         style={{
-                          opacity: pulseAnim,
-                          width: 12,
-                          height: 12,
-                          borderRadius: 6,
-                          backgroundColor: '#FF6B35',
+                          color: '#FF6B35',
+                          fontWeight: '900',
+                          fontSize: 11,
+                          letterSpacing: 0.8,
+                          textTransform: 'uppercase',
                         }}
-                      />
-                      <Text className="text-primary font-black text-xs uppercase tracking-wider">
-                        Active Delivery In Progress
+                        numberOfLines={1}
+                      >
+                        Live Order Tracking
                       </Text>
                     </View>
+
                     <Badge label={activeDeliveryOrder.status} variant={getVariant(activeDeliveryOrder.status)} />
                   </View>
 
-                  <View className="flex-row justify-between items-center bg-white/95 rounded-2xl p-3.5 border border-primary/10">
-                    <View className="flex-1 mr-3">
-                      <Text className="text-textPrimary font-black text-sm">
-                        #{activeDeliveryOrder.orderNumber || activeDeliveryOrder.id.slice(-6).toUpperCase()}
-                      </Text>
-                      <Text className="text-textSecondary text-xs font-semibold mt-0.5" numberOfLines={1}>
-                        👨‍🍳 Cook: {activeDeliveryOrder.cookName}
-                      </Text>
-                      <Text className="text-primary font-black text-xs mt-1">
-                        LKR {activeDeliveryOrder.totalAmount?.toLocaleString()}
-                      </Text>
+                  {/* Step Progress Tracker Bar */}
+                  <View style={{ marginBottom: 14 }}>
+                    <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>
+                      {[1, 2, 3, 4].map((step) => {
+                        const isCurrentOrPassed = getActiveStep(activeDeliveryOrder.status) >= step;
+                        return (
+                          <View
+                            key={step}
+                            style={{
+                              flex: 1,
+                              height: 5,
+                              borderRadius: 3,
+                              backgroundColor: isCurrentOrPassed ? '#FF6B35' : '#FED7AA',
+                            }}
+                          />
+                        );
+                      })}
+                    </View>
+                    <Text
+                      style={{
+                        color: '#6B7280',
+                        fontSize: 11,
+                        fontWeight: '600',
+                      }}
+                      numberOfLines={1}
+                    >
+                      {getStatusSubtitle(activeDeliveryOrder.status)}
+                    </Text>
+                  </View>
+
+                  {/* Inner White Card */}
+                  <View
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 18,
+                      borderWidth: 1,
+                      borderColor: '#FFE8DE',
+                      padding: 14,
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.04,
+                      shadowRadius: 4,
+                      elevation: 1,
+                    }}
+                  >
+                    {/* Order details row */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <View style={{ flex: 1, marginRight: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 3 }}>
+                          <View style={{ backgroundColor: '#F3F4F6', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, marginRight: 6 }}>
+                            <Text style={{ color: '#1A1A2E', fontWeight: '800', fontSize: 11 }}>
+                              #{activeDeliveryOrder.orderNumber || activeDeliveryOrder.id.slice(-6).toUpperCase()}
+                            </Text>
+                          </View>
+                          <Text style={{ color: '#9CA3AF', fontSize: 10, fontWeight: '700' }}>
+                            {activeDeliveryOrder.createdAt
+                              ? new Date(activeDeliveryOrder.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                              : ''}
+                          </Text>
+                        </View>
+                        <Text style={{ color: '#374151', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>
+                          👨‍🍳 {activeDeliveryOrder.cookName || 'Home Kitchen'}
+                        </Text>
+                      </View>
+
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ color: '#9CA3AF', fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                          Total Amount
+                        </Text>
+                        <Text style={{ color: '#FF6B35', fontSize: 14, fontWeight: '900' }}>
+                          LKR {activeDeliveryOrder.totalAmount?.toLocaleString()}
+                        </Text>
+                      </View>
                     </View>
 
+                    {/* Meal items preview if available */}
+                    {activeDeliveryOrder.items && activeDeliveryOrder.items.length > 0 && (
+                      <View style={{ backgroundColor: '#F9FAFB', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, marginBottom: 10 }}>
+                        <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '600' }} numberOfLines={1}>
+                          {activeDeliveryOrder.items.map((i: any) => `${i.name} (×${i.quantity || 1})`).join(' • ')}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Track Live Order Button */}
                     <TouchableOpacity
                       onPress={() => safeNavigate('OrderTracking', { orderId: activeDeliveryOrder.id })}
-                      className="px-4 py-2.5 rounded-xl bg-primary flex-row items-center gap-1.5 shadow-sm"
-                      activeOpacity={0.8}
+                      style={{
+                        backgroundColor: '#FF6B35',
+                        borderRadius: 14,
+                        paddingVertical: 11,
+                        paddingHorizontal: 16,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        shadowColor: '#FF6B35',
+                        shadowOffset: { width: 0, height: 3 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 5,
+                        elevation: 2,
+                      }}
+                      activeOpacity={0.85}
                     >
-                      <Feather name="map-pin" size={13} color="#FFFFFF" />
-                      <Text className="text-white font-extrabold text-xs">Track Live</Text>
+                      <Feather name="navigation" size={14} color="#FFFFFF" style={{ marginRight: 8 }} />
+                      <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 12, letterSpacing: 0.6, textTransform: 'uppercase' }}>
+                        Track Live Delivery
+                      </Text>
+                      <Feather name="chevron-right" size={15} color="#FFFFFF" style={{ marginLeft: 6 }} />
                     </TouchableOpacity>
                   </View>
                 </View>
