@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   RefreshControl, Image, Modal, Platform, Alert,
-  Animated, ActivityIndicator, Dimensions,
+  Animated, ActivityIndicator, Dimensions, TextInput,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,6 +11,21 @@ import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
 import { RiderOrderCard, RiderJobItem } from '../../components/rider/RiderOrderCard';
 import { Feather } from '@expo/vector-icons';
+import {
+  getRealLocation,
+  watchRealLocation,
+  calculateDistanceKm,
+  formatDistance,
+  syncRiderLocationToServer,
+  getCachedRiderLocation,
+  getCachedRiderLocationLabel,
+  cacheRiderLocation,
+  reverseGeocodeCoords,
+  searchAddressCoords,
+  SRI_LANKA_PRESETS,
+  DEFAULT_COORDINATES,
+  Coordinates,
+} from '../../services/locationService';
 
 let WebView: any = null;
 if (Platform.OS !== 'web') {
@@ -25,8 +40,11 @@ type FilterType = 'all' | 'nearby' | 'payout' | 'ready';
 type ViewMode = 'list' | 'map';
 
 const getDeliveryJobsMapHtml = (
-  jobs: (RiderJobItem & { lat: number; lon: number })[],
-  selectedJobId?: string
+  jobs: (RiderJobItem & { lat: number; lon: number; distanceKm?: number })[],
+  selectedJobId?: string,
+  riderLat: number = 6.9271,
+  riderLon: number = 79.8612,
+  isRealGps: boolean = false
 ) => {
   const serializedJobs = JSON.stringify(
     jobs.map((j) => ({
@@ -117,21 +135,41 @@ const getDeliveryJobsMapHtml = (
       50% { opacity: 0.8; }
       100% { transform: scale(1.2, 1.2); opacity: 0; }
     }
+    .locate-btn {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      z-index: 999;
+      background: #FFFFFF;
+      border: 1.5px solid #EA580C;
+      color: #EA580C;
+      border-radius: 12px;
+      padding: 6px 12px;
+      font-weight: 800;
+      font-size: 11px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
   <script>
-    var riderLat = 6.9271, riderLon = 79.8612;
+    var riderLat = ${riderLat};
+    var riderLon = ${riderLon};
+    var isRealGps = ${isRealGps};
     var map = L.map('map', { zoomControl: false }).setView([riderLat, riderLon], 14);
     L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png?api_key=sk-OP85plgYVLRSP0UYseCWtvvDJITdJ3mgrBVjGmh9OzAnaVWL', {
       maxZoom: 20,
-      attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      attribution: '&copy; Stadia Maps &copy; OpenStreetMap'
     }).addTo(map);
 
     // Radar Nearby Range Zone (< 3 km)
-    L.circle([riderLat, riderLon], {
-      radius: 2600,
+    var radarCircle = L.circle([riderLat, riderLon], {
+      radius: 3000,
       color: '#EA580C',
       fillColor: '#FFEDD5',
       fillOpacity: 0.18,
@@ -144,12 +182,16 @@ const getDeliveryJobsMapHtml = (
       '<div class="pulse-ring"></div>' +
       '<div class="rider-pin">🛵</div>' +
       '</div>';
-    L.marker([riderLat, riderLon], {
+    var popupHtml = isRealGps
+      ? '<b style="font-size:12px;">Your Live Location</b><br/><span style="color:#059669;font-size:11px;font-weight:700;">Live GPS Active 🟢</span>'
+      : '<b style="font-size:12px;">Map Center</b><br/><span style="color:#D97706;font-size:11px;">Acquiring live GPS... 🛰️</span>';
+    var riderMarker = L.marker([riderLat, riderLon], {
       icon: L.divIcon({ html: riderHtml, className: '', iconSize: [38, 38], iconAnchor: [19, 19] })
-    }).addTo(map).bindPopup('<b style="font-size:12px;">You are here</b><br/><span style="color:#6B7280;font-size:11px;">Westwood Food Hub (GPS Online 🟢)</span>');
+    }).addTo(map).bindPopup(popupHtml);
 
     // Jobs coordinates mapping
     var jobs = ${serializedJobs};
+    var jobLines = [];
 
     jobs.forEach(function(job) {
       var isAct = job.id === '${selectedJobId || ''}';
@@ -165,12 +207,14 @@ const getDeliveryJobsMapHtml = (
       }).addTo(map);
 
       // Dash line connecting rider to nearby job
-      L.polyline([[riderLat, riderLon], [job.lat, job.lon]], {
+      var line = L.polyline([[riderLat, riderLon], [job.lat, job.lon]], {
         color: isAct ? '#EA580C' : '#94A3B8',
         weight: isAct ? 3 : 1.5,
         opacity: isAct ? 0.85 : 0.45,
         dashArray: '5, 6'
       }).addTo(map);
+
+      jobLines.push({ line: line, destLat: job.lat, destLon: job.lon });
 
       marker.bindPopup(
         '<div style="font-family:sans-serif;min-width:140px;">' +
@@ -182,10 +226,96 @@ const getDeliveryJobsMapHtml = (
     });
 
     function selectJob(id) {
-      if (window.ReactNativeWebView) {
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SELECT_JOB', id: id }));
+      } else if (window.parent && window.parent.postMessage) {
+        window.parent.postMessage(JSON.stringify({ type: 'SELECT_JOB', id: id }), '*');
       }
     }
+
+    window.updateRiderPosition = function(newLat, newLon) {
+      riderLat = newLat;
+      riderLon = newLon;
+      if (riderMarker) {
+        riderMarker.setLatLng([newLat, newLon]);
+        riderMarker.setPopupContent('<b style="font-size:12px;">Your Live Location</b><br/><span style="color:#059669;font-size:11px;font-weight:700;">Live GPS Active 🟢</span>');
+      }
+      if (radarCircle) {
+        radarCircle.setLatLng([newLat, newLon]);
+      }
+      jobLines.forEach(function(item) {
+        if (item.line) {
+          item.line.setLatLngs([[newLat, newLon], [item.destLat, item.destLon]]);
+        }
+      });
+      map.setView([newLat, newLon], 14);
+    };
+
+    function notifyPosition(lat, lon) {
+      try {
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'RIDER_LOCATION', lat: lat, lon: lon }));
+        } else if (window.parent && window.parent.postMessage) {
+          window.parent.postMessage(JSON.stringify({ type: 'RIDER_LOCATION', lat: lat, lon: lon }), '*');
+        }
+      } catch(e) {}
+    }
+
+    function locateRiderDirectly() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          function(pos) {
+            if (pos && pos.coords) {
+              var lat = pos.coords.latitude;
+              var lon = pos.coords.longitude;
+              window.updateRiderPosition(lat, lon);
+              notifyPosition(lat, lon);
+            }
+          },
+          function(err) {
+            navigator.geolocation.getCurrentPosition(
+              function(pos2) {
+                if (pos2 && pos2.coords) {
+                  var lat2 = pos2.coords.latitude;
+                  var lon2 = pos2.coords.longitude;
+                  window.updateRiderPosition(lat2, lon2);
+                  notifyPosition(lat2, lon2);
+                }
+              },
+              function(err2) {
+                console.warn("Direct geolocation error:", err2);
+              },
+              { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+            );
+          },
+          { enableHighAccuracy: true, timeout: 6000, maximumAge: 15000 }
+        );
+      }
+    }
+
+    // Allow rider to tap anywhere on the map to pin their position
+    map.on('click', function(e) {
+      if (e && e.latlng) {
+        var lat = e.latlng.lat;
+        var lon = e.latlng.lng;
+        window.updateRiderPosition(lat, lon);
+        notifyPosition(lat, lon);
+      }
+    });
+
+    // Auto-locate if not yet confirmed real GPS
+    if (!isRealGps) {
+      locateRiderDirectly();
+    }
+
+    window.addEventListener('message', function(event) {
+      try {
+        var data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (data && data.type === 'UPDATE_LOCATION' && data.lat && data.lon) {
+          window.updateRiderPosition(data.lat, data.lon);
+        }
+      } catch(e) {}
+    });
   </script>
 </body>
 </html>`;
@@ -200,16 +330,78 @@ export const RiderDashboardScreen: React.FC = () => {
   const [togglingOnline, setTogglingOnline] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<FilterType>('nearby');
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('list'); // 'list' or 'map'
-  const [jobs, setJobs] = useState<(RiderJobItem & { lat: number; lon: number })[]>([]);
+  const [jobs, setJobs] = useState<(RiderJobItem & { lat: number; lon: number; distanceKm?: number })[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [selectedJob, setSelectedJob] = useState<RiderJobItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [accepting, setAccepting] = useState(false);
 
+  // Real GPS Location state
+  const [riderLocation, setRiderLocation] = useState<Coordinates>(DEFAULT_COORDINATES);
+  const [locationLabel, setLocationLabel] = useState<string>('Colombo');
+  const [isRealGps, setIsRealGps] = useState<boolean>(false);
+  const [gpsDetecting, setGpsDetecting] = useState<boolean>(false);
+  const [locationPickerVisible, setLocationPickerVisible] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<{ label: string; coords: Coordinates }[]>([]);
+  const [searchingLocation, setSearchingLocation] = useState<boolean>(false);
+
   // Animated spin for the auto-refreshing indicator
   const spinValue = useRef(new Animated.Value(0)).current;
+
+  // Real-time location watching
+  useEffect(() => {
+    let watcher: { remove: () => void } | null = null;
+    (async () => {
+      // 1. Instant recovery from local cache
+      const cached = await getCachedRiderLocation();
+      const cachedLabel = await getCachedRiderLocationLabel();
+      if (cached) {
+        setRiderLocation(cached);
+        if (cachedLabel) setLocationLabel(cachedLabel);
+        setIsRealGps(true);
+      }
+
+      // 2. Active continuous hardware GPS tracking
+      watcher = await watchRealLocation((newCoords, newLabel) => {
+        setRiderLocation(newCoords);
+        if (newLabel) setLocationLabel(newLabel);
+        setIsRealGps(true);
+        syncRiderLocationToServer(newCoords);
+      });
+    })();
+
+    return () => {
+      if (watcher) watcher.remove();
+    };
+  }, []);
+
+  // Web iframe cross-origin postMessage listener
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const handleWebMsg = async (e: MessageEvent) => {
+        try {
+          const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+          if (data && data.type === 'RIDER_LOCATION' && data.lat && data.lon) {
+            const newCoords = { latitude: data.lat, longitude: data.lon };
+            setRiderLocation(newCoords);
+            setIsRealGps(true);
+            const lbl = await reverseGeocodeCoords(data.lat, data.lon);
+            setLocationLabel(lbl);
+            await cacheRiderLocation(newCoords, lbl);
+            syncRiderLocationToServer(newCoords);
+          } else if (data && data.type === 'SELECT_JOB' && data.id) {
+            const target = jobs.find((j) => j.id === data.id);
+            if (target) handleOpenJob(target);
+          }
+        } catch (err) {}
+      };
+      window.addEventListener('message', handleWebMsg);
+      return () => window.removeEventListener('message', handleWebMsg);
+    }
+  }, [jobs]);
 
   useEffect(() => {
     Animated.loop(
@@ -228,6 +420,21 @@ export const RiderDashboardScreen: React.FC = () => {
 
   const fetchData = async () => {
     try {
+      // 1. Fetch real GPS location first
+      let currentCoords = riderLocation;
+      try {
+        const locResult = await getRealLocation();
+        currentCoords = locResult.coords;
+        setRiderLocation(locResult.coords);
+        if (locResult.label) setLocationLabel(locResult.label);
+        setIsRealGps(locResult.isRealGps);
+        if (locResult.isRealGps) {
+          syncRiderLocationToServer(locResult.coords);
+        }
+      } catch (locErr) {
+        console.warn('[RiderDashboard] Location retrieval error:', locErr);
+      }
+
       const [profileRes, availableRes, summaryRes] = await Promise.allSettled([
         api.get('/api/users/profile'),
         api.get('/api/orders/available'),
@@ -251,23 +458,50 @@ export const RiderDashboardScreen: React.FC = () => {
           const cookName = order.cookName || 'Home Cook';
           const payout = order.riderEarnings || Math.max(150, Math.round((order.totalAmount || 0) * 0.15));
           const foodName = order.items?.[0]?.name || 'Prepared Meal';
-          const cookCoords = order.cookCoordinates || [79.8612, 6.9271];
-          const cookLat = typeof cookCoords[1] === 'number' ? cookCoords[1] : (6.9271 + (idx * 0.005));
-          const cookLon = typeof cookCoords[0] === 'number' ? cookCoords[0] : (79.8612 + (idx * 0.005));
+          let cookLat: number;
+          let cookLon: number;
+          if (order.cookCoordinates && typeof order.cookCoordinates[1] === 'number') {
+            cookLat = order.cookCoordinates[1];
+            cookLon = order.cookCoordinates[0];
+          } else if (order.items?.[0]?.cookCoordinates && typeof order.items[0].cookCoordinates[1] === 'number') {
+            cookLat = order.items[0].cookCoordinates[1];
+            cookLon = order.items[0].cookCoordinates[0];
+          } else {
+            // Disperse nearby around rider's current position so orders appear on the radar
+            const offsets = [
+              [0.007, 0.005],
+              [-0.006, 0.008],
+              [0.009, -0.005],
+              [-0.008, -0.007],
+              [0.004, -0.009],
+            ];
+            const offset = offsets[idx % offsets.length];
+            cookLat = currentCoords.latitude + offset[0];
+            cookLon = currentCoords.longitude + offset[1];
+          }
+
+          // Calculate real straight-line distance from rider's current position to kitchen
+          const distanceKm = calculateDistanceKm(
+            currentCoords.latitude,
+            currentCoords.longitude,
+            cookLat,
+            cookLon
+          );
+          const distanceDisplay = formatDistance(distanceKm);
 
           return {
             id: order.id,
             orderNumber: order.orderNumber,
             cookName,
             isVerified: true,
-            distancePickup: order.cookAddressLabel || 'Home Kitchen',
+            distancePickup: `${distanceDisplay} to pickup`,
             estimatedTime: 'Ready Now',
             payoutAmount: payout,
             payoutTag: {
               type: 'ready_now' as const,
               text: 'Ready Now',
             },
-            pickupDistance: order.cookAddressLabel || 'Home Kitchen',
+            pickupDistance: `${distanceDisplay} to pickup`,
             dropoffDistance: order.address?.label ? (order.address.label.length > 18 ? order.address.label.slice(0, 16) + '...' : order.address.label) : 'Customer Address',
             packageSummary: {
               label: 'Items',
@@ -278,6 +512,7 @@ export const RiderDashboardScreen: React.FC = () => {
             imageUrl: 'https://images.unsplash.com/photo-1541696432-82c6da8ce7bf?auto=format&fit=crop&w=400&q=80',
             lat: cookLat,
             lon: cookLon,
+            distanceKm: distanceKm,
             rawOrder: order,
           };
         });
@@ -334,23 +569,45 @@ export const RiderDashboardScreen: React.FC = () => {
     }
   };
 
-  // Filter jobs logic
-  const filteredJobs = jobs.filter((job) => {
-    if (activeFilter === 'nearby') {
-      return true; // All fetched jobs are already in rider's serviceable area
-    }
-    if (activeFilter === 'payout') {
-      const amt =
-        typeof job.payoutAmount === 'number'
-          ? job.payoutAmount
-          : parseFloat(job.payoutAmount);
-      return amt >= 500;
-    }
-    if (activeFilter === 'ready') {
-      return job.payoutTag?.type === 'ready_now';
-    }
-    return true;
+  // Dynamically recompute distances relative to rider's latest location
+  const enrichedJobs = jobs.map((job) => {
+    const liveDistKm = calculateDistanceKm(
+      riderLocation.latitude,
+      riderLocation.longitude,
+      job.lat,
+      job.lon
+    );
+    const distStr = formatDistance(liveDistKm);
+    return {
+      ...job,
+      distanceKm: liveDistKm,
+      pickupDistance: `${distStr} to pickup`,
+      distancePickup: `${distStr} to pickup`,
+    };
   });
+
+  // Filter jobs logic
+  const filteredJobs = enrichedJobs
+    .filter((job) => {
+      if (activeFilter === 'nearby') {
+        const hasVeryClose = enrichedJobs.some((j) => (j.distanceKm ?? 0) <= 50);
+        return hasVeryClose ? (job.distanceKm ?? 0) <= 50 : true;
+      }
+      if (activeFilter === 'payout') {
+        const amt =
+          typeof job.payoutAmount === 'number'
+            ? job.payoutAmount
+            : parseFloat(job.payoutAmount);
+        return amt >= 500;
+      }
+      if (activeFilter === 'ready') {
+        return job.payoutTag?.type === 'ready_now';
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      return (a.distanceKm ?? 0) - (b.distanceKm ?? 0);
+    });
 
   const handleOpenJob = (job: RiderJobItem) => {
     setSelectedJob(job);
@@ -385,7 +642,7 @@ export const RiderDashboardScreen: React.FC = () => {
     }
   };
 
-  const handleMapMessage = (event: any) => {
+  const handleMapMessage = async (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'SELECT_JOB' && data.id) {
@@ -393,8 +650,51 @@ export const RiderDashboardScreen: React.FC = () => {
         if (target) {
           handleOpenJob(target);
         }
+      } else if (data.type === 'RIDER_LOCATION' && data.lat && data.lon) {
+        const newCoords = { latitude: data.lat, longitude: data.lon };
+        setRiderLocation(newCoords);
+        setIsRealGps(true);
+        const lbl = await reverseGeocodeCoords(data.lat, data.lon);
+        setLocationLabel(lbl);
+        await cacheRiderLocation(newCoords, lbl);
+        syncRiderLocationToServer(newCoords);
       }
     } catch (e) {}
+  };
+
+  const handleSelectLocation = async (coords: Coordinates, label: string) => {
+    setRiderLocation(coords);
+    setLocationLabel(label);
+    setIsRealGps(true);
+    await cacheRiderLocation(coords, label);
+    syncRiderLocationToServer(coords);
+    setLocationPickerVisible(false);
+    if (Platform.OS !== 'web') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  };
+
+  const handleTriggerDetectGps = async () => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setGpsDetecting(true);
+    const loc = await getRealLocation();
+    setRiderLocation(loc.coords);
+    setIsRealGps(loc.isRealGps);
+    if (loc.label) setLocationLabel(loc.label);
+    if (loc.isRealGps) {
+      await cacheRiderLocation(loc.coords, loc.label);
+      syncRiderLocationToServer(loc.coords);
+      Alert.alert(
+        'GPS Location Active',
+        `Centered on: ${loc.label || `${loc.coords.latitude.toFixed(4)}, ${loc.coords.longitude.toFixed(4)}`}`
+      );
+    } else {
+      Alert.alert(
+        'Location Notice',
+        loc.error || 'Could not acquire real GPS signal. You can select your area manually from the list.'
+      );
+    }
+    setGpsDetecting(false);
   };
 
   const deriveRiderName = () => {
@@ -416,7 +716,13 @@ export const RiderDashboardScreen: React.FC = () => {
     user?.avatarUrl ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(riderDisplayName)}&background=9A3412&color=fff&bold=true&size=256`;
 
-  const mapHtml = getDeliveryJobsMapHtml(filteredJobs, selectedJob?.id);
+  const mapHtml = getDeliveryJobsMapHtml(
+    filteredJobs,
+    selectedJob?.id,
+    riderLocation.latitude,
+    riderLocation.longitude,
+    isRealGps
+  );
 
   return (
     <View className="flex-1 bg-[#F9FAFB]">
@@ -677,6 +983,59 @@ export const RiderDashboardScreen: React.FC = () => {
             </TouchableOpacity>
           </ScrollView>
 
+          {/* ── Location Status & Quick Control Card ── */}
+          <View className="bg-white rounded-2xl p-3 border border-gray-200 mb-3 shadow-xs">
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center flex-1 mr-2">
+                <View className="w-8 h-8 rounded-xl bg-orange-100 items-center justify-center mr-2.5">
+                  <Feather name="navigation" size={15} color="#EA580C" />
+                </View>
+                <View className="flex-1">
+                  <View className="flex-row items-center">
+                    <Text className="text-textPrimary font-black text-xs" numberOfLines={1}>
+                      {locationLabel}
+                    </Text>
+                    <View className={`ml-2 px-1.5 py-0.5 rounded-full ${isRealGps ? 'bg-emerald-100' : 'bg-amber-100'}`}>
+                      <Text className={`text-[9px] font-extrabold ${isRealGps ? 'text-emerald-700' : 'text-amber-700'}`}>
+                        {isRealGps ? 'GPS ACTIVE' : 'DEFAULT'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text className="text-textMuted text-[10px] mt-0.5" numberOfLines={1}>
+                    {riderLocation.latitude.toFixed(4)}, {riderLocation.longitude.toFixed(4)} • Tap map or change to re-center
+                  </Text>
+                </View>
+              </View>
+
+              <View className="flex-row items-center gap-1.5">
+                <TouchableOpacity
+                  onPress={handleTriggerDetectGps}
+                  disabled={gpsDetecting}
+                  activeOpacity={0.7}
+                  className="bg-orange-50 border border-orange-200 px-2.5 py-1.5 rounded-xl flex-row items-center"
+                >
+                  {gpsDetecting ? (
+                    <ActivityIndicator size="small" color="#EA580C" />
+                  ) : (
+                    <>
+                      <Feather name="crosshair" size={12} color="#EA580C" />
+                      <Text className="text-[#EA580C] text-[11px] font-extrabold ml-1">Detect</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setLocationPickerVisible(true)}
+                  activeOpacity={0.7}
+                  className="bg-gray-100 border border-gray-200 px-2.5 py-1.5 rounded-xl flex-row items-center"
+                >
+                  <Feather name="map-pin" size={12} color="#4B5563" />
+                  <Text className="text-textPrimary text-[11px] font-extrabold ml-1">Change</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
           {/* ── 4. View Mode Switcher: List View vs Live Map ── */}
           <View className="flex-row items-center bg-gray-200/70 p-1 rounded-2xl mb-4">
             <TouchableOpacity
@@ -735,16 +1094,20 @@ export const RiderDashboardScreen: React.FC = () => {
               <View className="h-80 bg-white rounded-3xl overflow-hidden border border-gray-200 shadow-sm relative">
                 {WebView ? (
                   <WebView
+                    key={`radar_wv_${riderLocation.latitude.toFixed(4)}_${riderLocation.longitude.toFixed(4)}_${isRealGps}`}
                     source={{ html: mapHtml }}
                     style={{ flex: 1 }}
                     scrollEnabled={false}
+                    geolocationEnabled={true}
                     onMessage={handleMapMessage}
                   />
                 ) : Platform.OS === 'web' ? (
                   <iframe
+                    key={`radar_if_${riderLocation.latitude.toFixed(4)}_${riderLocation.longitude.toFixed(4)}_${isRealGps}`}
                     srcDoc={mapHtml}
                     style={{ width: '100%', height: '100%', border: 'none' }}
                     title="Live Jobs Map"
+                    allow="geolocation"
                   />
                 ) : (
                   <View className="flex-1 bg-gray-100 items-center justify-center">
@@ -755,19 +1118,37 @@ export const RiderDashboardScreen: React.FC = () => {
 
                 {/* Floating Map Status Overlay */}
                 <View className="absolute top-3 left-3 bg-white/95 px-3 py-1.5 rounded-full border border-gray-100 shadow-md flex-row items-center">
-                  <View className="w-2 h-2 rounded-full bg-emerald-500 mr-2" />
+                  <View className={`w-2 h-2 rounded-full mr-2 ${isRealGps ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                   <Text className="text-textPrimary font-extrabold text-[11px]">
-                    {filteredJobs.length} Nearest Jobs on Radar
+                    {isRealGps ? `GPS Active • ${filteredJobs.length} Jobs on Radar` : `Simulated GPS • ${filteredJobs.length} Jobs`}
                   </Text>
                 </View>
 
-                {/* Recenter Button */}
+                {/* Recenter / GPS Detect Button */}
                 <TouchableOpacity
-                  onPress={onRefresh}
+                  onPress={async () => {
+                    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    setGpsDetecting(true);
+                    const loc = await getRealLocation();
+                    setRiderLocation(loc.coords);
+                    setIsRealGps(loc.isRealGps);
+                    if (loc.isRealGps) {
+                      syncRiderLocationToServer(loc.coords);
+                      Alert.alert('GPS Location', `Real GPS coordinates detected: ${loc.coords.latitude.toFixed(4)}, ${loc.coords.longitude.toFixed(4)}`);
+                    } else {
+                      Alert.alert('Location Notice', loc.error || 'Could not acquire real GPS signal. Please allow location permissions in device settings.');
+                    }
+                    setGpsDetecting(false);
+                    fetchData();
+                  }}
                   activeOpacity={0.8}
                   className="absolute bottom-3 right-3 w-10 h-10 rounded-2xl bg-white items-center justify-center shadow-md border border-gray-100"
                 >
-                  <Feather name="navigation" size={18} color="#EA580C" />
+                  {gpsDetecting ? (
+                    <ActivityIndicator size="small" color="#EA580C" />
+                  ) : (
+                    <Feather name={isRealGps ? "crosshair" : "map-pin"} size={18} color="#EA580C" />
+                  )}
                 </TouchableOpacity>
               </View>
 
@@ -806,16 +1187,20 @@ export const RiderDashboardScreen: React.FC = () => {
               <View className="h-44 bg-white rounded-3xl overflow-hidden border border-gray-200 shadow-sm relative">
                 {WebView ? (
                   <WebView
+                    key={`mini_wv_${riderLocation.latitude.toFixed(4)}_${riderLocation.longitude.toFixed(4)}_${isRealGps}`}
                     source={{ html: mapHtml }}
                     style={{ flex: 1 }}
                     scrollEnabled={false}
+                    geolocationEnabled={true}
                     onMessage={handleMapMessage}
                   />
                 ) : Platform.OS === 'web' ? (
                   <iframe
+                    key={`mini_if_${riderLocation.latitude.toFixed(4)}_${riderLocation.longitude.toFixed(4)}_${isRealGps}`}
                     srcDoc={mapHtml}
                     style={{ width: '100%', height: '100%', border: 'none' }}
                     title="Live Jobs Radar Preview"
+                    allow="geolocation"
                   />
                 ) : (
                   <View className="flex-1 bg-gray-100 items-center justify-center">
@@ -830,6 +1215,36 @@ export const RiderDashboardScreen: React.FC = () => {
                     Live Radar: {filteredJobs.length} Jobs Nearby
                   </Text>
                 </View>
+
+                {/* Top-right Detect GPS button */}
+                <TouchableOpacity
+                  onPress={handleTriggerDetectGps}
+                  disabled={gpsDetecting}
+                  activeOpacity={0.8}
+                  className="absolute top-2.5 right-2.5 bg-white/95 px-2.5 py-1 rounded-full border border-gray-150 shadow-sm flex-row items-center"
+                >
+                  {gpsDetecting ? (
+                    <ActivityIndicator size="small" color="#EA580C" />
+                  ) : (
+                    <>
+                      <Feather name="crosshair" size={11} color="#EA580C" />
+                      <Text className="text-[#EA580C] font-extrabold text-[10px] ml-1">Detect GPS</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                {/* Bottom-left Location name pill */}
+                <TouchableOpacity
+                  onPress={() => setLocationPickerVisible(true)}
+                  activeOpacity={0.8}
+                  className="absolute bottom-2.5 left-2.5 bg-white/95 px-2.5 py-1 rounded-full border border-gray-150 shadow-sm flex-row items-center"
+                >
+                  <Feather name="map-pin" size={10} color="#EA580C" />
+                  <Text className="text-textPrimary font-black text-[10px] ml-1" numberOfLines={1}>
+                    {locationLabel}
+                  </Text>
+                  <Text className="text-textMuted text-[9px] ml-1 font-semibold">(tap to change)</Text>
+                </TouchableOpacity>
 
                 {/* Expand Map button */}
                 <TouchableOpacity
@@ -1044,6 +1459,159 @@ export const RiderDashboardScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── 9. Location Selector & Area Modal ── */}
+      <Modal
+        visible={locationPickerVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setLocationPickerVisible(false)}
+      >
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-white rounded-t-3xl p-5 border-t border-gray-150 max-h-[85%]">
+            {/* Modal Header */}
+            <View className="flex-row items-center justify-between mb-3">
+              <View>
+                <Text className="text-textPrimary font-black text-lg">
+                  Set Your Rider Location
+                </Text>
+                <Text className="text-textMuted text-xs mt-0.5">
+                  Select your current town/area for dispatch radar
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setLocationPickerVisible(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center"
+              >
+                <Feather name="x" size={18} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Quick Auto-Detect GPS Button */}
+            <TouchableOpacity
+              onPress={() => {
+                handleTriggerDetectGps();
+                setLocationPickerVisible(false);
+              }}
+              activeOpacity={0.8}
+              className="bg-[#FFF7ED] border border-[#FED7AA] p-3.5 rounded-2xl flex-row items-center mb-3.5"
+            >
+              <View className="w-9 h-9 rounded-xl bg-[#EA580C] items-center justify-center mr-3">
+                <Feather name="crosshair" size={18} color="#FFFFFF" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[#7C2D12] font-black text-xs">
+                  Auto-Detect Live GPS
+                </Text>
+                <Text className="text-textMuted text-[10px]">
+                  Acquire live coordinates from device / browser
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={16} color="#EA580C" />
+            </TouchableOpacity>
+
+            {/* Search Input */}
+            <View className="flex-row items-center bg-gray-100 rounded-2xl px-3.5 py-2.5 mb-3 border border-gray-200">
+              <Feather name="search" size={15} color="#9CA3AF" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={async (text) => {
+                  setSearchQuery(text);
+                  if (text.trim().length > 1) {
+                    setSearchingLocation(true);
+                    const res = await searchAddressCoords(text);
+                    setSearchResults(res);
+                    setSearchingLocation(false);
+                  } else {
+                    setSearchResults([]);
+                  }
+                }}
+                placeholder="Search any town or street in Sri Lanka..."
+                placeholderTextColor="#9CA3AF"
+                className="flex-1 ml-2 text-xs text-textPrimary font-semibold py-0"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults([]); }}>
+                  <Feather name="x-circle" size={14} color="#9CA3AF" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Scrollable Presets & Results */}
+            <ScrollView showsVerticalScrollIndicator={false} className="max-h-72">
+              {searchQuery.trim().length > 1 ? (
+                <View>
+                  <Text className="text-textMuted font-bold text-[11px] mb-2 uppercase tracking-wider">
+                    Search Results
+                  </Text>
+                  {searchingLocation ? (
+                    <ActivityIndicator size="small" color="#EA580C" className="my-3" />
+                  ) : searchResults.length === 0 ? (
+                    <Text className="text-textMuted text-xs text-center py-4">
+                      No matching areas found. Try a different name or pick from presets below.
+                    </Text>
+                  ) : (
+                    searchResults.map((item, idx) => (
+                      <TouchableOpacity
+                        key={idx}
+                        onPress={() => handleSelectLocation(item.coords, item.label)}
+                        className="py-2.5 px-3 rounded-xl border border-gray-150 mb-1.5 flex-row items-center justify-between bg-white"
+                      >
+                        <View className="flex-1 mr-2">
+                          <Text className="text-textPrimary font-bold text-xs">{item.label}</Text>
+                          <Text className="text-textMuted text-[10px]">{item.coords.latitude.toFixed(4)}, {item.coords.longitude.toFixed(4)}</Text>
+                        </View>
+                        <Feather name="arrow-right" size={14} color="#EA580C" />
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </View>
+              ) : null}
+
+              {/* Sri Lanka Popular Presets */}
+              <Text className="text-textMuted font-bold text-[11px] mt-2 mb-2 uppercase tracking-wider">
+                Popular Areas & Cities (Sri Lanka)
+              </Text>
+              <View className="flex-row flex-wrap gap-2 pb-6">
+                {SRI_LANKA_PRESETS.map((preset, idx) => {
+                  const isSelected =
+                    calculateDistanceKm(
+                      riderLocation.latitude,
+                      riderLocation.longitude,
+                      preset.coords.latitude,
+                      preset.coords.longitude
+                    ) < 2;
+
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={() => handleSelectLocation(preset.coords, preset.name)}
+                      activeOpacity={0.7}
+                      className={`px-3 py-2 rounded-xl border flex-row items-center ${
+                        isSelected
+                          ? 'bg-[#EA580C] border-[#EA580C]'
+                          : 'bg-gray-50 border-gray-200'
+                      }`}
+                    >
+                      <Text
+                        className={`text-xs font-bold ${
+                          isSelected ? 'text-white' : 'text-textPrimary'
+                        }`}
+                      >
+                        {preset.name}
+                      </Text>
+                      {isSelected && (
+                        <Feather name="check" size={12} color="#FFFFFF" className="ml-1" />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>

@@ -10,13 +10,32 @@ import { api } from '../../services/api';
 import { DeliveryStepperComponent } from '../../components/rider/DeliveryStepperComponent';
 import { SkeletonLoader } from '../../components/common/SkeletonLoader';
 import { Feather } from '@expo/vector-icons';
+import {
+  getRealLocation,
+  watchRealLocation,
+  syncRiderLocationToServer,
+  DEFAULT_COORDINATES,
+  Coordinates,
+} from '../../services/locationService';
 
 let WebView: any = null;
 if (Platform.OS !== 'web') {
   try { WebView = require('react-native-webview').WebView; } catch (e) {}
 }
 
-const getMapHtml = (cookLat: number, cookLon: number, custLat: number, custLon: number, status: string) => `
+const getMapHtml = (
+  cookLat: number,
+  cookLon: number,
+  custLat: number,
+  custLon: number,
+  status: string,
+  riderLat?: number,
+  riderLon?: number
+) => {
+  var rLat = riderLat !== undefined ? riderLat : cookLat;
+  var rLon = riderLon !== undefined ? riderLon : cookLon;
+
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -30,7 +49,7 @@ const getMapHtml = (cookLat: number, cookLon: number, custLat: number, custLon: 
 <body>
   <div id="map"></div>
   <script>
-    var map = L.map('map', { zoomControl: false }).fitBounds([[${cookLat},${cookLon}],[${custLat},${custLon}]], { padding: [40,40] });
+    var map = L.map('map', { zoomControl: false }).fitBounds([[${rLat},${rLon}],[${cookLat},${cookLon}],[${custLat},${custLon}]], { padding: [40,40] });
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png?api_key=sk-OP85plgYVLRSP0UYseCWtvvDJITdJ3mgrBVjGmh9OzAnaVWL', { maxZoom: 20, attribution: '&copy; Stadia Maps &copy; OpenStreetMap contributors' }).addTo(map);
     // Cook
@@ -42,26 +61,19 @@ const getMapHtml = (cookLat: number, cookLon: number, custLat: number, custLon: 
       icon: L.divIcon({ html: '<div style="background:#3B82F6;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 0 8px rgba(59,130,246,.8)"></div>', className:'m', iconSize:[14,14] })
     }).addTo(map).bindPopup('<div style="font-family:sans-serif;font-size:11px;font-weight:700">📍 Delivery Destination</div>');
     // Route
-    L.polyline([[${cookLat},${cookLon}],[${custLat},${custLon}]], { color:'#6366F1', dashArray:'5,8', weight:3 }).addTo(map);
+    L.polyline([[${rLat},${rLon}],[${cookLat},${cookLon}],[${custLat},${custLon}]], { color:'#6366F1', dashArray:'5,8', weight:3 }).addTo(map);
     // Rider marker
-    var riderMarker = L.marker([${cookLat},${cookLon}], {
-      icon: L.divIcon({ html: '<div style="background:#10B981;width:24px;height:24px;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(16,185,129,.8);display:flex;align-items:center;justify-content:center;font-size:12px">🛵</div>', className:'m', iconSize:[24,24] })
-    }).addTo(map);
-    var status = "${status}";
-    if (status === 'DELIVERING') {
-      var startTime = Date.now(), duration = 20000;
-      function animate() {
-        var t = Math.min((Date.now() - startTime) % duration / duration, 1);
-        riderMarker.setLatLng([${cookLat}+(${custLat}-${cookLat})*t, ${cookLon}+(${custLon}-${cookLon})*t]);
-        requestAnimationFrame(animate);
-      }
-      animate();
-    } else if (status === 'DELIVERED') {
-      riderMarker.setLatLng([${custLat},${custLon}]);
-    }
+    var riderMarker = L.marker([${rLat},${rLon}], {
+      icon: L.divIcon({ html: '<div style="background:#10B981;width:26px;height:26px;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(16,185,129,.8);display:flex;align-items:center;justify-content:center;font-size:13px">🛵</div>', className:'m', iconSize:[26,26] })
+    }).addTo(map).bindPopup('<b>Your Live Position</b>');
+
+    window.updateRiderLocation = function(lat, lon) {
+      if (riderMarker) riderMarker.setLatLng([lat, lon]);
+    };
   </script>
 </body>
 </html>`;
+};
 
 type Props = NativeStackScreenProps<RiderStackParamList, 'ActiveDelivery'>;
 
@@ -71,7 +83,26 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [riderCoords, setRiderCoords] = useState<Coordinates>(DEFAULT_COORDINATES);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    let watcher: { remove: () => void } | null = null;
+    (async () => {
+      const init = await getRealLocation();
+      setRiderCoords(init.coords);
+      if (init.isRealGps) syncRiderLocationToServer(init.coords);
+
+      watcher = await watchRealLocation((newCoords) => {
+        setRiderCoords(newCoords);
+        syncRiderLocationToServer(newCoords);
+      });
+    })();
+
+    return () => {
+      if (watcher) watcher.remove();
+    };
+  }, []);
 
   const fetchOrder = async () => {
     try {
@@ -209,7 +240,7 @@ export const ActiveDeliveryScreen: React.FC<Props> = ({ route, navigation }) => 
       <View style={{ height: 240 }}>
         {WebView ? (
           <WebView
-            source={{ html: getMapHtml(cookLat, cookLon, custLat, custLon, order.status) }}
+            source={{ html: getMapHtml(cookLat, cookLon, custLat, custLon, order.status, riderCoords.latitude, riderCoords.longitude) }}
             style={{ flex: 1 }}
             scrollEnabled={false}
           />
