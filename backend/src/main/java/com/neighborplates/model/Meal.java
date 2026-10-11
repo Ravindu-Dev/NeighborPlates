@@ -77,11 +77,21 @@ public class Meal {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class RecentReview {
+        private String reviewId;
         private String userId;
         private String userName;
         private int rating;
         private String comment;
         private String photoUrl;
         private Instant createdAt = Instant.now();
+
+        public RecentReview(String userId, String userName, int rating, String comment, String photoUrl, Instant createdAt) {
+            this.userId = userId;
+            this.userName = userName;
+            this.rating = rating;
+            this.comment = comment;
+            this.photoUrl = photoUrl;
+            this.createdAt = createdAt != null ? createdAt : Instant.now();
+        }
     }
 }

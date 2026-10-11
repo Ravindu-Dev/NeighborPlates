@@ -11,6 +11,7 @@ import { MealDetailScreen } from '../screens/customer/MealDetailScreen';
 import { CheckoutScreen } from '../screens/customer/CheckoutScreen';
 import { PaymentScreen } from '../screens/customer/PaymentScreen';
 import { OrderTrackingScreen } from '../screens/customer/OrderTrackingScreen';
+import { CustomerReviewsScreen } from '../screens/customer/CustomerReviewsScreen';
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
 
@@ -38,6 +39,7 @@ export type CustomerStackParamList = {
     longitude?: number;
   };
   OrderTracking: { orderId: string };
+  CustomerReviews: undefined;
 };
 
 export type CustomerTabParamList = {
@@ -126,6 +128,7 @@ export const CustomerNavigator = () => {
         <Stack.Screen name="Checkout"      component={CheckoutScreen} />
         <Stack.Screen name="Payment"       component={PaymentScreen} />
         <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
+        <Stack.Screen name="CustomerReviews" component={CustomerReviewsScreen} />
       </Stack.Navigator>
 
       {/* GLOBAL CUSTOMER AI CHATBOT ASSISTANT */}

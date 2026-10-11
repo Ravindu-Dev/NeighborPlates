@@ -218,11 +218,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation: propNa
     iconName: keyof typeof Feather.glyphMap,
     title: string,
     subtitle: string,
-    modal: ActiveModal,
+    modalOrAction: ActiveModal | (() => void),
     isLast = false,
   ) => (
     <TouchableOpacity
-      onPress={() => openModal(modal)}
+      onPress={() => {
+        if (typeof modalOrAction === 'function') {
+          modalOrAction();
+        } else {
+          openModal(modalOrAction);
+        }
+      }}
       className={`flex-row items-center justify-between p-4 bg-white ${!isLast ? 'border-b border-gray-50' : ''}`}
       activeOpacity={0.7}
     >
@@ -654,6 +660,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation: propNa
 
         {/* Menu List */}
         <View className="border border-gray-150 rounded-3xl overflow-hidden mb-6 shadow-sm">
+          {renderMenuItem("star",          "My Reviews",           "View, edit, or delete your meal reviews",    () => safeNavigate('CustomerReviews'))}
           {renderMenuItem("map-pin",       "Delivery Addresses",   "Manage home, work, and saved places",       'addresses')}
           {renderMenuItem("heart",         "Dietary Preferences", "Filter meals by vegan, allergen-free tags",  'dietary')}
           {renderMenuItem("credit-card",   "Wallet & Payments",   "Manage payment details and credits",         'wallet')}
