@@ -6,6 +6,7 @@ import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
 import { api } from '../../services/api';
 import { Badge } from '../../components/common/Badge';
 import { OrderReceiptModal } from '../../components/customer/OrderReceiptModal';
+import { OrderReviewModal } from '../../components/customer/OrderReviewModal';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useCartStore } from '../../store/cartStore';
 
@@ -38,6 +39,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'past'>('all');
   const [selectedReceiptOrder, setSelectedReceiptOrder] = useState<any>(null);
+  const [selectedReviewOrder, setSelectedReviewOrder] = useState<any>(null);
 
   // Pulsing animation for active delivery banner
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
@@ -492,46 +494,65 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
                   </Text>
                 </View>
 
-                {/* Price & Action Buttons */}
-                <View className="flex-row justify-between items-center pt-3 border-t border-gray-100">
-                  <View className="flex-1 mr-2">
+                {/* Price Summary Row */}
+                <View className="flex-row justify-between items-center pt-3 border-t border-gray-100 mb-3">
+                  <View>
                     <Text className="text-textMuted text-[9px] font-black uppercase tracking-wider">Total Amount</Text>
                     <Text className="text-primary font-black text-base">LKR {item.totalAmount?.toLocaleString()}</Text>
                   </View>
+                  <View className="bg-gray-100 rounded-full px-2.5 py-1">
+                    <Text className="text-textSecondary text-[10px] font-bold">
+                      {(item.items || []).reduce((acc: number, cur: any) => acc + (cur.quantity || 1), 0)}{' '}
+                      {(item.items || []).reduce((acc: number, cur: any) => acc + (cur.quantity || 1), 0) === 1 ? 'item' : 'items'}
+                    </Text>
+                  </View>
+                </View>
 
-                  <View className="flex-row items-center gap-2">
-                    {ACTIVE_STATUSES.includes(item.status) && (
+                {/* Action Buttons Row */}
+                <View className="flex-row items-center gap-2 flex-wrap">
+                  {ACTIVE_STATUSES.includes(item.status) && (
+                    <TouchableOpacity
+                      key="btn-track"
+                      onPress={() => safeNavigate('OrderTracking', { orderId: item.id })}
+                      className="flex-1 min-w-[120px] px-3.5 py-2.5 rounded-xl border border-primary/30 bg-primary/10 flex-row items-center justify-center gap-1.5 shadow-xs"
+                      activeOpacity={0.7}
+                    >
+                      <Feather name="navigation" size={13} color="#FF6B35" />
+                      <Text className="text-primary font-extrabold text-xs">Track Order</Text>
+                    </TouchableOpacity>
+                  )}
+                  {item.status === 'DELIVERED' && (
+                    <>
                       <TouchableOpacity
-                        key="btn-track"
-                        onPress={() => safeNavigate('OrderTracking', { orderId: item.id })}
-                        className="px-3.5 py-2.5 rounded-xl border border-primary/30 bg-primary/10 flex-row items-center gap-1.5 shadow-xs"
+                        key="btn-review"
+                        onPress={() => setSelectedReviewOrder(item)}
+                        className="flex-1 min-w-[85px] px-3 py-2.5 rounded-xl border border-amber-300 bg-amber-50 flex-row items-center justify-center gap-1.5 shadow-xs"
                         activeOpacity={0.7}
                       >
-                        <Feather name="navigation" size={13} color="#FF6B35" />
-                        <Text className="text-primary font-extrabold text-xs">Track Order</Text>
+                        <Ionicons name="star" size={13} color="#F59E0B" />
+                        <Text className="text-amber-800 font-extrabold text-xs">Review</Text>
                       </TouchableOpacity>
-                    )}
-                    {item.status === 'DELIVERED' && (
+
                       <TouchableOpacity
                         key="btn-reorder"
                         onPress={() => handleReorder(item)}
-                        className="px-3.5 py-2.5 rounded-xl bg-primary flex-row items-center gap-1.5 shadow-xs"
+                        className="flex-1 min-w-[85px] px-3 py-2.5 rounded-xl bg-primary flex-row items-center justify-center gap-1.5 shadow-xs"
                         activeOpacity={0.7}
                       >
                         <Feather name="refresh-cw" size={13} color="#FFFFFF" />
                         <Text className="text-white font-extrabold text-xs">Reorder</Text>
                       </TouchableOpacity>
-                    )}
-                    <TouchableOpacity
-                      key="btn-receipt"
-                      onPress={() => setSelectedReceiptOrder(item)}
-                      className="px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50 flex-row items-center gap-1.5 shadow-xs"
-                      activeOpacity={0.7}
-                    >
-                      <Feather name="file-text" size={13} color="#1A1A2E" />
-                      <Text className="text-textPrimary font-extrabold text-xs">View Receipt</Text>
-                    </TouchableOpacity>
-                  </View>
+                    </>
+                  )}
+                  <TouchableOpacity
+                    key="btn-receipt"
+                    onPress={() => setSelectedReceiptOrder(item)}
+                    className="flex-1 min-w-[100px] px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 flex-row items-center justify-center gap-1.5 shadow-xs"
+                    activeOpacity={0.7}
+                  >
+                    <Feather name="file-text" size={13} color="#1A1A2E" />
+                    <Text className="text-textPrimary font-extrabold text-xs">Receipt</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             )}
@@ -544,6 +565,14 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
         visible={!!selectedReceiptOrder}
         order={selectedReceiptOrder}
         onClose={() => setSelectedReceiptOrder(null)}
+      />
+
+      {/* Order Review Modal */}
+      <OrderReviewModal
+        visible={!!selectedReviewOrder}
+        order={selectedReviewOrder}
+        onClose={() => setSelectedReviewOrder(null)}
+        onSuccess={() => fetchOrders()}
       />
     </View>
   );
