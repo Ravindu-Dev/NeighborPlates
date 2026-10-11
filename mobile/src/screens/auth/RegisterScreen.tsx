@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, Platform, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, Platform, Modal, Image } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
 import { TextInput } from '../../components/common/TextInput';
@@ -174,6 +174,12 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ route, navigatio
     <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="bg-surface-elevated">
       <View className="flex-1 justify-center p-6 my-6">
         <View className="mb-6 items-center">
+          <Image
+            source={require('../../../assets/Logo.png')}
+            style={{ width: 68, height: 68 }}
+            resizeMode="contain"
+            className="mb-2"
+          />
           <Text className="text-primary text-3xl font-extrabold tracking-tight">NeighborPlates</Text>
           <Text className="text-textSecondary text-xs mt-1 text-center">
             Register as a {role === 'COOK' ? 'Home Cook' : 'Customer'}
