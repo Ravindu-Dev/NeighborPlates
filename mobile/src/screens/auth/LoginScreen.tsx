@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, Image } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
 import { TextInput } from '../../components/common/TextInput';
@@ -32,9 +32,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   return (
     <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="bg-surface-elevated">
       <View className="flex-1 justify-center p-6">
-        <View className="mb-10 items-center">
-          <Text className="text-primary text-4xl font-extrabold tracking-tight">NeighborPlates</Text>
-          <Text className="text-textSecondary text-sm mt-2 text-center">
+        <View className="mb-8 items-center">
+          <Image
+            source={require('../../../assets/Logo.png')}
+            style={{ width: 84, height: 84 }}
+            resizeMode="contain"
+            className="mb-2"
+          />
+          <Text className="text-primary text-3xl font-extrabold tracking-tight">NeighborPlates</Text>
+          <Text className="text-textSecondary text-sm mt-1 text-center">
             Fresh local home-cooked meals at your doorstep
           </Text>
         </View>
