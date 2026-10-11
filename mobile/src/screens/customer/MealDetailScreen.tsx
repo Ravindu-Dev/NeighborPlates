@@ -7,6 +7,7 @@ import { api } from '../../services/api';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { useCartStore } from '../../store/cartStore';
+import { useFavoriteStore } from '../../store/favoriteStore';
 import { Ionicons, Feather } from '@expo/vector-icons';
 
 type MealDetailScreenProps = NativeStackScreenProps<CustomerStackParamList, 'MealDetail'>;
@@ -16,7 +17,9 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
   const [meal, setMeal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
-  const [isFavorite, setIsFavorite] = useState(false);
+  const isFavorite = useFavoriteStore((state) => state.isFavorite(mealId));
+  const toggleFavorite = useFavoriteStore((state) => state.toggleFavorite);
+  const [togglingFavorite, setTogglingFavorite] = useState(false);
 
   const fetchMealDetails = async () => {
     try {
@@ -33,6 +36,9 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
   useFocusEffect(
     useCallback(() => {
       fetchMealDetails();
+      if (!useFavoriteStore.getState().isLoaded) {
+        useFavoriteStore.getState().fetchFavoriteMeals();
+      }
     }, [mealId])
   );
 
@@ -138,14 +144,25 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => setIsFavorite(prev => !prev)}
-              className="w-10 h-10 rounded-full bg-white/90 items-center justify-center shadow-md border border-white/50"
+              onPress={async () => {
+                if (togglingFavorite) return;
+                setTogglingFavorite(true);
+                try {
+                  await toggleFavorite(mealId);
+                } catch (err) {
+                  Alert.alert('Notice', 'Could not update favorites. Please check your connection.');
+                } finally {
+                  setTogglingFavorite(false);
+                }
+              }}
+              disabled={togglingFavorite}
+              className="w-10 h-10 rounded-full bg-white/90 items-center justify-center shadow-md border border-white/50 active:scale-95"
               activeOpacity={0.8}
             >
               <Ionicons 
                 name={isFavorite ? "heart" : "heart-outline"} 
                 size={20} 
-                color={isFavorite ? "#E04E1A" : "#1A1A2E"} 
+                color={isFavorite ? "#FF6B35" : "#1A1A2E"} 
               />
             </TouchableOpacity>
           </View>

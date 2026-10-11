@@ -4,7 +4,7 @@ import { Badge } from '../common/Badge';
 import { Ionicons, Feather } from '@expo/vector-icons';
 
 interface MealCardProps {
-  id: string;
+  id?: string;
   name: string;
   price: number;
   category: string;
@@ -15,6 +15,8 @@ interface MealCardProps {
   layout?: 'grid' | 'full';
   onPress: () => void;
   onAddToCart?: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
 }
 
 export const MealCard: React.FC<MealCardProps> = ({
@@ -28,6 +30,8 @@ export const MealCard: React.FC<MealCardProps> = ({
   layout = 'grid',
   onPress,
   onAddToCart,
+  isFavorite = false,
+  onToggleFavorite,
 }) => {
   const hasPhoto = photos && photos.length > 0;
   const deliveryEst = "25-35 mins";
@@ -57,6 +61,24 @@ export const MealCard: React.FC<MealCardProps> = ({
           <View className="absolute top-3 left-3">
             <Badge label={category || 'Meal'} variant="primary" className="shadow-sm" />
           </View>
+
+          {/* Top-right Favorite Heart Button */}
+          {onToggleFavorite && (
+            <TouchableOpacity
+              onPress={(e: any) => {
+                e.stopPropagation();
+                onToggleFavorite();
+              }}
+              activeOpacity={0.8}
+              className="absolute top-3 right-3 bg-white/90 w-8 h-8 rounded-full items-center justify-center shadow-sm border border-white/60"
+            >
+              <Ionicons
+                name={isFavorite ? "heart" : "heart-outline"}
+                size={16}
+                color={isFavorite ? "#FF6B35" : "#1A1A2E"}
+              />
+            </TouchableOpacity>
+          )}
 
           {/* Plus Add to Cart Button */}
           {onAddToCart && portionsRemaining > 0 && (
@@ -134,6 +156,24 @@ export const MealCard: React.FC<MealCardProps> = ({
         <View className="absolute top-2 left-2">
           <Badge label={category || 'Meal'} variant="primary" className="shadow-xs" />
         </View>
+
+        {/* Top-right Favorite Heart Button */}
+        {onToggleFavorite && (
+          <TouchableOpacity
+            onPress={(e: any) => {
+              e.stopPropagation();
+              onToggleFavorite();
+            }}
+            activeOpacity={0.8}
+            className="absolute top-2 right-2 bg-white/90 w-7 h-7 rounded-full items-center justify-center shadow-xs border border-white/60"
+          >
+            <Ionicons
+              name={isFavorite ? "heart" : "heart-outline"}
+              size={14}
+              color={isFavorite ? "#FF6B35" : "#1A1A2E"}
+            />
+          </TouchableOpacity>
+        )}
 
         {/* Plus Add to Cart Floating Icon */}
         {onAddToCart && portionsRemaining > 0 && (
