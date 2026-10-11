@@ -1,6 +1,7 @@
 package com.neighborplates.service;
 
 import com.neighborplates.dto.request.PlaceOrderRequest;
+import com.neighborplates.dto.request.UpdateOrderRequest;
 import com.neighborplates.dto.response.OrderResponse;
 import com.neighborplates.exception.ResourceNotFoundException;
 import com.neighborplates.exception.UnauthorizedException;
@@ -462,5 +463,99 @@ public class OrderService {
                 cook != null && cook.getProfile() != null ? cook.getProfile().getName() : "Cook",
                 rider != null && rider.getProfile() != null ? rider.getProfile().getName() : null
         );
+    }
+
+    public OrderResponse updateOrder(String email, String orderId, UpdateOrderRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+
+        if (!order.getCustomerId().equals(user.getId()) && user.getRole() != UserRole.ADMIN) {
+            throw new UnauthorizedException("You are not authorized to update this order");
+        }
+
+        if (order.getStatus() != OrderStatus.PLACED) {
+            throw new IllegalArgumentException("Orders can only be modified before they are accepted by the kitchen (current stage: " + order.getStatus() + ")");
+        }
+
+        if (request.getSpecialInstructions() != null) {
+            order.setSpecialInstructions(request.getSpecialInstructions());
+        }
+
+        if (request.getAddress() != null) {
+            Order.DeliveryAddress address = new Order.DeliveryAddress();
+            address.setLabel(request.getAddress().getLabel());
+            if (request.getAddress().getCoordinates() != null) {
+                address.setCoordinates(request.getAddress().getCoordinates());
+            }
+            order.setAddress(address);
+        }
+
+        if (request.getDeliveryMethod() != null && !request.getDeliveryMethod().trim().isEmpty()) {
+            order.setDeliveryMethod(request.getDeliveryMethod());
+        }
+
+        if (request.getScheduledFor() != null) {
+            order.setScheduledFor(request.getScheduledFor());
+        }
+
+        order.setUpdatedAt(Instant.now());
+        Order savedOrder = orderRepository.save(order);
+
+        User customer = savedOrder.getCustomerId() != null ? userRepository.findById(savedOrder.getCustomerId()).orElse(null) : null;
+        User cook = savedOrder.getCookId() != null ? userRepository.findById(savedOrder.getCookId()).orElse(null) : null;
+        User rider = savedOrder.getRiderId() != null ? userRepository.findById(savedOrder.getRiderId()).orElse(null) : null;
+        return mapToOrderResponse(savedOrder, customer, cook, rider);
+    }
+
+    public void deleteOrder(String email, String orderId) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+
+        if (!order.getCustomerId().equals(user.getId()) && user.getRole() != UserRole.ADMIN) {
+            throw new UnauthorizedException("You are not authorized to delete this order");
+        }
+
+        if (order.getStatus() == OrderStatus.PLACED) {
+            // Restore meal portions
+            if (order.getItems() != null) {
+                for (Order.OrderItem item : order.getItems()) {
+                    if (item.getMealId() != null) {
+                        mealRepository.findById(item.getMealId()).ifPresent(meal -> {
+                            meal.setPortionsRemaining(meal.getPortionsRemaining() + item.getQuantity());
+                            meal.setTotalOrders(Math.max(0, meal.getTotalOrders() - item.getQuantity()));
+                            mealRepository.save(meal);
+                        });
+                    }
+                }
+            }
+            // Decrement user order count
+            if (user.getStats() != null) {
+                user.getStats().setTotalOrders(Math.max(0, user.getStats().getTotalOrders() - 1));
+                userRepository.save(user);
+            }
+            orderRepository.delete(order);
+        } else if (order.getStatus() == OrderStatus.DELIVERED || order.getStatus() == OrderStatus.CANCELLED) {
+            orderRepository.delete(order);
+        } else {
+            throw new IllegalArgumentException("Cannot delete an active order that is currently in progress (" + order.getStatus() + ")");
+        }
+    }
+
+    public int deleteAllDeliveredOrders(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        List<Order> deliveredOrders = orderRepository.findByCustomerIdAndStatus(user.getId(), OrderStatus.DELIVERED);
+        int count = deliveredOrders.size();
+        if (count > 0) {
+            orderRepository.deleteAll(deliveredOrders);
+        }
+        return count;
     }
 }

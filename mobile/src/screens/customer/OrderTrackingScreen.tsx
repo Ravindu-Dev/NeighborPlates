@@ -5,6 +5,7 @@ import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
 import { api } from '../../services/api';
 import { Button } from '../../components/common/Button';
 import { TextInput } from '../../components/common/TextInput';
+import { EditOrderModal } from '../../components/customer/EditOrderModal';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { pickImageFromGallery, uploadImageToImgBB } from '../../services/imageService';
 
@@ -134,6 +135,7 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
   const [disputeReason, setDisputeReason] = useState('Late Delivery');
   const [disputeDetails, setDisputeDetails] = useState('');
   const [disputeSubmitting, setDisputeSubmitting] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
 
   const handleReportDisputeSubmit = async () => {
     if (!disputeReason) {
@@ -212,13 +214,34 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
   const steps = ['PLACED', 'ACCEPTED', 'PREPARING', 'READY', 'DELIVERING', 'DELIVERED'];
   const currentStepIndex = steps.indexOf(order?.status || 'PLACED');
 
-  const handleCancel = async () => {
-    try {
-      await api.put(`/api/orders/${orderId}/status?status=CANCELLED`);
-      Alert.alert('Success', 'Order cancelled successfully.');
-      fetchOrder();
-    } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to cancel order.');
+  const handleCancel = () => {
+    const doCancel = async () => {
+      try {
+        await api.delete(`/api/orders/${orderId}`);
+        if (Platform.OS === 'web') {
+          window.alert('Order cancelled and removed successfully.');
+        } else {
+          Alert.alert('Success', 'Order cancelled and removed successfully.');
+        }
+        navigation.goBack();
+      } catch (error: any) {
+        Alert.alert('Error', error.response?.data?.message || 'Failed to cancel order.');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm('Are you sure you want to cancel this order? Any reserved portions will be returned to the kitchen.')) {
+        doCancel();
+      }
+    } else {
+      Alert.alert(
+        'Cancel Order',
+        'Are you sure you want to cancel this order? Any reserved portions will be returned to the kitchen.',
+        [
+          { text: 'Keep Order', style: 'cancel' },
+          { text: 'Cancel Order', style: 'destructive', onPress: doCancel },
+        ]
+      );
     }
   };
 
@@ -468,14 +491,22 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
           </View>
         </View>
 
-        {/* Cancellation / Review Forms */}
+        {/* Cancellation / Edit / Review Forms */}
         {order?.status === 'PLACED' ? (
-          <Button
-            title="CANCEL ORDER"
-            onPress={handleCancel}
-            variant="outline"
-            className="w-full mb-10 border-red-500 text-red-500"
-          />
+          <View className="flex-row gap-3 mb-10">
+            <Button
+              title="EDIT DETAILS"
+              onPress={() => setEditModalVisible(true)}
+              variant="outline"
+              className="flex-1 border-blue-500 text-blue-600"
+            />
+            <Button
+              title="CANCEL ORDER"
+              onPress={handleCancel}
+              variant="outline"
+              className="flex-1 border-red-500 text-red-500"
+            />
+          </View>
         ) : (
           renderReviewForm()
         )}
@@ -558,6 +589,16 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
           </View>
         </View>
       </Modal>
+      {/* Edit Pending Order Modal */}
+      <EditOrderModal
+        visible={editModalVisible}
+        order={order}
+        onClose={() => setEditModalVisible(false)}
+        onSuccess={() => {
+          setEditModalVisible(false);
+          fetchOrder();
+        }}
+      />
     </View>
   );
 };
