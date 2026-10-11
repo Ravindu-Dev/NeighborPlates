@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,21 +10,52 @@ import {
   ActivityIndicator,
   Modal,
   TextInput,
+  StyleSheet,
+  StatusBar,
+  Dimensions,
+  Animated,
+  RefreshControl,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Button } from '../../components/common/Button';
-import { SectionHeader } from '../../components/common/SectionHeader';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { Toast } from '../../components/common/Toast';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
-import { Ionicons, Feather } from '@expo/vector-icons';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// ─── Design Tokens ─────────────────────────────────────────────────────────────
+const C = {
+  dark:        '#0F1923',
+  darkMid:     '#132235',
+  darkCard:    '#162438',
+  darkBorder:  '#1E324D',
+  green:       '#2D6A4F',
+  greenLight:  '#52B788',
+  greenGlow:   '#40916C',
+  orange:      '#FF6B35',
+  amber:       '#F59E0B',
+  blue:        '#3B82F6',
+  blueLight:   '#60A5FA',
+  purple:      '#8B5CF6',
+  red:         '#EF4444',
+  redLight:    '#F87171',
+  white:       '#FFFFFF',
+  surface:     '#F4F7FB',
+  cardBg:      '#FFFFFF',
+  text1:       '#0F1923',
+  text2:       '#5A6E85',
+  text3:       '#94A3B8',
+  borderLight: '#E2E8F0',
+};
 
 const CATEGORY_ICONS: Record<string, string> = {
   BREAKFAST: '🥞',
-  LUNCH: '🍛',
-  DINNER: '🍲',
-  SNACK: '🍿',
-  COMBO: '🎁',
+  LUNCH:     '🍛',
+  DINNER:    '🍲',
+  SNACK:     '🍿',
+  COMBO:     '🎁',
 };
 
 export const CreateListingScreen: React.FC = () => {
@@ -33,17 +64,23 @@ export const CreateListingScreen: React.FC = () => {
 
   const [cookMeals, setCookMeals] = useState<any[]>([]);
   const [loadingMeals, setLoadingMeals] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
 
-  // Search & Filter state
+  // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'PAUSED'>('ALL');
 
-  // Portion quick modal and options modal state
+  // Modals
   const [portionModalMeal, setPortionModalMeal] = useState<any | null>(null);
   const [newPortionsCount, setNewPortionsCount] = useState<string>('10');
   const [savingPortions, setSavingPortions] = useState<boolean>(false);
   const [optionsModalMeal, setOptionsModalMeal] = useState<any | null>(null);
+
+  // Animation values
+  const heroOpacity = useRef(new Animated.Value(0)).current;
+  const heroSlide = useRef(new Animated.Value(-15)).current;
 
   const fetchCookMeals = async () => {
     try {
@@ -59,6 +96,7 @@ export const CreateListingScreen: React.FC = () => {
       console.error('Error fetching cook meals:', err);
     } finally {
       setLoadingMeals(false);
+      setRefreshing(false);
     }
   };
 
@@ -69,6 +107,20 @@ export const CreateListingScreen: React.FC = () => {
     });
     return unsubscribe;
   }, [navigation]);
+
+  useEffect(() => {
+    if (!loadingMeals) {
+      Animated.parallel([
+        Animated.timing(heroOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.spring(heroSlide, { toValue: 0, tension: 60, friction: 8, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [loadingMeals]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchCookMeals();
+  };
 
   const handleAddNewMeal = () => {
     navigation.navigate('AddMealForm');
@@ -130,7 +182,7 @@ export const CreateListingScreen: React.FC = () => {
         visible: true,
         message: nextActiveState
           ? `🟢 "${meal.name}" is now Available & taking orders!`
-          : `⏸️ "${meal.name}" is now Out of Stock`,
+          : `⏸️ "${meal.name}" is now Paused`,
         type: 'success',
       });
     } catch (err: any) {
@@ -184,10 +236,6 @@ export const CreateListingScreen: React.FC = () => {
     }
   };
 
-  const handleOpenMealOptions = (meal: any) => {
-    setOptionsModalMeal(meal);
-  };
-
   const handleDeleteCookMeal = async (mealId: string) => {
     const deleteAction = async () => {
       try {
@@ -213,6 +261,12 @@ export const CreateListingScreen: React.FC = () => {
     }
   };
 
+  // Metrics
+  const totalMeals = cookMeals.length;
+  const activeMeals = cookMeals.filter((m) => Boolean(m.active));
+  const pausedMeals = cookMeals.filter((m) => !m.active);
+  const totalPortionsAvailable = activeMeals.reduce((sum, m) => sum + (m.portionsRemaining ?? 0), 0);
+
   // Category counts
   const breakfastCount = cookMeals.filter((m) => m.category === 'BREAKFAST').length;
   const lunchCount = cookMeals.filter((m) => m.category === 'LUNCH').length;
@@ -220,22 +274,29 @@ export const CreateListingScreen: React.FC = () => {
   const snackCount = cookMeals.filter((m) => m.category === 'SNACK').length;
 
   const categoryChips = [
-    { key: 'ALL', label: `All (${cookMeals.length})`, icon: '🍽️' },
-    { key: 'BREAKFAST', label: `Breakfast (${breakfastCount})`, icon: '🥞' },
-    { key: 'LUNCH', label: `Lunch (${lunchCount})`, icon: '🍛' },
-    { key: 'DINNER', label: `Dinner (${dinnerCount})`, icon: '🍲' },
+    { key: 'ALL', label: 'All Dishes', count: cookMeals.length, icon: '🍽️' },
+    { key: 'BREAKFAST', label: 'Breakfast', count: breakfastCount, icon: '🥞' },
+    { key: 'LUNCH', label: 'Lunch', count: lunchCount, icon: '🍛' },
+    { key: 'DINNER', label: 'Dinner', count: dinnerCount, icon: '🍲' },
   ];
   if (snackCount > 0) {
-    categoryChips.push({ key: 'SNACK', label: `Snacks (${snackCount})`, icon: '🍿' });
+    categoryChips.push({ key: 'SNACK', label: 'Snacks', count: snackCount, icon: '🍿' });
   }
 
-  // Filtered Meals logic
+  // Filtered Meals
   const filteredMeals = cookMeals.filter((meal) => {
-    const matchesCategory =
-      selectedCategory === 'ALL' || meal.category === selectedCategory;
+    // Category match
+    const matchesCategory = selectedCategory === 'ALL' || meal.category === selectedCategory;
 
+    // Status filter match
+    const matchesStatus =
+      statusFilter === 'ALL' ||
+      (statusFilter === 'ACTIVE' && Boolean(meal.active)) ||
+      (statusFilter === 'PAUSED' && !meal.active);
+
+    // Search query match
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return matchesCategory;
+    if (!query) return matchesCategory && matchesStatus;
 
     const matchesQuery =
       (meal.name || '').toLowerCase().includes(query) ||
@@ -244,11 +305,12 @@ export const CreateListingScreen: React.FC = () => {
       (meal.category || '').toLowerCase().includes(query) ||
       (meal.ingredients || []).some((ing: string) => ing.toLowerCase().includes(query));
 
-    return matchesCategory && matchesQuery;
+    return matchesCategory && matchesStatus && matchesQuery;
   });
 
   return (
-    <View className="flex-1 bg-surface-elevated">
+    <View style={S.container}>
+      <StatusBar barStyle="light-content" backgroundColor={C.dark} />
       <Toast
         message={toast.message}
         type={toast.type}
@@ -256,101 +318,164 @@ export const CreateListingScreen: React.FC = () => {
         onDismiss={() => setToast({ ...toast, visible: false })}
       />
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        <View className="px-5 pt-14 pb-6">
-          {/* ─── Screen Header ─── */}
-          <View className="flex-row justify-between items-center mb-5">
-            <View>
-              <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider">
-                COOK FOOD MANAGEMENT
-              </Text>
-              <Text className="text-textPrimary font-extrabold text-2xl mt-0.5">
-                My Meals 🍛
-              </Text>
+      <ScrollView
+        style={S.scroll}
+        contentContainerStyle={S.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={C.greenLight}
+            colors={[C.greenLight]}
+            progressBackgroundColor={C.darkCard}
+          />
+        }
+      >
+        {/* ─── Hero Header Banner ─── */}
+        <LinearGradient
+          colors={['#0F1923', '#0D2137', '#0F2B1A']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={S.hero}
+        >
+          <View style={S.blobTopRight} />
+          <View style={S.blobBottomLeft} />
+
+          <Animated.View
+            style={[
+              S.heroContent,
+              {
+                opacity: heroOpacity,
+                transform: [{ translateY: heroSlide }],
+              },
+            ]}
+          >
+            {/* Top Pill / Badge */}
+            <View style={S.heroBadgeRow}>
+              <View style={S.heroTagPill}>
+                <Ionicons name="restaurant" size={12} color={C.greenLight} style={{ marginRight: 5 }} />
+                <Text style={S.heroTagText}>CHEF MENU HUB</Text>
+              </View>
+
+              <View style={S.kitchenIndicator}>
+                <View style={[S.liveDot, { backgroundColor: activeMeals.length > 0 ? '#10B981' : '#F59E0B' }]} />
+                <Text style={S.kitchenIndicatorText}>
+                  {activeMeals.length > 0 ? `${activeMeals.length} Dishes Live` : 'Kitchen Idle'}
+                </Text>
+              </View>
             </View>
-          </View>
 
-          {/* ─── Combo Deals & Add New Meals Options ─── */}
-          <View className="mb-5">
-            {/* Create Combo Deal Banner */}
-            <TouchableOpacity
-              onPress={() => navigation.navigate('ComboDeals')}
-              activeOpacity={0.85}
-              className="bg-secondary rounded-3xl py-4 px-5 mb-3.5 flex-row items-center"
-              style={{
-                shadowColor: '#2D6A4F',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.25,
-                shadowRadius: 10,
-                elevation: 6,
-              }}
-            >
-              <View className="w-12 h-12 rounded-2xl bg-white/20 items-center justify-center mr-4">
-                <Text className="text-2xl">🎁</Text>
-              </View>
-              <View className="flex-1">
-                <Text className="text-white font-extrabold text-sm tracking-wide">
-                  CREATE COMBO DEAL
-                </Text>
-                <Text className="text-white/70 text-[10px] mt-0.5">
-                  AI-powered bundled meal packages • Boost your sales
-                </Text>
-              </View>
-              <View className="bg-white/20 rounded-full w-8 h-8 items-center justify-center">
-                <Ionicons name="sparkles" size={16} color="#FBBF24" />
-              </View>
-            </TouchableOpacity>
+            {/* Header Titles */}
+            <Text style={S.heroTitle}>Culinary Listings</Text>
+            <Text style={S.heroSubtitle}>
+              Craft your offerings, schedule meal drops, and adjust portions in real-time.
+            </Text>
 
-            {/* Add New Meals Button (Positioned to the right and below) */}
-            <View className="flex-row justify-end">
+            {/* Quick Metrics Bar */}
+            <View style={S.metricsBar}>
+              <View style={S.metricItem}>
+                <Text style={S.metricVal}>{totalMeals}</Text>
+                <Text style={S.metricLbl}>Total Dishes</Text>
+              </View>
+              <View style={S.metricSep} />
+              <View style={S.metricItem}>
+                <Text style={[S.metricVal, { color: C.greenLight }]}>{activeMeals.length}</Text>
+                <Text style={S.metricLbl}>Taking Orders</Text>
+              </View>
+              <View style={S.metricSep} />
+              <View style={S.metricItem}>
+                <Text style={[S.metricVal, { color: C.blueLight }]}>{totalPortionsAvailable}</Text>
+                <Text style={S.metricLbl}>Portions Left</Text>
+              </View>
+            </View>
+
+            {/* Action Bar (Add Meal Button + Combo Deals) */}
+            <View style={S.actionRow}>
+              {/* Primary Add Dish Button */}
               <TouchableOpacity
                 onPress={handleAddNewMeal}
-                activeOpacity={0.85}
-                className="flex-row items-center px-4 py-2.5 rounded-2xl shadow-sm bg-primary"
-                style={{
-                  shadowColor: '#FF6B35',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.25,
-                  shadowRadius: 4,
-                  elevation: 3,
-                }}
+                activeOpacity={0.88}
+                style={S.addDishBtn}
               >
-                <Ionicons
-                  name="add-circle"
-                  size={18}
-                  color="#FFFFFF"
-                  style={{ marginRight: 6 }}
-                />
-                <Text className="font-extrabold text-xs tracking-wide text-white">
-                  Add New Meals
-                </Text>
+                <LinearGradient
+                  colors={[C.greenLight, C.green]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={S.addDishGradient}
+                >
+                  <View style={S.addIconWrap}>
+                    <Feather name="plus" size={18} color={C.white} />
+                  </View>
+                  <Text style={S.addDishText}>Add New Dish</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Combo Deals Button */}
+              <TouchableOpacity
+                onPress={() => navigation.navigate('ComboDeals')}
+                activeOpacity={0.85}
+                style={S.comboBtn}
+              >
+                <LinearGradient
+                  colors={['#1E293B', '#0F172A']}
+                  style={S.comboGradient}
+                >
+                  <Text style={{ fontSize: 16, marginRight: 6 }}>🎁</Text>
+                  <Text style={S.comboText}>Combos</Text>
+                  <View style={S.sparkleBadge}>
+                    <Ionicons name="sparkles" size={10} color="#FBBF24" />
+                  </View>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
-          </View>
+          </Animated.View>
+        </LinearGradient>
 
-          {/* ─── Search Bar ─── */}
-          <View className="flex-row items-center bg-white px-4 py-2.5 rounded-2xl border border-gray-200 mb-3.5 shadow-xs">
-            <Feather name="search" size={17} color="#6B7280" style={{ marginRight: 8 }} />
+        {/* ─── Search & Filters Bar ─── */}
+        <View style={S.filtersContainer}>
+          {/* Search Box */}
+          <View style={S.searchBox}>
+            <Feather name="search" size={16} color={C.text3} style={{ marginRight: 8 }} />
             <TextInput
-              placeholder="Search meals by name, cuisine, ingredients..."
-              placeholderTextColor="#9CA3AF"
+              placeholder="Search by meal name, ingredients, or cuisine..."
+              placeholderTextColor={C.text3}
               value={searchQuery}
               onChangeText={setSearchQuery}
-              className="flex-1 text-xs font-semibold text-textPrimary py-1"
+              style={S.searchInput}
             />
             {searchQuery.trim().length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')} className="p-1">
-                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+              <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 4 }}>
+                <Ionicons name="close-circle" size={18} color={C.text3} />
               </TouchableOpacity>
             )}
           </View>
 
-          {/* ─── Category Filter Chips ─── */}
+          {/* Status Filter Chips (All, Live Now, Paused) */}
+          <View style={S.statusRow}>
+            {(['ALL', 'ACTIVE', 'PAUSED'] as const).map((st) => {
+              const active = statusFilter === st;
+              const labels = { ALL: 'All Statuses', ACTIVE: '🟢 Live Now', PAUSED: '⏸️ Paused' };
+              return (
+                <TouchableOpacity
+                  key={st}
+                  onPress={() => setStatusFilter(st)}
+                  activeOpacity={0.75}
+                  style={[S.statusChip, active && S.statusChipActive]}
+                >
+                  <Text style={[S.statusChipText, active && S.statusChipTextActive]}>
+                    {labels[st]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Category Chips ScrollView */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            className="-mx-1 mb-5"
-            contentContainerStyle={{ paddingHorizontal: 2 }}
+            contentContainerStyle={S.categoriesScroll}
           >
             {categoryChips.map((cat) => {
               const isSelected = selectedCategory === cat.key;
@@ -359,269 +484,283 @@ export const CreateListingScreen: React.FC = () => {
                   key={cat.key}
                   onPress={() => setSelectedCategory(cat.key)}
                   activeOpacity={0.8}
-                  className={`flex-row items-center px-4 py-2 rounded-2xl mr-2.5 border ${
-                    isSelected
-                      ? 'bg-secondary border-secondary shadow-xs'
-                      : 'bg-white border-gray-200 shadow-xs'
-                  }`}
+                  style={[S.catChip, isSelected && S.catChipActive]}
                 >
-                  <Text className="mr-1.5 text-xs">{cat.icon}</Text>
-                  <Text
-                    className={`text-xs font-extrabold ${
-                      isSelected ? 'text-white' : 'text-textPrimary'
-                    }`}
-                  >
+                  <Text style={{ fontSize: 13, marginRight: 6 }}>{cat.icon}</Text>
+                  <Text style={[S.catLabel, isSelected && S.catLabelActive]}>
                     {cat.label}
                   </Text>
+                  <View style={[S.catCountBadge, isSelected && S.catCountBadgeActive]}>
+                    <Text style={[S.catCountText, isSelected && S.catCountTextActive]}>
+                      {cat.count}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
+        </View>
 
-          {/* ─── All Added Meals Section ─── */}
-          <View className="mb-6">
-            <SectionHeader
-              title={selectedCategory === 'ALL' ? 'All Added Meals' : `${selectedCategory.charAt(0) + selectedCategory.slice(1).toLowerCase()} Meals`}
-              icon="🍛"
-              actionLabel={filteredMeals.length > 0 ? `${filteredMeals.length} item${filteredMeals.length !== 1 ? 's' : ''}` : undefined}
-            />
-
-            {loadingMeals ? (
-              <View className="py-8 items-center justify-center">
-                <ActivityIndicator size="small" color="#FF6B35" />
-                <Text className="text-textMuted text-xs mt-2 font-medium">Loading your meals...</Text>
-              </View>
-            ) : cookMeals.length === 0 ? (
-              <View className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm items-center text-center">
-                <Text className="text-4xl mb-3">🍽️</Text>
-                <Text className="text-textPrimary font-extrabold text-base text-center mb-1">
-                  No Meals Added Yet
-                </Text>
-                <Text className="text-textSecondary text-xs text-center leading-4 px-4 mb-4">
-                  Click 'Add New Meals' above to list your first delicious home-cooked dish!
-                </Text>
-                <TouchableOpacity
-                  onPress={handleAddNewMeal}
-                  className="bg-primary px-5 py-2.5 rounded-2xl"
-                >
-                  <Text className="text-white font-bold text-xs">Add First Meal</Text>
-                </TouchableOpacity>
-              </View>
-            ) : filteredMeals.length === 0 ? (
-              <View className="bg-white rounded-3xl p-7 border border-gray-100 shadow-sm items-center text-center">
-                <Text className="text-3xl mb-2">🔍</Text>
-                <Text className="text-textPrimary font-extrabold text-sm text-center mb-1">
-                  No Matching Meals Found
-                </Text>
-                <Text className="text-textSecondary text-xs text-center leading-4 px-4 mb-3">
-                  {searchQuery.trim()
-                    ? `No meals found for "${searchQuery}" in this category.`
-                    : `No meals added under ${selectedCategory} category yet.`}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setSearchQuery('');
-                    setSelectedCategory('ALL');
-                  }}
-                  className="bg-gray-100 px-4 py-2 rounded-xl"
-                >
-                  <Text className="text-textPrimary font-bold text-xs">Clear Filters</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View className="mt-1">
-                {filteredMeals.map((meal) => {
-                  const isAvailable = Boolean(meal.active);
-                  const portionsLeft = meal.portionsRemaining ?? meal.portionLimit ?? 10;
-                  const prepTimeText = meal.availability?.servingTime
-                    ? `${meal.availability.servingTime} prep`
-                    : '25 min prep';
-
-                  return (
-                    <View
-                      key={meal.id}
-                      className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-5"
-                    >
-                      {/* ─── Top Food Image Container ─── */}
-                      <View className="h-48 w-full relative bg-gray-100">
-                        {meal.photos && meal.photos.length > 0 ? (
-                          <Image
-                            source={{ uri: meal.photos[0] }}
-                            className="w-full h-full"
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <View className="w-full h-full bg-secondary/10 items-center justify-center">
-                            <Text className="text-5xl">
-                              {CATEGORY_ICONS[meal.category] || '🍛'}
-                            </Text>
-                          </View>
-                        )}
-
-                        {/* Top-Left Badge (AVAILABLE when Switch is ON, OUT OF STOCK when Switch is OFF) */}
-                        <View
-                          className="absolute top-3.5 left-3.5 px-3 py-1.5 rounded-full flex-row items-center shadow-xs"
-                          style={{
-                            backgroundColor: isAvailable ? '#D1FAE5' : '#FEF3C7',
-                          }}
-                        >
-                          <View
-                            className="w-2.5 h-2.5 rounded-full mr-1.5"
-                            style={{
-                              backgroundColor: isAvailable ? '#059669' : '#D97706',
-                            }}
-                          />
-                          <Text
-                            className="font-extrabold text-[11px] tracking-wider"
-                            style={{
-                              color: isAvailable ? '#065F46' : '#92400E',
-                            }}
-                          >
-                            {isAvailable ? 'AVAILABLE' : 'OUT OF STOCK'}
-                          </Text>
-                        </View>
-
-                        {/* Bottom-Right Portions Remaining Badge */}
-                        <View
-                          className="absolute bottom-3.5 right-3.5 px-3.5 py-1.5 rounded-full flex-row items-center border border-gray-100/70 shadow-sm"
-                          style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)' }}
-                        >
-                          <Feather
-                            name="box"
-                            size={13}
-                            color={isAvailable ? '#065F46' : '#92400E'}
-                            style={{ marginRight: 6 }}
-                          />
-                          <Text
-                            className="font-bold text-xs"
-                            style={{
-                              color: isAvailable ? '#065F46' : '#92400E',
-                            }}
-                          >
-                            {isAvailable
-                              ? `${portionsLeft > 0 ? portionsLeft : 10} portions remaining`
-                              : '0 portions (Out of Stock)'}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* ─── Card Body Details ─── */}
-                      <View className="p-4">
-                        {/* Row 1: Name & Taking Orders Toggle Switch */}
-                        <View className="flex-row justify-between items-center mb-1.5">
-                          <Text
-                            className="text-textPrimary font-extrabold text-lg flex-1 mr-2"
-                            numberOfLines={1}
-                          >
-                            {meal.name}
-                          </Text>
-
-                          <View className="flex-row items-center">
-                            <Text
-                              className="font-bold text-xs mr-2"
-                              style={{ color: isAvailable ? '#166534' : '#6B7280' }}
-                            >
-                              {isAvailable ? 'Taking Orders' : 'Out of Stock'}
-                            </Text>
-                            {/* Reliable Animated Toggle Switch */}
-                            <TouchableOpacity
-                              activeOpacity={0.8}
-                              onPress={() => handleToggleTakingOrders(meal)}
-                              style={{
-                                width: 48,
-                                height: 26,
-                                borderRadius: 13,
-                                padding: 2,
-                                justifyContent: 'center',
-                                backgroundColor: isAvailable ? '#166534' : '#D1D5DB',
-                              }}
-                            >
-                              <View
-                                style={{
-                                  width: 22,
-                                  height: 22,
-                                  borderRadius: 11,
-                                  backgroundColor: '#FFFFFF',
-                                  shadowColor: '#000',
-                                  shadowOffset: { width: 0, height: 1 },
-                                  shadowOpacity: 0.25,
-                                  shadowRadius: 2,
-                                  elevation: 2,
-                                  transform: [{ translateX: isAvailable ? 22 : 0 }],
-                                }}
-                              />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-
-                        {/* Row 2: Price & Prep Time */}
-                        <View className="flex-row items-center mb-2">
-                          <Text className="text-[#166534] font-black text-sm">
-                            Rs. {meal.price}
-                          </Text>
-                          <Text className="text-gray-400 mx-2 text-xs">•</Text>
-                          <Feather name="clock" size={12} color="#6B7280" style={{ marginRight: 4 }} />
-                          <Text className="text-textMuted font-medium text-xs">
-                            {prepTimeText}
-                          </Text>
-                        </View>
-
-                        {/* Row 3: Description */}
-                        <Text
-                          className="text-textSecondary text-xs leading-4 mb-4"
-                          numberOfLines={2}
-                        >
-                          {meal.description || 'Traditional freshly prepared homemade delicacy.'}
-                        </Text>
-
-                        {/* Row 4: Action Buttons (Edit Meal, Sliders, More Actions) */}
-                        <View className="flex-row items-center">
-                          <TouchableOpacity
-                            onPress={() => handleEditCookMeal(meal)}
-                            activeOpacity={0.8}
-                            className="flex-1 bg-[#EAF2ED] py-3 rounded-2xl flex-row items-center justify-center mr-2.5"
-                          >
-                            <Feather
-                              name="edit-3"
-                              size={14}
-                              color="#1E293B"
-                              style={{ marginRight: 6 }}
-                            />
-                            <Text className="text-textPrimary font-bold text-xs">
-                              Edit Meal
-                            </Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            onPress={() => handleOpenPortionModal(meal)}
-                            activeOpacity={0.8}
-                            className="w-11 h-11 bg-[#EAF2ED] rounded-2xl items-center justify-center mr-2"
-                          >
-                            <Feather name="sliders" size={16} color="#1E293B" />
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            onPress={() => handleOpenMealOptions(meal)}
-                            activeOpacity={0.8}
-                            className="w-11 h-11 bg-[#EAF2ED] rounded-2xl items-center justify-center"
-                          >
-                            <Feather name="more-vertical" size={16} color="#1E293B" />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            )}
+        {/* ─── Meals List Section ─── */}
+        <View style={S.mealsListContainer}>
+          <View style={S.sectionHeader}>
+            <View>
+              <Text style={S.sectionTitle}>
+                {selectedCategory === 'ALL'
+                  ? 'All Listed Dishes'
+                  : `${selectedCategory.charAt(0) + selectedCategory.slice(1).toLowerCase()} Specialties`}
+              </Text>
+              <Text style={S.sectionSub}>
+                {filteredMeals.length} {filteredMeals.length === 1 ? 'dish' : 'dishes'} match your current filter
+              </Text>
+            </View>
           </View>
 
-          {/* Bottom spacer */}
-          <View className="h-8" />
+          {loadingMeals && !refreshing ? (
+            <View style={S.loadingCard}>
+              <ActivityIndicator size="small" color={C.greenLight} />
+              <Text style={S.loadingText}>Syncing kitchen menu...</Text>
+            </View>
+          ) : cookMeals.length === 0 ? (
+            <View style={S.emptyCard}>
+              <View style={S.emptyIconWrap}>
+                <Text style={{ fontSize: 44 }}>🍲</Text>
+              </View>
+              <Text style={S.emptyTitle}>Your Kitchen is Ready!</Text>
+              <Text style={S.emptyDesc}>
+                You haven't added any dishes to your menu yet. Add your signature recipes to start receiving orders from neighbors.
+              </Text>
+              <TouchableOpacity
+                onPress={handleAddNewMeal}
+                activeOpacity={0.85}
+                style={S.emptyAddBtn}
+              >
+                <LinearGradient
+                  colors={[C.greenLight, C.green]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={S.emptyAddGradient}
+                >
+                  <Feather name="plus-circle" size={16} color={C.white} style={{ marginRight: 6 }} />
+                  <Text style={S.emptyAddText}>Create First Meal Listing</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          ) : filteredMeals.length === 0 ? (
+            <View style={S.emptyFilterCard}>
+              <Text style={{ fontSize: 36, marginBottom: 8 }}>🔍</Text>
+              <Text style={S.emptyTitle}>No Matching Dishes</Text>
+              <Text style={S.emptyDesc}>
+                {searchQuery.trim()
+                  ? `No dishes matched "${searchQuery}". Try adjusting your keywords or category filter.`
+                  : `No dishes found under ${selectedCategory} with status "${statusFilter}".`}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('ALL');
+                  setStatusFilter('ALL');
+                }}
+                style={S.resetFiltersBtn}
+              >
+                <Text style={S.resetFiltersText}>Reset All Filters</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            filteredMeals.map((meal) => {
+              const isAvailable = Boolean(meal.active);
+              const portionsLeft = meal.portionsRemaining ?? meal.portionLimit ?? 10;
+              const maxPortions = Math.max(meal.portionLimit || 10, portionsLeft);
+              const portionPct = maxPortions > 0 ? (portionsLeft / maxPortions) * 100 : 0;
+              const prepTimeText = meal.availability?.servingTime
+                ? `${meal.availability.servingTime} ready`
+                : '30m prep';
+
+              return (
+                <View key={meal.id} style={S.mealCard}>
+                  {/* Photo Container */}
+                  <View style={S.mealPhotoContainer}>
+                    {meal.photos && meal.photos.length > 0 ? (
+                      <Image
+                        source={{ uri: meal.photos[0] }}
+                        style={S.mealPhoto}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <LinearGradient
+                        colors={['#162438', '#0F1923']}
+                        style={S.mealPhotoPlaceholder}
+                      >
+                        <Text style={{ fontSize: 52 }}>
+                          {CATEGORY_ICONS[meal.category] || '🍛'}
+                        </Text>
+                      </LinearGradient>
+                    )}
+
+                    {/* Gradient scrim for text readability */}
+                    <LinearGradient
+                      colors={['transparent', 'rgba(15, 25, 35, 0.85)']}
+                      style={S.photoScrim}
+                    />
+
+                    {/* Top Status Badge (Live vs Paused) */}
+                    <View
+                      style={[
+                        S.statusBadge,
+                        {
+                          backgroundColor: isAvailable ? 'rgba(16, 185, 129, 0.95)' : 'rgba(245, 158, 11, 0.95)',
+                        },
+                      ]}
+                    >
+                      <View style={[S.statusBadgeDot, { backgroundColor: isAvailable ? '#FFFFFF' : '#78350F' }]} />
+                      <Text style={[S.statusBadgeText, { color: isAvailable ? '#FFFFFF' : '#451A03' }]}>
+                        {isAvailable ? 'LIVE & AVAILABLE' : 'PAUSED'}
+                      </Text>
+                    </View>
+
+                    {/* Category Tag (Top Right) */}
+                    <View style={S.categoryTag}>
+                      <Text style={S.categoryTagText}>
+                        {CATEGORY_ICONS[meal.category] || '🍽️'} {meal.category}
+                      </Text>
+                    </View>
+
+                    {/* Bottom Photo Overlay Info (Portions left) */}
+                    <View style={S.photoBottomBar}>
+                      <View style={S.portionsPill}>
+                        <Feather name="package" size={12} color={isAvailable ? C.greenLight : C.amber} style={{ marginRight: 5 }} />
+                        <Text style={[S.portionsText, { color: isAvailable ? '#E8F5E9' : '#FEF3C7' }]}>
+                          {isAvailable ? `${portionsLeft} portions left` : 'Sold out / Inactive'}
+                        </Text>
+                      </View>
+
+                      {meal.cuisineType && (
+                        <View style={S.cuisinePill}>
+                          <Text style={S.cuisineText}>{meal.cuisineType}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Portions Capacity Progress Bar */}
+                  {isAvailable && (
+                    <View style={S.capacityBarBg}>
+                      <View
+                        style={[
+                          S.capacityBarFill,
+                          {
+                            width: `${Math.min(portionPct, 100)}%`,
+                            backgroundColor: portionPct > 30 ? C.greenLight : C.amber,
+                          },
+                        ]}
+                      />
+                    </View>
+                  )}
+
+                  {/* Meal Content Details */}
+                  <View style={S.mealBody}>
+                    {/* Header Row: Title & Toggle */}
+                    <View style={S.titleRow}>
+                      <View style={{ flex: 1, marginRight: 12 }}>
+                        <Text style={S.mealTitle} numberOfLines={1}>
+                          {meal.name}
+                        </Text>
+                        <View style={S.metaRow}>
+                          <Text style={S.mealPrice}>LKR {Number(meal.price || 0).toLocaleString()}</Text>
+                          <Text style={S.metaDot}>•</Text>
+                          <Feather name="clock" size={12} color={C.text2} style={{ marginRight: 4 }} />
+                          <Text style={S.metaTime}>{prepTimeText}</Text>
+                        </View>
+                      </View>
+
+                      {/* Taking Orders Toggle */}
+                      <View style={S.toggleWrapper}>
+                        <Text style={[S.toggleLabel, { color: isAvailable ? C.green : C.text2 }]}>
+                          {isAvailable ? 'Live' : 'Off'}
+                        </Text>
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          onPress={() => handleToggleTakingOrders(meal)}
+                          style={[
+                            S.toggleTrack,
+                            { backgroundColor: isAvailable ? C.green : '#CBD5E1' },
+                          ]}
+                        >
+                          <View
+                            style={[
+                              S.toggleThumb,
+                              { transform: [{ translateX: isAvailable ? 20 : 0 }] },
+                            ]}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Description */}
+                    <Text style={S.mealDesc} numberOfLines={2}>
+                      {meal.description || 'Delicious, freshly made home recipe prepared with premium ingredients.'}
+                    </Text>
+
+                    {/* Ingredients Chips Preview */}
+                    {meal.ingredients && meal.ingredients.length > 0 && (
+                      <View style={S.ingWrap}>
+                        {meal.ingredients.slice(0, 3).map((ing: string, i: number) => (
+                          <View key={i} style={S.ingChip}>
+                            <Text style={S.ingText} numberOfLines={1}>{ing}</Text>
+                          </View>
+                        ))}
+                        {meal.ingredients.length > 3 && (
+                          <View style={S.ingChipMore}>
+                            <Text style={S.ingMoreText}>+{meal.ingredients.length - 3}</Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+
+                    {/* Action Buttons Toolbar */}
+                    <View style={S.actionToolbar}>
+                      {/* Edit Details */}
+                      <TouchableOpacity
+                        onPress={() => handleEditCookMeal(meal)}
+                        activeOpacity={0.8}
+                        style={S.editBtn}
+                      >
+                        <Feather name="edit-3" size={14} color={C.green} style={{ marginRight: 6 }} />
+                        <Text style={S.editBtnText}>Edit Details</Text>
+                      </TouchableOpacity>
+
+                      {/* Quick Portions Adjuster */}
+                      <TouchableOpacity
+                        onPress={() => handleOpenPortionModal(meal)}
+                        activeOpacity={0.8}
+                        style={S.portionsBtn}
+                        accessibilityLabel="Adjust Portions"
+                      >
+                        <Feather name="sliders" size={15} color={C.text1} />
+                        <Text style={S.portionsBtnText}>Portions</Text>
+                      </TouchableOpacity>
+
+                      {/* Options Menu */}
+                      <TouchableOpacity
+                        onPress={() => setOptionsModalMeal(meal)}
+                        activeOpacity={0.8}
+                        style={S.moreBtn}
+                        accessibilityLabel="More Options"
+                      >
+                        <Feather name="more-vertical" size={16} color={C.text1} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              );
+            })
+          )}
         </View>
+
+        <View style={{ height: 60 }} />
       </ScrollView>
 
-      {/* ─── Options / Action Sheet Modal ─── */}
+      {/* ─── Deluxe Action Sheet Modal ─── */}
       <Modal
         visible={!!optionsModalMeal}
         transparent
@@ -631,14 +770,14 @@ export const CreateListingScreen: React.FC = () => {
         <TouchableOpacity
           activeOpacity={1}
           onPress={() => setOptionsModalMeal(null)}
-          className="flex-1 bg-black/50 justify-end"
+          style={S.modalOverlay}
         >
-          <View className="bg-white rounded-t-3xl p-5 pb-8">
-            <View className="w-12 h-1.5 bg-gray-200 rounded-full self-center mb-4" />
-            <Text className="text-textPrimary font-extrabold text-base mb-1">
+          <View style={S.actionSheet}>
+            <View style={S.sheetHandle} />
+            <Text style={S.sheetTitle} numberOfLines={1}>
               {optionsModalMeal?.name}
             </Text>
-            <Text className="text-textMuted text-xs mb-4">Manage this meal listing</Text>
+            <Text style={S.sheetSub}>Listing management & controls</Text>
 
             <TouchableOpacity
               onPress={() => {
@@ -646,10 +785,16 @@ export const CreateListingScreen: React.FC = () => {
                 setOptionsModalMeal(null);
                 handleEditCookMeal(m);
               }}
-              className="flex-row items-center py-3.5 border-b border-gray-100"
+              style={S.sheetRow}
             >
-              <Feather name="edit-3" size={18} color="#3B82F6" style={{ marginRight: 12 }} />
-              <Text className="text-textPrimary font-bold text-sm">Edit Full Details</Text>
+              <View style={[S.sheetIconBox, { backgroundColor: '#EFF6FF' }]}>
+                <Feather name="edit-3" size={16} color={C.blue} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={S.sheetRowTitle}>Edit Full Details</Text>
+                <Text style={S.sheetRowSub}>Update title, description, photos, and recipe tags</Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={C.text3} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -658,10 +803,16 @@ export const CreateListingScreen: React.FC = () => {
                 setOptionsModalMeal(null);
                 handleOpenPortionModal(m);
               }}
-              className="flex-row items-center py-3.5 border-b border-gray-100"
+              style={S.sheetRow}
             >
-              <Feather name="sliders" size={18} color="#059669" style={{ marginRight: 12 }} />
-              <Text className="text-textPrimary font-bold text-sm">Adjust Portions Remaining</Text>
+              <View style={[S.sheetIconBox, { backgroundColor: '#ECFDF5' }]}>
+                <Feather name="sliders" size={16} color={C.green} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={S.sheetRowTitle}>Adjust Remaining Portions</Text>
+                <Text style={S.sheetRowSub}>Set how many plates are available today</Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={C.text3} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -670,12 +821,22 @@ export const CreateListingScreen: React.FC = () => {
                 setOptionsModalMeal(null);
                 handleToggleTakingOrders(m);
               }}
-              className="flex-row items-center py-3.5 border-b border-gray-100"
+              style={S.sheetRow}
             >
-              <Feather name="power" size={18} color="#F59E0B" style={{ marginRight: 12 }} />
-              <Text className="text-textPrimary font-bold text-sm">
-                {optionsModalMeal?.active ? 'Pause Taking Orders' : 'Resume Taking Orders'}
-              </Text>
+              <View style={[S.sheetIconBox, { backgroundColor: '#FFFBEB' }]}>
+                <Feather name="power" size={16} color={C.amber} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={S.sheetRowTitle}>
+                  {optionsModalMeal?.active ? 'Pause Taking Orders' : 'Resume Taking Orders'}
+                </Text>
+                <Text style={S.sheetRowSub}>
+                  {optionsModalMeal?.active
+                    ? 'Temporarily hide from customer browsing'
+                    : 'Make visible to hungry neighbors'}
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={C.text3} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -684,23 +845,29 @@ export const CreateListingScreen: React.FC = () => {
                 setOptionsModalMeal(null);
                 if (id) handleDeleteCookMeal(id);
               }}
-              className="flex-row items-center py-3.5"
+              style={[S.sheetRow, { borderBottomWidth: 0 }]}
             >
-              <Feather name="trash-2" size={18} color="#EF4444" style={{ marginRight: 12 }} />
-              <Text className="text-red-500 font-bold text-sm">Delete Meal Listing</Text>
+              <View style={[S.sheetIconBox, { backgroundColor: '#FEF2F2' }]}>
+                <Feather name="trash-2" size={16} color={C.red} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[S.sheetRowTitle, { color: C.red }]}>Delete Listing</Text>
+                <Text style={S.sheetRowSub}>Permanently delete this dish from menu</Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={C.text3} />
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => setOptionsModalMeal(null)}
-              className="mt-3 bg-gray-100 py-3.5 rounded-2xl items-center"
+              style={S.sheetCancelBtn}
             >
-              <Text className="text-textSecondary font-bold text-sm">Cancel</Text>
+              <Text style={S.sheetCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
 
-      {/* ─── Quick Portions Adjuster Modal ─── */}
+      {/* ─── Deluxe Quick Portions Stepper Modal ─── */}
       <Modal
         visible={!!portionModalMeal}
         transparent
@@ -710,87 +877,1011 @@ export const CreateListingScreen: React.FC = () => {
         <TouchableOpacity
           activeOpacity={1}
           onPress={() => setPortionModalMeal(null)}
-          className="flex-1 bg-black/50 justify-center items-center px-6"
+          style={S.modalOverlay}
         >
           <TouchableOpacity
             activeOpacity={1}
-            className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl"
+            style={S.portionModalBox}
           >
-            <View className="flex-row items-center justify-between mb-2">
-              <Text className="text-textPrimary font-extrabold text-base">
-                Update Portions
-              </Text>
-              <TouchableOpacity onPress={() => setPortionModalMeal(null)}>
-                <Ionicons name="close" size={22} color="#6B7280" />
+            <View style={S.portionHeader}>
+              <View>
+                <Text style={S.portionTitle}>Update Portions</Text>
+                <Text style={S.portionSub} numberOfLines={1}>
+                  {portionModalMeal?.name}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setPortionModalMeal(null)} style={S.closeModalBtn}>
+                <Ionicons name="close" size={20} color={C.text2} />
               </TouchableOpacity>
             </View>
-            <Text className="text-textMuted text-xs mb-4">
-              Set available remaining portions for "{portionModalMeal?.name}"
-            </Text>
 
-            {/* Quick Increment buttons */}
-            <View className="flex-row justify-between mb-4">
-              {[5, 10, 15, 20].map((preset) => (
-                <TouchableOpacity
-                  key={preset}
-                  onPress={() => setNewPortionsCount(String(preset))}
-                  className={`flex-1 mx-1 py-2 rounded-xl items-center border ${
-                    newPortionsCount === String(preset)
-                      ? 'bg-secondary/10 border-secondary'
-                      : 'bg-gray-50 border-gray-200'
-                  }`}
-                >
-                  <Text
-                    className={`font-bold text-xs ${
-                      newPortionsCount === String(preset) ? 'text-secondary' : 'text-textSecondary'
-                    }`}
+            {/* Quick Presets */}
+            <Text style={S.presetLabel}>QUICK SELECT PRESETS</Text>
+            <View style={S.presetRow}>
+              {[5, 10, 15, 20, 25].map((preset) => {
+                const isSelected = newPortionsCount === String(preset);
+                return (
+                  <TouchableOpacity
+                    key={preset}
+                    onPress={() => setNewPortionsCount(String(preset))}
+                    style={[S.presetBtn, isSelected && S.presetBtnActive]}
                   >
-                    {preset} pcs
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text style={[S.presetText, isSelected && S.presetTextActive]}>
+                      {preset}
+                    </Text>
+                    <Text style={[S.presetSub, isSelected && S.presetSubActive]}>pcs</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
-            {/* Direct Input */}
-            <View className="flex-row items-center justify-center bg-gray-50 rounded-2xl p-3 border border-gray-200 mb-5">
+            {/* Numeric Stepper Box */}
+            <View style={S.stepperBox}>
               <TouchableOpacity
                 onPress={() => {
                   const current = parseInt(newPortionsCount, 10) || 0;
                   setNewPortionsCount(String(Math.max(0, current - 1)));
                 }}
-                className="w-10 h-10 rounded-xl bg-white items-center justify-center border border-gray-200 shadow-xs"
+                style={S.stepperBtn}
               >
-                <Feather name="minus" size={18} color="#1E293B" />
+                <Feather name="minus" size={20} color={C.text1} />
               </TouchableOpacity>
 
-              <TextInput
-                value={newPortionsCount}
-                onChangeText={setNewPortionsCount}
-                keyboardType="numeric"
-                className="text-center font-black text-2xl text-textPrimary px-4 min-w-[70px]"
-              />
+              <View style={S.stepperInputWrap}>
+                <TextInput
+                  value={newPortionsCount}
+                  onChangeText={setNewPortionsCount}
+                  keyboardType="numeric"
+                  style={S.stepperInput}
+                />
+                <Text style={S.stepperUnit}>portions</Text>
+              </View>
 
               <TouchableOpacity
                 onPress={() => {
                   const current = parseInt(newPortionsCount, 10) || 0;
                   setNewPortionsCount(String(current + 1));
                 }}
-                className="w-10 h-10 rounded-xl bg-white items-center justify-center border border-gray-200 shadow-xs"
+                style={S.stepperBtn}
               >
-                <Feather name="plus" size={18} color="#1E293B" />
+                <Feather name="plus" size={20} color={C.text1} />
               </TouchableOpacity>
             </View>
 
-            <Button
-              title={savingPortions ? 'Saving...' : 'Save Portions'}
+            {/* Save Button */}
+            <TouchableOpacity
               onPress={handleSavePortions}
-              loading={savingPortions}
-              variant="secondary"
-              size="md"
-            />
+              disabled={savingPortions}
+              activeOpacity={0.88}
+              style={S.savePortionBtn}
+            >
+              <LinearGradient
+                colors={[C.greenLight, C.green]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={S.savePortionGradient}
+              >
+                {savingPortions ? (
+                  <ActivityIndicator size="small" color={C.white} />
+                ) : (
+                  <>
+                    <Feather name="check" size={18} color={C.white} style={{ marginRight: 8 }} />
+                    <Text style={S.savePortionText}>Save Portions</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
     </View>
   );
 };
+
+// ─── Stylesheet ────────────────────────────────────────────────────────────────
+const S = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: C.surface,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+
+  // Hero Section
+  hero: {
+    paddingTop: Platform.OS === 'ios' ? 56 : 46,
+    paddingHorizontal: 20,
+    paddingBottom: 28,
+    position: 'relative',
+    overflow: 'hidden',
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+  },
+  blobTopRight: {
+    position: 'absolute',
+    top: -40,
+    right: -40,
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    backgroundColor: 'rgba(82, 183, 136, 0.12)',
+  },
+  blobBottomLeft: {
+    position: 'absolute',
+    bottom: -30,
+    left: -30,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+  },
+  heroContent: {
+    position: 'relative',
+    zIndex: 1,
+  },
+  heroBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  heroTagPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(82, 183, 136, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(82, 183, 136, 0.35)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  heroTagText: {
+    color: C.greenLight,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  kitchenIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  kitchenIndicatorText: {
+    color: '#E2E8F0',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  heroTitle: {
+    color: C.white,
+    fontSize: 26,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  heroSubtitle: {
+    color: '#94A3B8',
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '500',
+    marginBottom: 18,
+  },
+
+  // Metrics Bar inside Hero
+  metricsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(22, 36, 56, 0.85)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.darkBorder,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 18,
+  },
+  metricItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  metricVal: {
+    color: C.white,
+    fontSize: 18,
+    fontWeight: '900',
+    marginBottom: 2,
+  },
+  metricLbl: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  metricSep: {
+    width: 1,
+    height: 26,
+    backgroundColor: C.darkBorder,
+  },
+
+  // Action Bar in Hero
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  addDishBtn: {
+    flex: 1,
+    borderRadius: 18,
+    overflow: 'hidden',
+    shadowColor: C.green,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  addDishGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  addIconWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addDishText: {
+    color: C.white,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  comboBtn: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  comboGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+  },
+  comboText: {
+    color: C.white,
+    fontSize: 12,
+    fontWeight: '800',
+    marginRight: 6,
+  },
+  sparkleBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(251, 191, 36, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Filters Section
+  filtersContainer: {
+    paddingHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.white,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: C.text1,
+    padding: 0,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  statusChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  statusChipActive: {
+    backgroundColor: '#0F1923',
+    borderColor: '#0F1923',
+  },
+  statusChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: C.text2,
+  },
+  statusChipTextActive: {
+    color: C.white,
+  },
+  categoriesScroll: {
+    gap: 8,
+    paddingBottom: 4,
+  },
+  catChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.white,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  catChipActive: {
+    backgroundColor: C.green,
+    borderColor: C.green,
+  },
+  catLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.text1,
+    marginRight: 6,
+  },
+  catLabelActive: {
+    color: C.white,
+  },
+  catCountBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  catCountBadgeActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  catCountText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: C.text2,
+  },
+  catCountTextActive: {
+    color: C.white,
+  },
+
+  // Meals List Section
+  mealsListContainer: {
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: C.text1,
+    letterSpacing: -0.2,
+  },
+  sectionSub: {
+    fontSize: 11,
+    color: C.text3,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  loadingCard: {
+    backgroundColor: C.white,
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  loadingText: {
+    fontSize: 12,
+    color: C.text2,
+    fontWeight: '600',
+    marginTop: 10,
+  },
+  emptyCard: {
+    backgroundColor: C.white,
+    borderRadius: 24,
+    padding: 28,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  emptyIconWrap: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: C.text1,
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  emptyDesc: {
+    fontSize: 12,
+    color: C.text2,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
+    paddingHorizontal: 12,
+  },
+  emptyAddBtn: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    width: '100%',
+    shadowColor: C.green,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  emptyAddGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+  },
+  emptyAddText: {
+    color: C.white,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  emptyFilterCard: {
+    backgroundColor: C.white,
+    borderRadius: 24,
+    padding: 28,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  resetFiltersBtn: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 14,
+    marginTop: 4,
+  },
+  resetFiltersText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.text1,
+  },
+
+  // Meal Card
+  mealCard: {
+    backgroundColor: C.white,
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: '#E8EEF5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  mealPhotoContainer: {
+    height: 190,
+    width: '100%',
+    position: 'relative',
+    backgroundColor: '#E2E8F0',
+  },
+  mealPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  mealPhotoPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoScrim: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 80,
+  },
+  statusBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  statusBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  categoryTag: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(15, 25, 35, 0.75)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  categoryTagText: {
+    color: C.white,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  photoBottomBar: {
+    position: 'absolute',
+    bottom: 10,
+    left: 12,
+    right: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  portionsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 25, 35, 0.85)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  portionsText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  cuisinePill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+  },
+  cuisineText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: C.dark,
+  },
+  capacityBarBg: {
+    height: 4,
+    backgroundColor: '#F1F5F9',
+    width: '100%',
+  },
+  capacityBarFill: {
+    height: 4,
+  },
+
+  // Meal Body
+  mealBody: {
+    padding: 16,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  mealTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: C.text1,
+    letterSpacing: -0.3,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+  },
+  mealPrice: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: C.green,
+    letterSpacing: -0.2,
+  },
+  metaDot: {
+    fontSize: 11,
+    color: C.text3,
+    marginHorizontal: 6,
+  },
+  metaTime: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: C.text2,
+  },
+
+  // Taking Orders Switch
+  toggleWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  toggleLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  toggleTrack: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: C.white,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+
+  // Description
+  mealDesc: {
+    fontSize: 12,
+    color: C.text2,
+    lineHeight: 18,
+    fontWeight: '500',
+    marginBottom: 10,
+  },
+
+  // Ingredients Chips
+  ingWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 14,
+  },
+  ingChip: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  ingText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: C.text2,
+  },
+  ingChipMore: {
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  ingMoreText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: C.text1,
+  },
+
+  // Action Toolbar
+  actionToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 12,
+  },
+  editBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: 'rgba(45, 106, 79, 0.2)',
+    paddingVertical: 9,
+    borderRadius: 14,
+  },
+  editBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: C.green,
+  },
+  portionsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    gap: 5,
+  },
+  portionsBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.text1,
+  },
+  moreBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Modal Overlay
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 25, 35, 0.65)',
+    justifyContent: 'flex-end',
+  },
+
+  // Action Sheet
+  actionSheet: {
+    backgroundColor: C.white,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 28,
+  },
+  sheetHandle: {
+    width: 44,
+    height: 5,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: C.text1,
+    marginBottom: 2,
+  },
+  sheetSub: {
+    fontSize: 12,
+    color: C.text3,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  sheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    gap: 12,
+  },
+  sheetIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetRowTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: C.text1,
+    marginBottom: 2,
+  },
+  sheetRowSub: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: C.text3,
+  },
+  sheetCancelBtn: {
+    marginTop: 14,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 13,
+    borderRadius: 18,
+    alignItems: 'center',
+  },
+  sheetCancelText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: C.text2,
+  },
+
+  // Quick Portions Stepper Modal
+  portionModalBox: {
+    backgroundColor: C.white,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 28,
+  },
+  portionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  portionTitle: {
+    fontSize: 19,
+    fontWeight: '900',
+    color: C.text1,
+  },
+  portionSub: {
+    fontSize: 12,
+    color: C.text2,
+    fontWeight: '600',
+    marginTop: 2,
+    maxWidth: SCREEN_WIDTH - 80,
+  },
+  closeModalBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  presetLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: C.text3,
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  presetRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 20,
+  },
+  presetBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 14,
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  presetBtnActive: {
+    backgroundColor: '#ECFDF5',
+    borderColor: C.green,
+  },
+  presetText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: C.text1,
+  },
+  presetTextActive: {
+    color: C.green,
+  },
+  presetSub: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: C.text3,
+    marginTop: 1,
+  },
+  presetSubActive: {
+    color: C.green,
+  },
+  stepperBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 20,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 20,
+  },
+  stepperBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: C.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  stepperInputWrap: {
+    alignItems: 'center',
+  },
+  stepperInput: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: C.text1,
+    textAlign: 'center',
+    minWidth: 90,
+  },
+  stepperUnit: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: C.text3,
+    marginTop: -4,
+  },
+  savePortionBtn: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    shadowColor: C.green,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  savePortionGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+  },
+  savePortionText: {
+    color: C.white,
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+});
