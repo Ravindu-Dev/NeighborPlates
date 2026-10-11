@@ -1,0 +1,260 @@
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Alert, Image, StyleSheet } from 'react-native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { AuthStackParamList } from '../../navigation/AuthNavigator';
+import { TextInput } from '../../components/common/TextInput';
+import { Button } from '../../components/common/Button';
+import { DropdownPicker } from '../../components/common/DropdownPicker';
+import { DISTRICT_TOWN_DATA } from '../../constants/filterConstants';
+import { useAuthStore } from '../../store/authStore';
+import { AuthTopBar, AuthRoleTabs, UserRoleType } from '../../components/auth/AuthRoleSwitcher';
+import { Feather } from '@expo/vector-icons';
+
+type Props = NativeStackScreenProps<AuthStackParamList, 'RiderRegister'>;
+
+const VEHICLES = [
+  { id: 'E-Bike', label: 'E-Bike', icon: 'zap' as const },
+  { id: 'Motorcycle', label: 'Motorbike', icon: 'navigation' as const },
+  { id: 'Bicycle', label: 'Bicycle', icon: 'activity' as const },
+  { id: 'Car', label: 'Car', icon: 'truck' as const },
+];
+
+export const RiderRegisterScreen: React.FC<Props> = ({ navigation }) => {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [district, setDistrict] = useState('');
+  const [town, setTown] = useState('');
+  const [vehicleType, setVehicleType] = useState('E-Bike');
+  const [vehiclePlate, setVehiclePlate] = useState('');
+
+  const { register, isLoading, error } = useAuthStore();
+
+  const handleRoleSwitch = (targetRole: UserRoleType) => {
+    if (targetRole === 'CUSTOMER') navigation.navigate('CustomerRegister');
+    else if (targetRole === 'COOK') navigation.navigate('CookRegister');
+  };
+
+  const handleRegister = async () => {
+    if (!name.trim() || !email.trim() || !password.trim() || !phone.trim()) {
+      Alert.alert('Validation Error', 'Please complete your name, email, phone, and password.');
+      return;
+    }
+    if (password.length < 6) {
+      Alert.alert('Validation Error', 'Password must be at least 6 characters.');
+      return;
+    }
+    if (!district || !town) {
+      Alert.alert('Validation Error', 'Please select your operating District and Town.');
+      return;
+    }
+
+    try {
+      await register({
+        name: name.trim(),
+        email: email.trim(),
+        password: password.trim(),
+        phone: phone.trim(),
+        role: 'RIDER',
+        district,
+        town,
+      });
+    } catch (err) {
+      // Handled by store
+    }
+  };
+
+  return (
+    <ScrollView
+      contentContainerStyle={{ flexGrow: 1 }}
+      className="bg-surface-elevated"
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={{ maxWidth: 480, width: '100%', alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 30 }}>
+        {/* Top Back Navigation with Safe Area Padding */}
+        <AuthTopBar onBackToLogin={() => navigation.navigate('Login')} />
+
+        {/* Header Branding */}
+        <View className="mb-4 items-center mt-2">
+          <Image
+            source={require('../../../assets/Logo.png')}
+            style={{ width: 72, height: 72 }}
+            resizeMode="contain"
+            className="mb-2"
+          />
+          <Text className="text-indigo-600 text-3xl font-extrabold tracking-tight">Food Rider Sign Up</Text>
+          <Text className="text-textSecondary text-xs mt-1 text-center max-w-[280px]">
+            Deliver fresh home-cooked meals in your community and earn on your schedule.
+          </Text>
+        </View>
+
+        {/* Role Switcher Tabs (Moved Lower Down) */}
+        <AuthRoleTabs
+          currentRole="RIDER"
+          onSelectRole={handleRoleSwitch}
+        />
+
+        {/* Form Card */}
+        <View className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+          <Text className="text-textPrimary text-lg font-bold mb-5 text-center">
+            Register as a Delivery Partner
+          </Text>
+
+          <TextInput
+            label="FULL NAME *"
+            placeholder="e.g. Kamal Silva"
+            value={name}
+            onChangeText={setName}
+            autoCapitalize="words"
+          />
+
+          <TextInput
+            label="EMAIL ADDRESS *"
+            placeholder="kamal@example.com"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+
+          <TextInput
+            label="PHONE NUMBER *"
+            placeholder="+94 77 123 4567"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+          />
+
+          <TextInput
+            label="PASSWORD *"
+            placeholder="Min 6 characters"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+
+          {/* Vehicle Type Selection Pills */}
+          <View className="mb-4">
+            <Text className="text-textPrimary font-semibold text-xs mb-2 ml-1">
+              PRIMARY DELIVERY VEHICLE *
+            </Text>
+            <View className="flex-row gap-2">
+              {VEHICLES.map((v) => {
+                const isSelected = vehicleType === v.id;
+                return (
+                  <TouchableOpacity
+                    key={v.id}
+                    onPress={() => setVehicleType(v.id)}
+                    activeOpacity={0.8}
+                    style={[
+                      styles.vehiclePill,
+                      isSelected && styles.vehiclePillSelected,
+                    ]}
+                  >
+                    <Feather
+                      name={v.icon}
+                      size={14}
+                      color={isSelected ? '#4F46E5' : '#6B7280'}
+                    />
+                    <Text
+                      style={[
+                        styles.vehicleLabel,
+                        isSelected && styles.vehicleLabelSelected,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {v.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          <TextInput
+            label="VEHICLE PLATE / REGISTRATION (OPTIONAL)"
+            placeholder="e.g. WP-4092 or #EB-10"
+            value={vehiclePlate}
+            onChangeText={setVehiclePlate}
+            autoCapitalize="characters"
+          />
+
+          <DropdownPicker
+            label="OPERATING DISTRICT *"
+            placeholder="Select District..."
+            selectedValue={district}
+            onValueChange={(val) => {
+              setDistrict(val);
+              setTown('');
+            }}
+            options={Object.keys(DISTRICT_TOWN_DATA)}
+            iconName="map-pin"
+          />
+
+          <DropdownPicker
+            label="OPERATING TOWN / HUB *"
+            placeholder={district ? "Select Town..." : "Select District first..."}
+            selectedValue={town}
+            onValueChange={setTown}
+            options={district ? DISTRICT_TOWN_DATA[district] || [] : []}
+            disabled={!district}
+            iconName="navigation"
+          />
+
+          {error ? (
+            <Text className="text-red-500 text-xs mb-4 text-center font-medium">{error}</Text>
+          ) : null}
+
+          {/* Submit Button */}
+          <TouchableOpacity
+            onPress={handleRegister}
+            disabled={isLoading}
+            activeOpacity={0.85}
+            className="w-full mt-3 bg-indigo-600 rounded-xl py-3.5 items-center justify-center flex-row shadow-sm shadow-indigo-300"
+          >
+            <Text className="text-white font-bold text-sm tracking-wide">
+              {isLoading ? 'REGISTERING...' : 'BECOME A DELIVERY RIDER'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Footer Link */}
+        <View className="mt-6 mb-4 flex-row justify-center items-center">
+          <Text className="text-textMuted text-sm">Already have an account? </Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+            <Text className="text-indigo-600 font-bold text-sm">Log In</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </ScrollView>
+  );
+};
+
+const styles = StyleSheet.create({
+  vehiclePill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    gap: 4,
+  },
+  vehiclePillSelected: {
+    borderColor: '#4F46E5',
+    backgroundColor: '#EEF2FF',
+  },
+  vehicleLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#6B7280',
+  },
+  vehicleLabelSelected: {
+    color: '#4F46E5',
+  },
+});
