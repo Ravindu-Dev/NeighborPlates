@@ -287,6 +287,19 @@ public class MealService {
         return responses;
     }
 
+    public List<MealResponse> getMealsByIds(List<String> mealIds) {
+        if (mealIds == null || mealIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Meal> meals = mealRepository.findAllById(mealIds);
+        List<MealResponse> responses = new ArrayList<>();
+        for (Meal meal : meals) {
+            User cook = userRepository.findById(meal.getCookId()).orElse(null);
+            responses.add(mapToMealResponse(meal, cook));
+        }
+        return responses;
+    }
+
     private MealResponse mapToMealResponse(Meal meal, User cook) {
         String cookName = (cook != null && cook.getProfile() != null) ? cook.getProfile().getName() : "Unknown Cook";
         Double cookLon = null;

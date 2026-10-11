@@ -1,21 +1,37 @@
 package com.neighborplates.service;
 
+import com.neighborplates.dto.request.ChangePasswordRequest;
+import com.neighborplates.dto.response.FavoriteToggleResponse;
+import com.neighborplates.dto.response.MealResponse;
 import com.neighborplates.exception.ResourceNotFoundException;
 import com.neighborplates.exception.UnauthorizedException;
 import com.neighborplates.model.User;
 import com.neighborplates.model.enums.UserRole;
+import com.neighborplates.repository.MealRepository;
 import com.neighborplates.repository.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class UserService {
 
     private final UserRepository userRepository;
+    private final MealRepository mealRepository;
+    private final MealService mealService;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository,
+                       MealRepository mealRepository,
+                       MealService mealService,
+                       PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.mealRepository = mealRepository;
+        this.mealService = mealService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public User getOwnProfile(String email) {
@@ -81,5 +97,59 @@ public class UserService {
         }
 
         return cook;
+    }
+
+    public FavoriteToggleResponse toggleFavorite(String email, String mealId) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User profile not found"));
+
+        if (!mealRepository.existsById(mealId)) {
+            throw new ResourceNotFoundException("Meal not found");
+        }
+
+        List<String> favorites = user.getFavorites();
+        if (favorites == null) {
+            favorites = new ArrayList<>();
+            user.setFavorites(favorites);
+        }
+
+        boolean favorited;
+        if (favorites.contains(mealId)) {
+            favorites.remove(mealId);
+            favorited = false;
+        } else {
+            favorites.add(mealId);
+            favorited = true;
+        }
+
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+
+        return new FavoriteToggleResponse(favorited, mealId, favorites);
+    }
+
+    public List<MealResponse> getFavoriteMeals(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User profile not found"));
+
+        List<String> favorites = user.getFavorites();
+        if (favorites == null || favorites.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        return mealService.getMealsByIds(favorites);
+    }
+
+    public void changePassword(String email, ChangePasswordRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User profile not found"));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new IllegalArgumentException("Current password is incorrect");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
     }
 }
