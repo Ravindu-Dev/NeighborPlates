@@ -15,4 +15,5 @@ public interface OrderRepository extends MongoRepository<Order, String> {
     List<Order> findByStatusInAndRiderIdIsNull(List<com.neighborplates.model.enums.OrderStatus> statuses);
     List<Order> findByDisputedTrueOrderByDisputeReportedAtDesc();
     List<Order> findByStatusInOrderByCreatedAtDesc(List<com.neighborplates.model.enums.OrderStatus> statuses);
+    List<Order> findByCustomerIdAndStatus(String customerId, com.neighborplates.model.enums.OrderStatus status);
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, FlatList, ActivityIndicator, Animated, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, Animated, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
@@ -7,6 +7,7 @@ import { api } from '../../services/api';
 import { Badge } from '../../components/common/Badge';
 import { OrderReceiptModal } from '../../components/customer/OrderReceiptModal';
 import { OrderReviewModal } from '../../components/customer/OrderReviewModal';
+import { EditOrderModal } from '../../components/customer/EditOrderModal';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useCartStore } from '../../store/cartStore';
 
@@ -40,6 +41,9 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
   const [activeTab, setActiveTab] = useState<'all' | 'past'>('all');
   const [selectedReceiptOrder, setSelectedReceiptOrder] = useState<any>(null);
   const [selectedReviewOrder, setSelectedReviewOrder] = useState<any>(null);
+  const [selectedEditOrder, setSelectedEditOrder] = useState<any>(null);
+  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
+  const [clearingDelivered, setClearingDelivered] = useState(false);
 
   // Pulsing animation for active delivery banner
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
@@ -90,6 +94,81 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
 
     useCartStore.setState({ items: cartItems });
     safeNavigate('Checkout');
+  };
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm(`${title}\n\n${message}`)) {
+        onConfirm();
+      }
+    } else {
+      Alert.alert(title, message, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: onConfirm },
+      ]);
+    }
+  };
+
+  const handleDeleteOrder = (order: any) => {
+    if (!order) return;
+    const isPlaced = order.status === 'PLACED';
+    const orderNum = order.orderNumber || order.id?.slice(-6).toUpperCase();
+
+    const title = isPlaced ? 'Cancel & Delete Order' : 'Delete Order';
+    const message = isPlaced
+      ? `Are you sure you want to cancel order #${orderNum}? Any reserved meal portions will be returned to the kitchen.`
+      : `Are you sure you want to remove order #${orderNum} from your history?`;
+
+    showConfirm(title, message, async () => {
+      setDeletingOrderId(order.id);
+      try {
+        await api.delete(`/api/orders/${order.id}`);
+        setOrders((prev) => prev.filter((o) => o.id !== order.id));
+        if (Platform.OS === 'web') {
+          window.alert(`Order #${orderNum} deleted.`);
+        } else {
+          Alert.alert('Success', `Order #${orderNum} deleted.`);
+        }
+      } catch (err: any) {
+        console.error('Delete order error:', err);
+        const msg = err?.response?.data?.message || 'Could not delete order. Please try again.';
+        Alert.alert('Delete Failed', msg);
+      } finally {
+        setDeletingOrderId(null);
+      }
+    });
+  };
+
+  const handleClearAllDelivered = () => {
+    const deliveredCount = orders.filter((o) => o.status === 'DELIVERED').length;
+    if (deliveredCount === 0) {
+      Alert.alert('Notice', 'No delivered orders found in your history.');
+      return;
+    }
+
+    showConfirm(
+      'Clear Delivered History',
+      `Are you sure you want to delete all ${deliveredCount} delivered ${deliveredCount === 1 ? 'order' : 'orders'} from your history? This action cannot be undone.`,
+      async () => {
+        setClearingDelivered(true);
+        try {
+          const res = await api.delete('/api/orders/delivered');
+          setOrders((prev) => prev.filter((o) => o.status !== 'DELIVERED'));
+          const msg = res?.data?.message || `Successfully removed ${deliveredCount} delivered orders.`;
+          if (Platform.OS === 'web') {
+            window.alert(msg);
+          } else {
+            Alert.alert('Delivered Orders Cleared', msg);
+          }
+        } catch (err: any) {
+          console.error('Clear delivered orders error:', err);
+          const msg = err?.response?.data?.message || 'Could not clear delivered orders.';
+          Alert.alert('Error', msg);
+        } finally {
+          setClearingDelivered(false);
+        }
+      }
+    );
   };
 
   useEffect(() => {
@@ -167,6 +246,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
   // Find most recent active order for the banner under 'all' tab
   const activeDeliveryOrder = orders.find((o) => ACTIVE_STATUSES.includes(o.status));
   const pastOrdersCount = orders.filter((o) => o.status === 'DELIVERED' || o.status === 'CANCELLED').length;
+  const deliveredOrdersCount = orders.filter((o) => o.status === 'DELIVERED').length;
 
   return (
     <View className="flex-1 bg-surface-elevated relative">
@@ -255,6 +335,38 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
             </View>
           </TouchableOpacity>
         </View>
+
+        {/* Past Orders Bulk Clear Delivered Banner */}
+        {activeTab === 'past' && deliveredOrdersCount > 0 && (
+          <View className="mb-4 bg-red-50/80 border border-red-200 rounded-2xl p-3.5 flex-row items-center justify-between shadow-xs">
+            <View className="flex-row items-center gap-2.5 flex-1 mr-2">
+              <View className="w-8 h-8 rounded-full bg-red-100 items-center justify-center">
+                <Feather name="trash-2" size={14} color="#DC2626" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-textPrimary text-xs font-black">Delivered Orders History</Text>
+                <Text className="text-textMuted text-[10px] font-semibold">
+                  {deliveredOrdersCount} completed {deliveredOrdersCount === 1 ? 'order' : 'orders'} in your account
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={handleClearAllDelivered}
+              disabled={clearingDelivered}
+              className="bg-white border border-red-300 px-3.5 py-2 rounded-xl flex-row items-center gap-1.5 shadow-xs"
+              activeOpacity={0.7}
+            >
+              {clearingDelivered ? (
+                <ActivityIndicator size="small" color="#DC2626" />
+              ) : (
+                <>
+                  <Feather name="trash" size={12} color="#DC2626" />
+                  <Text className="text-red-600 font-black text-xs">Clear All</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
 
         {loading ? (
           <View key="state-loading" className="flex-1 justify-center items-center">
@@ -459,6 +571,58 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
                       </Text>
                       <Feather name="chevron-right" size={15} color="#FFFFFF" style={{ marginLeft: 6 }} />
                     </TouchableOpacity>
+
+                    {/* Pending PLACED quick actions in active tracking banner */}
+                    {activeDeliveryOrder.status === 'PLACED' && (
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                        <TouchableOpacity
+                          onPress={() => setSelectedEditOrder(activeDeliveryOrder)}
+                          style={{
+                            flex: 1,
+                            backgroundColor: '#EFF6FF',
+                            borderWidth: 1,
+                            borderColor: '#BFDBFE',
+                            borderRadius: 12,
+                            paddingVertical: 8,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Feather name="edit-2" size={12} color="#2563EB" />
+                          <Text style={{ color: '#1D4ED8', fontWeight: '800', fontSize: 11 }}>Edit Order</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          onPress={() => handleDeleteOrder(activeDeliveryOrder)}
+                          disabled={deletingOrderId === activeDeliveryOrder.id}
+                          style={{
+                            backgroundColor: '#FEF2F2',
+                            borderWidth: 1,
+                            borderColor: '#FECACA',
+                            borderRadius: 12,
+                            paddingVertical: 8,
+                            paddingHorizontal: 14,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 4,
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          {deletingOrderId === activeDeliveryOrder.id ? (
+                            <ActivityIndicator size="small" color="#DC2626" />
+                          ) : (
+                            <>
+                              <Feather name="trash-2" size={12} color="#DC2626" />
+                              <Text style={{ color: '#DC2626', fontWeight: '800', fontSize: 11 }}>Cancel</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
                 </View>
               ) : null
@@ -510,17 +674,52 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
 
                 {/* Action Buttons Row */}
                 <View className="flex-row items-center gap-2 flex-wrap">
+                  {/* Track Order for in-progress orders */}
                   {ACTIVE_STATUSES.includes(item.status) && (
                     <TouchableOpacity
                       key="btn-track"
                       onPress={() => safeNavigate('OrderTracking', { orderId: item.id })}
-                      className="flex-1 min-w-[120px] px-3.5 py-2.5 rounded-xl border border-primary/30 bg-primary/10 flex-row items-center justify-center gap-1.5 shadow-xs"
+                      className="flex-1 min-w-[100px] px-3 py-2.5 rounded-xl border border-primary/30 bg-primary/10 flex-row items-center justify-center gap-1.5 shadow-xs"
                       activeOpacity={0.7}
                     >
                       <Feather name="navigation" size={13} color="#FF6B35" />
-                      <Text className="text-primary font-extrabold text-xs">Track Order</Text>
+                      <Text className="text-primary font-extrabold text-xs">Track</Text>
                     </TouchableOpacity>
                   )}
+
+                  {/* Customer can EDIT or CANCEL/DELETE if status is PLACED (before accepted by kitchen) */}
+                  {item.status === 'PLACED' && (
+                    <>
+                      <TouchableOpacity
+                        key="btn-edit"
+                        onPress={() => setSelectedEditOrder(item)}
+                        className="flex-1 min-w-[85px] px-3 py-2.5 rounded-xl border border-blue-200 bg-blue-50 flex-row items-center justify-center gap-1.5 shadow-xs"
+                        activeOpacity={0.7}
+                      >
+                        <Feather name="edit-2" size={13} color="#2563EB" />
+                        <Text className="text-blue-700 font-extrabold text-xs">Edit</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        key="btn-cancel"
+                        onPress={() => handleDeleteOrder(item)}
+                        disabled={deletingOrderId === item.id}
+                        className="flex-1 min-w-[85px] px-3 py-2.5 rounded-xl border border-red-200 bg-red-50 flex-row items-center justify-center gap-1.5 shadow-xs"
+                        activeOpacity={0.7}
+                      >
+                        {deletingOrderId === item.id ? (
+                          <ActivityIndicator size="small" color="#DC2626" />
+                        ) : (
+                          <>
+                            <Feather name="trash-2" size={13} color="#DC2626" />
+                            <Text className="text-red-700 font-extrabold text-xs">Cancel</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </>
+                  )}
+
+                  {/* DELIVERED order actions: Review, Reorder, Delete individual */}
                   {item.status === 'DELIVERED' && (
                     <>
                       <TouchableOpacity
@@ -542,12 +741,48 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
                         <Feather name="refresh-cw" size={13} color="#FFFFFF" />
                         <Text className="text-white font-extrabold text-xs">Reorder</Text>
                       </TouchableOpacity>
+
+                      <TouchableOpacity
+                        key="btn-delete-delivered"
+                        onPress={() => handleDeleteOrder(item)}
+                        disabled={deletingOrderId === item.id}
+                        className="px-3 py-2.5 rounded-xl border border-red-200 bg-red-50 flex-row items-center justify-center shadow-xs"
+                        activeOpacity={0.7}
+                      >
+                        {deletingOrderId === item.id ? (
+                          <ActivityIndicator size="small" color="#DC2626" />
+                        ) : (
+                          <Feather name="trash-2" size={13} color="#DC2626" />
+                        )}
+                      </TouchableOpacity>
                     </>
                   )}
+
+                  {/* CANCELLED order action: Delete from history */}
+                  {item.status === 'CANCELLED' && (
+                    <TouchableOpacity
+                      key="btn-delete-cancelled"
+                      onPress={() => handleDeleteOrder(item)}
+                      disabled={deletingOrderId === item.id}
+                      className="flex-1 min-w-[85px] px-3 py-2.5 rounded-xl border border-red-200 bg-red-50 flex-row items-center justify-center gap-1.5 shadow-xs"
+                      activeOpacity={0.7}
+                    >
+                      {deletingOrderId === item.id ? (
+                        <ActivityIndicator size="small" color="#DC2626" />
+                      ) : (
+                        <>
+                          <Feather name="trash-2" size={13} color="#DC2626" />
+                          <Text className="text-red-700 font-extrabold text-xs">Delete</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Receipt Modal button */}
                   <TouchableOpacity
                     key="btn-receipt"
                     onPress={() => setSelectedReceiptOrder(item)}
-                    className="flex-1 min-w-[100px] px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 flex-row items-center justify-center gap-1.5 shadow-xs"
+                    className="flex-1 min-w-[85px] px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 flex-row items-center justify-center gap-1.5 shadow-xs"
                     activeOpacity={0.7}
                   >
                     <Feather name="file-text" size={13} color="#1A1A2E" />
@@ -573,6 +808,17 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
         order={selectedReviewOrder}
         onClose={() => setSelectedReviewOrder(null)}
         onSuccess={() => fetchOrders()}
+      />
+
+      {/* Edit Pending Order Modal */}
+      <EditOrderModal
+        visible={!!selectedEditOrder}
+        order={selectedEditOrder}
+        onClose={() => setSelectedEditOrder(null)}
+        onSuccess={() => {
+          setSelectedEditOrder(null);
+          fetchOrders();
+        }}
       />
     </View>
   );
