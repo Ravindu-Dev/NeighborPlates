@@ -15,8 +15,24 @@ const targetFile = path.join(
 if (fs.existsSync(targetFile)) {
   let content = fs.readFileSync(targetFile, 'utf8');
 
+  // Fix any duplicate catch blocks if previously present
+  if (content.includes('} catch {\n        return "[Props]";\n    }\n} catch {')) {
+    content = content.replace(
+      /\} catch \{\s*return "\[Props\]";\s*\}\s*\} catch \{\s*return "\[Props\]";\s*\}/g,
+      '} catch {\n        return "[Props]";\n    }'
+    );
+    fs.writeFileSync(targetFile, content, 'utf8');
+    console.log('[patch-css-interop] Repaired duplicate catch block in render-component.js');
+    return;
+  }
+
+  if (content.includes('// Ignore throwing getters')) {
+    console.log('[patch-css-interop] react-native-css-interop is already patched');
+    return;
+  }
+
   // Replace stringify and printUpgradeWarning with exception-safe versions
-  const targetPattern = /function printUpgradeWarning\(warning, originalProps\) \{[\s\S]*?function stringify\(object\) \{[\s\S]*?seen\.delete\(value\);[\s\S]*?return newValue;[\s\S]*?\}, 2\);[\s\S]*?\}/;
+  const targetPattern = /function printUpgradeWarning\(warning, originalProps\) \{[\s\S]*?(?=function getDebugReplacer\(\))/;
 
   const safeReplacement = `function printUpgradeWarning(warning, originalProps) {
     try {
@@ -50,14 +66,13 @@ function stringify(object) {
     } catch {
         return "[Props]";
     }
-}`;
+}
+`;
 
   if (targetPattern.test(content)) {
     content = content.replace(targetPattern, safeReplacement);
     fs.writeFileSync(targetFile, content, 'utf8');
     console.log('[patch-css-interop] Successfully patched react-native-css-interop render-component.js');
-  } else if (content.includes('// Ignore throwing getters')) {
-    console.log('[patch-css-interop] react-native-css-interop is already patched');
   } else {
     console.warn('[patch-css-interop] Warning: Could not match printUpgradeWarning pattern in render-component.js');
   }

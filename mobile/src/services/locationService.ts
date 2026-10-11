@@ -392,7 +392,7 @@ export async function watchRealLocation(
           timeInterval: 4000,
           distanceInterval: 10,
         },
-        async (loc) => {
+        async (loc: any) => {
           const coords = {
             latitude: loc.coords.latitude,
             longitude: loc.coords.longitude,
