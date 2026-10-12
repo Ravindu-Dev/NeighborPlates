@@ -24,7 +24,7 @@ const extractIp = (str?: string): string | null => {
 
 // Resolve backend API URL dynamically for any network:
 // 1. Explicit EXPO_PUBLIC_API_URL if set in environment
-// 2. Web: Connects to localhost (http://localhost:8081)
+// 2. Web: Connects to localhost (http://localhost:8082)
 // 3. Physical device (Expo Go): Dynamically extracts the host PC IP from Metro server across multiple Expo Constants sources
 // 4. Emulators/Simulators: Fallback to 10.0.2.2 (Android) or localhost (iOS)
 export const getBackendUrl = (): string => {
@@ -33,23 +33,23 @@ export const getBackendUrl = (): string => {
   }
 
   if (Platform.OS === 'web') {
-    return 'http://localhost:8081';
+    return 'http://localhost:8082';
   }
 
   // Check hostUri, debuggerHost, and linkingUri for host IP
   const hostUriIp = extractIp(Constants.expoConfig?.hostUri);
-  if (hostUriIp) return `http://${hostUriIp}:8081`;
+  if (hostUriIp) return `http://${hostUriIp}:8082`;
 
   const debuggerHost =
     (Constants as any).manifest2?.extra?.expoGo?.debuggerHost ||
     (Constants as any).manifest?.debuggerHost;
   const debuggerIp = extractIp(debuggerHost);
-  if (debuggerIp) return `http://${debuggerIp}:8081`;
+  if (debuggerIp) return `http://${debuggerIp}:8082`;
 
   const linkingIp = extractIp(Constants.linkingUri);
-  if (linkingIp) return `http://${linkingIp}:8081`;
+  if (linkingIp) return `http://${linkingIp}:8082`;
 
-  return Platform.OS === 'android' ? 'http://10.0.2.2:8081' : 'http://localhost:8081';
+  return Platform.OS === 'android' ? 'http://10.0.2.2:8082' : 'http://localhost:8082';
 };
 
 export const api = axios.create({
@@ -80,9 +80,18 @@ export const setUnauthorizedCallback = (callback: () => void) => {
   onUnauthorizedCallback = callback;
 };
 
-// Response interceptor to handle token refresh on 401
+// Response interceptor to handle token refresh on 401 and guard against HTML responses
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // If a request accidentally returned an HTML page instead of JSON, reject
+    if (
+      typeof response.data === 'string' &&
+      (response.data.trim().startsWith('<!DOCTYPE') || response.data.trim().startsWith('<html'))
+    ) {
+      return Promise.reject(new Error('Invalid JSON response received from server.'));
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
     if (error.response?.status === 401 && !originalRequest._retry) {

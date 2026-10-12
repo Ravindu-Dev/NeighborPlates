@@ -1,22 +1,22 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Image, Animated, ActivityIndicator, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, Image, Animated, ActivityIndicator, StyleSheet, StatusBar, Platform } from 'react-native';
 
 export const SplashScreen: React.FC = () => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.88)).current;
+  const fadeAnim = useRef(new Animated.Value(0.4)).current;
+  const scaleAnim = useRef(new Animated.Value(0.92)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
+        duration: 500,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(scaleAnim, {
         toValue: 1,
         friction: 6,
         tension: 40,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   }, []);

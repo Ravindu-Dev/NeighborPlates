@@ -156,8 +156,11 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
       const response = await api.get(
         `/api/meals?longitude=79.8612&latitude=6.9271&maxDistance=${parseFloat(distVal)}`
       );
+      const rawMeals = Array.isArray(response.data)
+        ? response.data
+        : (Array.isArray(response.data?.content) ? response.data.content : []);
       // Filter list locally based on query keywords
-      const filtered = response.data.filter((meal: any) =>
+      const filtered = rawMeals.filter((meal: any) =>
         (meal.name || '').toLowerCase().includes(searchVal.toLowerCase()) ||
         (meal.description || '').toLowerCase().includes(searchVal.toLowerCase()) ||
         (meal.cuisineType || '').toLowerCase().includes(searchVal.toLowerCase()) ||
@@ -166,6 +169,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
       setMeals(filtered);
     } catch (error) {
       console.error('Search error:', error);
+      setMeals([]);
     } finally {
       setLoading(false);
     }

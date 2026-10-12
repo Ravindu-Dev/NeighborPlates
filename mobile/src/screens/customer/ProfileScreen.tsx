@@ -125,9 +125,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation: propNa
     setOrdersLoading(true);
     try {
       const response = await api.get('/api/orders/my');
-      setOrders(response.data);
+      const raw = response.data;
+      setOrders(Array.isArray(raw) ? raw : (Array.isArray(raw?.content) ? raw.content : []));
     } catch (error) {
       console.error('Error fetching orders:', error);
+      setOrders([]);
     } finally {
       setOrdersLoading(false);
     }
@@ -758,7 +760,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation: propNa
     </>
   );
 
-  const activeOrdersCount = orders.filter(
+  const activeOrdersCount = (Array.isArray(orders) ? orders : []).filter(
     o => !['DELIVERED', 'CANCELLED'].includes(o.status)
   ).length;
 

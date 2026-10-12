@@ -70,9 +70,17 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
   const fetchOrders = async () => {
     try {
       const response = await api.get('/api/orders/my');
-      setOrders(response.data || []);
+      const rawData = response.data;
+      if (Array.isArray(rawData)) {
+        setOrders(rawData);
+      } else if (rawData && Array.isArray(rawData.content)) {
+        setOrders(rawData.content);
+      } else {
+        setOrders([]);
+      }
     } catch (error) {
       console.error('Error fetching orders:', error);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -235,8 +243,10 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
     }
   };
 
+  const safeOrders = Array.isArray(orders) ? orders : [];
+
   // Compute filtered list based on active tab
-  const filteredOrders = orders.filter((order) => {
+  const filteredOrders = safeOrders.filter((order) => {
     if (activeTab === 'past') {
       return order.status === 'DELIVERED' || order.status === 'CANCELLED';
     }
@@ -244,9 +254,9 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ navigation: propNavi
   });
 
   // Find most recent active order for the banner under 'all' tab
-  const activeDeliveryOrder = orders.find((o) => ACTIVE_STATUSES.includes(o.status));
-  const pastOrdersCount = orders.filter((o) => o.status === 'DELIVERED' || o.status === 'CANCELLED').length;
-  const deliveredOrdersCount = orders.filter((o) => o.status === 'DELIVERED').length;
+  const activeDeliveryOrder = safeOrders.find((o) => ACTIVE_STATUSES.includes(o.status));
+  const pastOrdersCount = safeOrders.filter((o) => o.status === 'DELIVERED' || o.status === 'CANCELLED').length;
+  const deliveredOrdersCount = safeOrders.filter((o) => o.status === 'DELIVERED').length;
 
   return (
     <View className="flex-1 bg-surface-elevated relative">

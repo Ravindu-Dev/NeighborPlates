@@ -80,9 +80,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     try {
       const categoryParam = cat && cat !== 'ALL' ? `?category=${cat}` : '';
       const response = await api.get(`/api/meals${categoryParam}`);
-      setMeals(response.data || []);
+      const rawData = response.data;
+      if (Array.isArray(rawData)) {
+        setMeals(rawData);
+      } else if (rawData && Array.isArray(rawData.content)) {
+        setMeals(rawData.content);
+      } else {
+        setMeals([]);
+      }
     } catch (error) {
       console.error('Error fetching meals:', error);
+      setMeals([]);
     } finally {
       setLoading(false);
     }
@@ -92,12 +100,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setLoadingAi(true);
     try {
       const response = await api.get('/api/combos/recommendations');
-      if (response.data && response.data.length > 0) {
+      if (Array.isArray(response.data) && response.data.length > 0) {
         setAiCombos(response.data);
       } else {
         const allCombosRes = await api.get('/api/combos');
-        if (allCombosRes.data && allCombosRes.data.length > 0) {
-          const formatted = allCombosRes.data.map((c: any) => ({
+        const combosList = Array.isArray(allCombosRes.data) ? allCombosRes.data : [];
+        if (combosList.length > 0) {
+          const formatted = combosList.map((c: any) => ({
             combo: c,
             tag: `${c.discountPercentage || 15}% OFF COMBO`,
             reason: c.description || `Fresh bundled feast package by Chef ${c.cookName}.`,
@@ -110,16 +119,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     } catch {
       try {
         const allCombosRes = await api.get('/api/combos');
-        if (allCombosRes.data && allCombosRes.data.length > 0) {
-          const formatted = allCombosRes.data.map((c: any) => ({
+        const combosList = Array.isArray(allCombosRes.data) ? allCombosRes.data : [];
+        if (combosList.length > 0) {
+          const formatted = combosList.map((c: any) => ({
             combo: c,
             tag: `${c.discountPercentage || 15}% OFF COMBO`,
             reason: c.description || `Fresh bundled feast package by Chef ${c.cookName}.`,
           }));
           setAiCombos(formatted);
+        } else {
+          setAiCombos([]);
         }
       } catch {
-        // Fallback silently
+        setAiCombos([]);
       }
     } finally {
       setLoadingAi(false);
@@ -148,7 +160,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   }, [navigation, filters.category]);
 
   const getProcessedMeals = () => {
-    let processed = meals.filter((meal) => {
+    const safeMeals = Array.isArray(meals) ? meals : [];
+    let processed = safeMeals.filter((meal) => {
       if (
         filters.category &&
         filters.category !== 'ALL' &&
