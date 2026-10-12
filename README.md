@@ -14,16 +14,58 @@
 
 ---
 
+## ⚡ Quick Start: Running Commands (TL;DR)
+
+To run the entire platform locally, open **two separate terminal windows**:
+
+### 🟢 Terminal 1: Run the Backend (Spring Boot API)
+```bash
+# 1. Navigate to the backend directory
+cd backend
+
+# 2. Run the Spring Boot server (starts on port 8081)
+mvn spring-boot:run
+```
+> 🌐 **Backend URL:** [http://localhost:8081](http://localhost:8081)  
+> 📑 **Swagger UI:** [http://localhost:8081/swagger-ui.html](http://localhost:8081/swagger-ui.html)  
+> *(First-time build alternative: `mvn clean install -DskipTests && mvn spring-boot:run`)*
+
+---
+
+### 📱 Terminal 2: Run the Mobile App (React Native / Expo)
+```bash
+# 1. Navigate to the mobile directory
+cd mobile
+
+# 2. Install dependencies (only required the first time)
+npm install
+
+# 3. Start Expo development server (starts on port 8082)
+npm start
+```
+
+#### Shortcut Commands for Specific Platforms:
+| Platform | Command | Notes |
+| :--- | :--- | :--- |
+| **Expo Interactive Menu** | `npm start` | Generates QR code + keyboard shortcuts menu |
+| **Android Device / Emulator** | `npm run android` | Launches on running Android emulator or USB device |
+| **iOS Simulator** | `npm run ios` | Launches on Xcode iOS simulator (macOS only) |
+| **Web Browser** | `npm run web` | Launches the React Native Web preview in your browser |
+| **Reset Cache & Start** | `npx expo start -c --port 8082` | Clears Metro bundler and NativeWind cache |
+
+---
+
 ## 📖 Table of Contents
+- [Quick Start: Running Commands (TL;DR)](#-quick-start-running-commands-tldr)
 - [Overview](#-overview)
 - [Key Features by Role](#-key-features-by-role)
 - [Tech Stack](#-tech-stack)
 - [System Architecture & Repository Structure](#-system-architecture--repository-structure)
 - [Prerequisites](#-prerequisites)
-- [Setup & Run Instructions](#-setup--run-instructions)
+- [Detailed Setup & Run Guide](#-detailed-setup--run-guide)
   - [1. Clone the Repository](#1-clone-the-repository)
-  - [2. Backend Setup (Spring Boot)](#2-backend-setup-spring-boot)
-  - [3. Mobile App Setup (React Native / Expo)](#3-mobile-app-setup-react-native--expo)
+  - [2. Backend Setup & Run (Spring Boot)](#2-backend-setup--run-spring-boot)
+  - [3. Mobile Setup & Run (React Native / Expo)](#3-mobile-setup--run-react-native--expo)
 - [Pre-seeded Demo Accounts](#-pre-seeded-demo-accounts)
 - [REST API Endpoints & Swagger](#-rest-api-endpoints--swagger)
 - [Troubleshooting & FAQs](#-troubleshooting--faqs)
@@ -141,7 +183,7 @@ Before running NeighborPlates, make sure you have the following installed on you
 
 ---
 
-## ⚡ Setup & Run Instructions
+## 📖 Detailed Setup & Run Guide
 
 ### 1. Clone the Repository
 
@@ -152,7 +194,7 @@ cd NeighborPlates
 
 ---
 
-### 2. Backend Setup (Spring Boot)
+### 2. Backend Setup & Run (Spring Boot)
 
 The backend runs on **Port `8081`** by default.
 
@@ -190,7 +232,7 @@ Open your browser and navigate to:
 
 ---
 
-### 3. Mobile App Setup (React Native / Expo)
+### 3. Mobile Setup & Run (React Native / Expo)
 
 The mobile client is managed by Expo and Metro bundler running on **Port `8082`**.
 
@@ -226,9 +268,9 @@ npm start
 #### Step 3.4: Launch on Your Device or Emulator
 Once the QR code appears in your terminal:
 - **Physical Device:** Open the **Expo Go** app on your Android or iOS device and scan the terminal QR code.
-- **Android Emulator:** Press <kbd>a</kbd> in the terminal (with an emulator running in Android Studio).
-- **iOS Simulator (macOS only):** Press <kbd>i</kbd> in the terminal.
-- **Web Browser:** Press <kbd>w</kbd> in the terminal to preview in the browser.
+- **Android Emulator:** Press <kbd>a</kbd> in the terminal (with an emulator running in Android Studio), or execute `npm run android`.
+- **iOS Simulator (macOS only):** Press <kbd>i</kbd> in the terminal, or execute `npm run ios`.
+- **Web Browser:** Press <kbd>w</kbd> in the terminal, or execute `npm run web`.
 
 ---
 
