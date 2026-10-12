@@ -8,20 +8,23 @@ import { CookNavigator } from './CookNavigator';
 import { AdminNavigator } from './AdminNavigator';
 import { RiderNavigator } from './RiderNavigator';
 
-const SPLASH_DURATION_MS = 2200; // Display logo for ~2.2 seconds
+const SPLASH_DURATION_MS = 1000; // Snappy 1-second splash display
 
 export const AppNavigator = () => {
-  const { isAuthenticated, user, isLoading, checkAuth } = useAuthStore();
+  const { isAuthenticated, user, checkAuth } = useAuthStore();
   const [isSplashLoading, setIsSplashLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
     const initialize = async () => {
       try {
-        await Promise.all([
-          checkAuth(),
-          new Promise((resolve) => setTimeout(resolve, SPLASH_DURATION_MS)),
+        const minSplashTime = new Promise((resolve) => setTimeout(resolve, SPLASH_DURATION_MS));
+        await Promise.race([
+          Promise.all([checkAuth(), minSplashTime]),
+          new Promise((resolve) => setTimeout(resolve, 3000)), // 3s hard safety fallback
         ]);
+      } catch (err) {
+        console.error('App initialization error:', err);
       } finally {
         if (isMounted) {
           setIsSplashLoading(false);
@@ -35,7 +38,7 @@ export const AppNavigator = () => {
     };
   }, []);
 
-  if (isSplashLoading || isLoading) {
+  if (isSplashLoading) {
     return <SplashScreen />;
   }
 

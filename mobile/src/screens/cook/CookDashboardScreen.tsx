@@ -287,14 +287,18 @@ export const CookDashboardScreen: React.FC = () => {
         api.get('/api/orders/my'),
       ]);
       setProfile(profRes.data);
-      setOrders(ordRes.data || []);
+      setOrders(Array.isArray(ordRes.data) ? ordRes.data : (Array.isArray(ordRes.data?.content) ? ordRes.data.content : []));
       if (profRes.data?.id) {
         try {
           const mealsRes = await api.get(`/api/meals/cook/${profRes.data.id}`);
-          setMeals(mealsRes.data || []);
+          setMeals(Array.isArray(mealsRes.data) ? mealsRes.data : (Array.isArray(mealsRes.data?.content) ? mealsRes.data.content : []));
         } catch { setMeals([]); }
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      setOrders([]);
+      setMeals([]);
+    }
     finally { setLoading(false); }
   };
 
