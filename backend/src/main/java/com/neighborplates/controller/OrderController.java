@@ -1,6 +1,9 @@
 package com.neighborplates.controller;
 
 import com.neighborplates.dto.request.PlaceOrderRequest;
+import com.neighborplates.dto.request.ReportDisputeRequest;
+import com.neighborplates.dto.request.UpdateOrderRequest;
+import com.neighborplates.dto.response.ApiResponse;
 import com.neighborplates.dto.response.OrderResponse;
 import com.neighborplates.model.enums.OrderStatus;
 import com.neighborplates.service.OrderService;
@@ -39,6 +42,29 @@ public class OrderController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<OrderResponse> updateOrder(
+            @PathVariable String id,
+            @RequestBody UpdateOrderRequest request,
+            Principal principal) {
+        OrderResponse response = orderService.updateOrder(principal.getName(), id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/delivered")
+    public ResponseEntity<ApiResponse> deleteAllDeliveredOrders(Principal principal) {
+        int count = orderService.deleteAllDeliveredOrders(principal.getName());
+        return ResponseEntity.ok(new ApiResponse(true, "Successfully deleted " + count + " delivered orders"));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse> deleteOrder(
+            @PathVariable String id,
+            Principal principal) {
+        orderService.deleteOrder(principal.getName(), id);
+        return ResponseEntity.ok(new ApiResponse(true, "Order deleted successfully"));
+    }
+
     @PutMapping("/{id}/status")
     public ResponseEntity<OrderResponse> updateStatus(
             @PathVariable String id,
@@ -65,7 +91,7 @@ public class OrderController {
     @PostMapping("/{id}/dispute")
     public ResponseEntity<OrderResponse> reportDispute(
             @PathVariable String id,
-            @Valid @RequestBody com.neighborplates.dto.request.ReportDisputeRequest request,
+            @Valid @RequestBody ReportDisputeRequest request,
             Principal principal) {
         OrderResponse response = orderService.reportDispute(id, principal.getName(), request);
         return ResponseEntity.ok(response);

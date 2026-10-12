@@ -33,9 +33,15 @@ public class Review {
 
     private String photoUrl;
 
+    private String mealName;
+
+    private String mealPhoto;
+
     private boolean flagged = false;
 
     private String flaggedReason;
 
     private Instant createdAt = Instant.now();
+
+    private Instant updatedAt;
 }

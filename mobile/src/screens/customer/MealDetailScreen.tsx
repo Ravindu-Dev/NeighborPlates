@@ -7,6 +7,7 @@ import { api } from '../../services/api';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { useCartStore } from '../../store/cartStore';
+import { useFavoriteStore } from '../../store/favoriteStore';
 import { Ionicons, Feather } from '@expo/vector-icons';
 
 type MealDetailScreenProps = NativeStackScreenProps<CustomerStackParamList, 'MealDetail'>;
@@ -16,7 +17,9 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
   const [meal, setMeal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
-  const [isFavorite, setIsFavorite] = useState(false);
+  const isFavorite = useFavoriteStore((state) => state.isFavorite(mealId));
+  const toggleFavorite = useFavoriteStore((state) => state.toggleFavorite);
+  const [togglingFavorite, setTogglingFavorite] = useState(false);
 
   const fetchMealDetails = async () => {
     try {
@@ -33,6 +36,9 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
   useFocusEffect(
     useCallback(() => {
       fetchMealDetails();
+      if (!useFavoriteStore.getState().isLoaded) {
+        useFavoriteStore.getState().fetchFavoriteMeals();
+      }
     }, [mealId])
   );
 
@@ -138,14 +144,25 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => setIsFavorite(prev => !prev)}
-              className="w-10 h-10 rounded-full bg-white/90 items-center justify-center shadow-md border border-white/50"
+              onPress={async () => {
+                if (togglingFavorite) return;
+                setTogglingFavorite(true);
+                try {
+                  await toggleFavorite(mealId);
+                } catch (err) {
+                  Alert.alert('Notice', 'Could not update favorites. Please check your connection.');
+                } finally {
+                  setTogglingFavorite(false);
+                }
+              }}
+              disabled={togglingFavorite}
+              className="w-10 h-10 rounded-full bg-white/90 items-center justify-center shadow-md border border-white/50 active:scale-95"
               activeOpacity={0.8}
             >
               <Ionicons 
                 name={isFavorite ? "heart" : "heart-outline"} 
                 size={20} 
-                color={isFavorite ? "#E04E1A" : "#1A1A2E"} 
+                color={isFavorite ? "#FF6B35" : "#1A1A2E"} 
               />
             </TouchableOpacity>
           </View>
@@ -156,11 +173,16 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
           {/* Category Badge & Rating */}
           <View className="flex-row items-center justify-between mb-3">
             <Badge label={meal.category || 'Meal'} variant="primary" />
-            <View className="flex-row items-center bg-amber-50 border border-amber-150 px-3 py-1 rounded-full shadow-xs">
-              <Ionicons name="star" size={12} color="#F59E0B" className="mr-1" />
+            <View className="flex-row items-center bg-amber-50 border border-amber-200 px-3 py-1 rounded-full shadow-xs">
+              <Ionicons name="star" size={13} color="#F59E0B" />
               <Text className="text-amber-800 font-extrabold text-xs ml-1">
                 {meal.avgRating > 0 ? meal.avgRating.toFixed(1) : 'New'}
               </Text>
+              {meal.recentReviews && meal.recentReviews.length > 0 && (
+                <Text className="text-amber-700/80 text-[10px] font-bold ml-1">
+                  ({meal.recentReviews.length})
+                </Text>
+              )}
             </View>
           </View>
 
@@ -271,31 +293,68 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
 
           {/* Neighbor Reviews Section */}
           <View className="mb-6">
-            <Text className="text-textPrimary font-black text-sm uppercase tracking-wider mb-4">Neighbor Feedback</Text>
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-textPrimary font-black text-sm uppercase tracking-wider">
+                Neighbor Feedback
+              </Text>
+              <View className="bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full flex-row items-center">
+                <Ionicons name="star" size={10} color="#F59E0B" style={{ marginRight: 3 }} />
+                <Text className="text-amber-800 text-[10px] font-black">
+                  {meal.avgRating > 0 ? `${meal.avgRating.toFixed(1)} / 5.0` : 'No reviews'}
+                </Text>
+              </View>
+            </View>
+
             {meal.recentReviews && meal.recentReviews.length > 0 ? (
-              meal.recentReviews.map((item: any, index: number) => (
-                <View key={index} className="bg-white border border-gray-100 rounded-2xl p-4 mb-3 shadow-xs">
-                  <View className="flex-row justify-between items-center mb-1.5">
-                    <View className="flex-row items-center">
-                      <View className="w-7 h-7 rounded-full bg-gray-100 items-center justify-center mr-2 border border-gray-200">
-                        <Text className="text-[10px] font-black text-gray-700">{getInitials(item.userName)}</Text>
+              <>
+                {/* Summary Rating Banner */}
+                <View className="bg-amber-50/50 border border-amber-100 rounded-3xl p-4 mb-4 flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    <Text className="text-textPrimary font-black text-3xl mr-3">
+                      {meal.avgRating > 0 ? meal.avgRating.toFixed(1) : '5.0'}
+                    </Text>
+                    <View>
+                      <View className="flex-row items-center gap-0.5">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Ionicons
+                            key={i}
+                            name={i < Math.round(meal.avgRating || 5) ? 'star' : 'star-outline'}
+                            size={12}
+                            color="#F59E0B"
+                          />
+                        ))}
                       </View>
-                      <Text className="text-textPrimary font-extrabold text-xs">{item.userName}</Text>
-                    </View>
-                    <View className="flex-row items-center gap-0.5">
-                      {Array.from({ length: item.rating }).map((_, i) => (
-                        <Ionicons key={i} name="star" size={10} color="#F59E0B" />
-                      ))}
+                      <Text className="text-textMuted text-[10px] font-semibold mt-0.5">
+                        Based on {meal.recentReviews.length} community {meal.recentReviews.length === 1 ? 'review' : 'reviews'}
+                      </Text>
                     </View>
                   </View>
-                  {item.comment ? (
-                    <Text className="text-textSecondary text-xs leading-relaxed font-medium mb-1">{item.comment}</Text>
-                  ) : null}
-                  {item.photoUrl ? (
-                    <Image source={{ uri: item.photoUrl }} className="w-full h-40 rounded-xl mt-2 bg-gray-50" resizeMode="cover" />
-                  ) : null}
                 </View>
-              ))
+
+                {meal.recentReviews.map((item: any, index: number) => (
+                  <View key={index} className="bg-white border border-gray-100 rounded-2xl p-4 mb-3 shadow-xs">
+                    <View className="flex-row justify-between items-center mb-1.5">
+                      <View className="flex-row items-center">
+                        <View className="w-7 h-7 rounded-full bg-gray-100 items-center justify-center mr-2 border border-gray-200">
+                          <Text className="text-[10px] font-black text-gray-700">{getInitials(item.userName)}</Text>
+                        </View>
+                        <Text className="text-textPrimary font-extrabold text-xs">{item.userName}</Text>
+                      </View>
+                      <View className="flex-row items-center gap-0.5">
+                        {Array.from({ length: item.rating }).map((_, i) => (
+                          <Ionicons key={i} name="star" size={10} color="#F59E0B" />
+                        ))}
+                      </View>
+                    </View>
+                    {item.comment ? (
+                      <Text className="text-textSecondary text-xs leading-relaxed font-medium mb-1">{item.comment}</Text>
+                    ) : null}
+                    {item.photoUrl ? (
+                      <Image source={{ uri: item.photoUrl }} className="w-full h-40 rounded-xl mt-2 bg-gray-50" resizeMode="cover" />
+                    ) : null}
+                  </View>
+                ))}
+              </>
             ) : (
               <View className="bg-white border border-gray-100 rounded-2xl p-5 items-center">
                 <Feather name="message-square" size={24} color="#9CA3AF" className="mb-2" />
