@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Alert, TouchableOpacity, Modal } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { LinearGradient } from 'expo-linear-gradient';
+import { cssInterop } from 'nativewind';
 import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
 import { useCartStore } from '../../store/cartStore';
 import { api } from '../../services/api';
 import { Button } from '../../components/common/Button';
 import { TextInput } from '../../components/common/TextInput';
 import { Feather, Ionicons } from '@expo/vector-icons';
+
+cssInterop(LinearGradient, {
+  className: 'style',
+});
 
 type PaymentScreenProps = NativeStackScreenProps<CustomerStackParamList, 'Payment'>;
 
@@ -47,15 +53,39 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
   const getCardBrandDetails = (num: string) => {
     const cleanNum = num.replace(/\s+/g, '');
     if (cleanNum.startsWith('4')) {
-      return { name: 'Visa', emoji: '💳', color: 'text-blue-600', gradient: ['from-blue-600', 'to-indigo-800'] };
+      return { 
+        name: 'Visa', 
+        emoji: '💳', 
+        color: 'text-blue-600', 
+        gradient: ['from-blue-600', 'to-indigo-800'],
+        gradientColors: ['#2563EB', '#312E81'] as const,
+      };
     }
     if (cleanNum.startsWith('5')) {
-      return { name: 'Mastercard', emoji: '💳', color: 'text-red-500', gradient: ['from-red-600', 'to-orange-700'] };
+      return { 
+        name: 'Mastercard', 
+        emoji: '💳', 
+        color: 'text-red-500', 
+        gradient: ['from-red-600', 'to-orange-700'],
+        gradientColors: ['#DC2626', '#C2410C'] as const,
+      };
     }
     if (cleanNum.startsWith('3')) {
-      return { name: 'Amex', emoji: '💳', color: 'text-cyan-600', gradient: ['from-teal-600', 'to-cyan-800'] };
+      return { 
+        name: 'Amex', 
+        emoji: '💳', 
+        color: 'text-cyan-600', 
+        gradient: ['from-teal-600', 'to-cyan-800'],
+        gradientColors: ['#0D9488', '#0E7490'] as const,
+      };
     }
-    return { name: 'Card', emoji: '💳', color: 'text-gray-450', gradient: ['from-gray-800', 'to-slate-900'] };
+    return { 
+      name: 'Card', 
+      emoji: '💳', 
+      color: 'text-gray-400', 
+      gradient: ['from-gray-800', 'to-slate-900'],
+      gradientColors: ['#1F2937', '#0F172A'] as const,
+    };
   };
 
   const cardDetails = getCardBrandDetails(cardNumber);
@@ -267,7 +297,13 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
         </View>
 
         {/* Mock card preview - Dynamic Gradients */}
-        <View className={`bg-gradient-to-tr ${cardDetails.gradient.join(' ')} rounded-3xl p-6 mb-6 shadow-lg relative overflow-hidden`}>
+        <LinearGradient
+          colors={cardDetails.gradientColors}
+          start={{ x: 0, y: 1 }}
+          end={{ x: 1, y: 0 }}
+          className="rounded-3xl p-6 mb-6 shadow-lg relative overflow-hidden"
+          style={{ borderRadius: 24, padding: 24, marginBottom: 24, position: 'relative', overflow: 'hidden' }}
+        >
           <View className="absolute w-64 h-64 rounded-full bg-white/5 -bottom-20 -right-20" />
           <View className="absolute w-40 h-40 rounded-full bg-white/5 -top-20 -left-20" />
           
@@ -294,7 +330,7 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ route, navigation 
               </Text>
             </View>
           </View>
-        </View>
+        </LinearGradient>
 
         {/* Credit Card Input Form */}
         <View className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm mb-6">
