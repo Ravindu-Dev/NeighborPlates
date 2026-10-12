@@ -10,8 +10,8 @@ import {
   Platform,
   ActivityIndicator,
   Animated,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAiChatStore, ChatMessage } from '../../store/aiChatStore';
 import { AiCardRenderer } from './AiCardRenderer';

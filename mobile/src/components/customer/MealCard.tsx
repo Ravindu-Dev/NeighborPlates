@@ -40,7 +40,7 @@ export const MealCard: React.FC<MealCardProps> = ({
     return (
       <TouchableOpacity
         onPress={onPress}
-        className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-5 animate-fade-in"
+        className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-5"
         activeOpacity={0.9}
       >
         {/* Banner Image Container */}
@@ -66,7 +66,7 @@ export const MealCard: React.FC<MealCardProps> = ({
           {onToggleFavorite && (
             <TouchableOpacity
               onPress={(e: any) => {
-                e.stopPropagation();
+                e?.stopPropagation?.();
                 onToggleFavorite();
               }}
               activeOpacity={0.8}
@@ -84,7 +84,7 @@ export const MealCard: React.FC<MealCardProps> = ({
           {onAddToCart && portionsRemaining > 0 && (
             <TouchableOpacity
               onPress={(e: any) => {
-                e.stopPropagation();
+                e?.stopPropagation?.();
                 onAddToCart();
               }}
               activeOpacity={0.8}
@@ -161,7 +161,7 @@ export const MealCard: React.FC<MealCardProps> = ({
         {onToggleFavorite && (
           <TouchableOpacity
             onPress={(e: any) => {
-              e.stopPropagation();
+              e?.stopPropagation?.();
               onToggleFavorite();
             }}
             activeOpacity={0.8}
@@ -179,7 +179,7 @@ export const MealCard: React.FC<MealCardProps> = ({
         {onAddToCart && portionsRemaining > 0 && (
           <TouchableOpacity
             onPress={(e: any) => {
-              e.stopPropagation();
+              e?.stopPropagation?.();
               onAddToCart();
             }}
             activeOpacity={0.8}
