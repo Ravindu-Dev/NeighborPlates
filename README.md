@@ -41,16 +41,12 @@ npm run web       # Run on Web browser
 
 ---
 
-## 👥 Demo Logins
+## 👥 User Roles
 
-Use any of these pre-seeded accounts to log in:
-
-| Role | Email | Password |
-| :--- | :--- | :--- |
-| **Customer** | `customer.demo@neighborplates.com` | `cust123` |
-| **Cook** | `nimali.cook@neighborplates.com` | `cook123` |
-| **Rider** | `rider@neighborplates.com` | `rider123` |
-| **Admin** | `admin@neighborplates.com` | `admin123` |
+- **Customer**: Browse home-cooked meals, filter dietary preferences, order meals, pay via card/cash, track deliveries, and rate cooks.
+- **Cook**: Manage kitchen profile, publish meal listings with photos, create combo specials, update order progress, and track earnings.
+- **Rider (Courier)**: Accept nearby delivery jobs, navigate pickup and delivery routes, verify equipment, and track completed deliveries.
+- **Admin**: System-wide oversight, user account management (ban/activate/verify), listing moderation, and operational analytics.
 
 ---
 
