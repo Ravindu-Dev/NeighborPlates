@@ -92,7 +92,7 @@ const RiderTabNavigator = () => {
         component={RiderDashboardScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon iconName="briefcase" label="Jobs" focused={focused} showBadge={true} />
+            <TabIcon iconName="briefcase" label="Jobs" focused={focused} />
           ),
         }}
       />

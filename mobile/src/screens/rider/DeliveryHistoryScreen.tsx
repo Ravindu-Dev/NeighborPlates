@@ -47,6 +47,308 @@ export const DeliveryHistoryScreen: React.FC = () => {
   const [cashingOut, setCashingOut] = useState(false);
   const [profile, setProfile] = useState<any>(null);
 
+// Realistic dummy data generator for rider delivery history and charts
+const getDummyRiderData = () => {
+  const now = new Date();
+  const daysAgo = (days: number, hour: number, min: number) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - days);
+    d.setHours(hour, min, 0, 0);
+    return d.toISOString();
+  };
+
+  const dummyDeliveries: DeliveryRecord[] = [
+    // Today
+    {
+      id: 'NP-DEL-8901',
+      time: '02:15 PM',
+      distance: 'Nugegoda Home Hub',
+      duration: '18 min',
+      restaurant: "Amma's Spice Garden",
+      dropoff: '12/A Flower Road, Colombo 07',
+      payout: 285.0,
+      baseFee: 245.0,
+      tip: 40.0,
+      rawDate: daysAgo(0, 14, 15),
+    },
+    {
+      id: 'NP-DEL-8902',
+      time: '12:45 PM',
+      distance: 'Maharagama Artisan Kitchen',
+      duration: '14 min',
+      restaurant: "Nimali's Home Kitchen",
+      dropoff: '45 High Level Road, Nugegoda',
+      payout: 217.5,
+      baseFee: 185.0,
+      tip: 32.5,
+      rawDate: daysAgo(0, 12, 45),
+    },
+    // Yesterday (1 day ago)
+    {
+      id: 'NP-DEL-8903',
+      time: '08:15 PM',
+      distance: 'Kollupitiya Diner Hub',
+      duration: '22 min',
+      restaurant: 'Green Leaf Vegetarian',
+      dropoff: '32 Duplication Road, Kollupitiya',
+      payout: 310.0,
+      baseFee: 260.0,
+      tip: 50.0,
+      rawDate: daysAgo(1, 20, 15),
+    },
+    {
+      id: 'NP-DEL-8904',
+      time: '06:40 PM',
+      distance: 'Havelock Gourmet Pantry',
+      duration: '20 min',
+      restaurant: 'Curry Leaf Kitchen',
+      dropoff: '14 Havelock Town, Colombo 05',
+      payout: 350.0,
+      baseFee: 290.0,
+      tip: 60.0,
+      rawDate: daysAgo(1, 18, 40),
+    },
+    {
+      id: 'NP-DEL-8905',
+      time: '01:20 PM',
+      distance: 'Coastal Kitchens',
+      duration: '26 min',
+      restaurant: 'Authentic Jaffna Crab Pots',
+      dropoff: '88 Galle Road, Mount Lavinia',
+      payout: 420.0,
+      baseFee: 350.0,
+      tip: 70.0,
+      rawDate: daysAgo(1, 13, 20),
+    },
+    // 2 days ago
+    {
+      id: 'NP-DEL-8906',
+      time: '07:15 PM',
+      distance: 'Dematagoda Spice Stop',
+      duration: '21 min',
+      restaurant: 'Village Claypot Rice',
+      dropoff: '25 Baseline Road, Dematagoda',
+      payout: 310.0,
+      baseFee: 270.0,
+      tip: 40.0,
+      rawDate: daysAgo(2, 19, 15),
+    },
+    {
+      id: 'NP-DEL-8907',
+      time: '11:30 AM',
+      distance: 'Borella Heritage Cooks',
+      duration: '15 min',
+      restaurant: "Nimali's Home Kitchen",
+      dropoff: '102 Kynsey Road, Borella',
+      payout: 240.0,
+      baseFee: 210.0,
+      tip: 30.0,
+      rawDate: daysAgo(2, 11, 30),
+    },
+    // 3 days ago
+    {
+      id: 'NP-DEL-8908',
+      time: '08:50 PM',
+      distance: 'Kotte Sweets Collective',
+      duration: '14 min',
+      restaurant: 'Sweet & Spice Treats',
+      dropoff: '18 Rajagiriya Road, Kotte',
+      payout: 260.0,
+      baseFee: 210.0,
+      tip: 50.0,
+      rawDate: daysAgo(3, 20, 50),
+    },
+    {
+      id: 'NP-DEL-8909',
+      time: '06:30 PM',
+      distance: 'Havelock Biryani Lab',
+      duration: '25 min',
+      restaurant: 'Ceylon Biryani House',
+      dropoff: '77 Havelock Road, Colombo 05',
+      payout: 390.0,
+      baseFee: 340.0,
+      tip: 50.0,
+      rawDate: daysAgo(3, 18, 30),
+    },
+    {
+      id: 'NP-DEL-8910',
+      time: '01:45 PM',
+      distance: 'Marine Drive Curries',
+      duration: '19 min',
+      restaurant: 'Southern Fish Curry Pot',
+      dropoff: '54 Marine Drive, Bambalapitiya',
+      payout: 340.0,
+      baseFee: 290.0,
+      tip: 50.0,
+      rawDate: daysAgo(3, 13, 45),
+    },
+    {
+      id: 'NP-DEL-8911',
+      time: '12:10 PM',
+      distance: 'Cinnamon Gardens Hub',
+      duration: '28 min',
+      restaurant: "Grandma's Lamprais",
+      dropoff: '6 Ward Place, Colombo 07',
+      payout: 430.0,
+      baseFee: 380.0,
+      tip: 50.0,
+      rawDate: daysAgo(3, 12, 10),
+    },
+    // 4 days ago
+    {
+      id: 'NP-DEL-8912',
+      time: '08:30 PM',
+      distance: 'Colombo 07 Cloud Cooks',
+      duration: '17 min',
+      restaurant: "Nimali's Home Kitchen",
+      dropoff: '30 Barnes Place, Colombo 07',
+      payout: 280.0,
+      baseFee: 240.0,
+      tip: 40.0,
+      rawDate: daysAgo(4, 20, 30),
+    },
+    {
+      id: 'NP-DEL-8913',
+      time: '06:15 PM',
+      distance: 'Park Street Dining Co.',
+      duration: '23 min',
+      restaurant: 'Curry Leaf Kitchen',
+      dropoff: '15 Park Street, Colombo 02',
+      payout: 360.0,
+      baseFee: 310.0,
+      tip: 50.0,
+      rawDate: daysAgo(4, 18, 15),
+    },
+    {
+      id: 'NP-DEL-8914',
+      time: '01:00 PM',
+      distance: 'Dharmapala Home Cooks',
+      duration: '19 min',
+      restaurant: "Amma's Spice Garden",
+      dropoff: '91 Dharmapala Mawatha, Colombo 07',
+      payout: 310.0,
+      baseFee: 270.0,
+      tip: 40.0,
+      rawDate: daysAgo(4, 13, 0),
+    },
+    // 5 days ago
+    {
+      id: 'NP-DEL-8915',
+      time: '07:45 PM',
+      distance: 'Torrington Food Stalls',
+      duration: '27 min',
+      restaurant: 'Authentic Jaffna Crab Pots',
+      dropoff: '68 Torrington Square, Colombo 07',
+      payout: 420.0,
+      baseFee: 360.0,
+      tip: 60.0,
+      rawDate: daysAgo(5, 19, 45),
+    },
+    {
+      id: 'NP-DEL-8916',
+      time: '12:30 PM',
+      distance: 'Rajagiriya Artisan Hub',
+      duration: '20 min',
+      restaurant: 'Village Claypot Rice',
+      dropoff: '44 Nawala Road, Rajagiriya',
+      payout: 320.0,
+      baseFee: 280.0,
+      tip: 40.0,
+      rawDate: daysAgo(5, 12, 30),
+    },
+    // 6 days ago
+    {
+      id: 'NP-DEL-8917',
+      time: '07:30 PM',
+      distance: 'Borella Junction Kitchen',
+      duration: '18 min',
+      restaurant: 'Green Leaf Vegetarian',
+      dropoff: '58 Cotta Road, Borella',
+      payout: 285.0,
+      baseFee: 245.0,
+      tip: 40.0,
+      rawDate: daysAgo(6, 19, 30),
+    },
+    {
+      id: 'NP-DEL-8918',
+      time: '02:00 PM',
+      distance: 'Dickmans Heritage Cooks',
+      duration: '21 min',
+      restaurant: 'Ceylon Biryani House',
+      dropoff: '11 Dickmans Road, Colombo 05',
+      payout: 325.0,
+      baseFee: 275.0,
+      tip: 50.0,
+      rawDate: daysAgo(6, 14, 0),
+    },
+    {
+      id: 'NP-DEL-8919',
+      time: '11:45 AM',
+      distance: 'Rosmead Gardens Kitchen',
+      duration: '24 min',
+      restaurant: "Grandma's Lamprais",
+      dropoff: '22 Rosmead Place, Colombo 07',
+      payout: 360.0,
+      baseFee: 310.0,
+      tip: 50.0,
+      rawDate: daysAgo(6, 11, 45),
+    },
+  ];
+
+  // Build last 7 days dynamic metrics aligned to days
+  const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const last7Days: any[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const dayLabel = dayNames[d.getDay()];
+
+    const matching = dummyDeliveries.filter((del) => {
+      const delD = new Date(del.rawDate!);
+      return (
+        delD.getDate() === d.getDate() &&
+        delD.getMonth() === d.getMonth() &&
+        delD.getFullYear() === d.getFullYear()
+      );
+    });
+    const count = matching.length;
+    const earnings = matching.reduce((sum, item) => sum + item.payout, 0);
+
+    last7Days.push({
+      dayLabel,
+      count,
+      earnings,
+      isToday: i === 0,
+    });
+  }
+
+  const todayEarnings = last7Days[6].earnings;
+  const todayCount = last7Days[6].count;
+  const weekEarnings = last7Days.reduce((acc, d) => acc + d.earnings, 0);
+  const weekCount = last7Days.reduce((acc, d) => acc + d.count, 0);
+
+  const dummySummary = {
+    today: {
+      earnings: todayEarnings,
+      deliveryCount: todayCount,
+    },
+    thisWeek: {
+      earnings: weekEarnings,
+      deliveryCount: weekCount,
+    },
+    thisMonth: {
+      earnings: 24850,
+      deliveryCount: 84,
+    },
+    totalEarnings: 486200,
+    totalDeliveries: 142,
+    activeDeliveries: 0,
+    last7Days,
+  };
+
+  return { dummyDeliveries, dummySummary };
+};
+
   const fetchHistory = async () => {
     try {
       const [ordersRes, profileRes, summaryRes] = await Promise.allSettled([
@@ -59,13 +361,12 @@ export const DeliveryHistoryScreen: React.FC = () => {
         setProfile(profileRes.value.data);
       }
 
-      if (summaryRes.status === 'fulfilled' && summaryRes.value.data) {
-        setSummary(summaryRes.value.data);
-      }
+      let summaryData = summaryRes.status === 'fulfilled' ? summaryRes.value.data : null;
+      let mappedDeliveries: DeliveryRecord[] = [];
 
       if (ordersRes.status === 'fulfilled' && Array.isArray(ordersRes.value.data)) {
         const delivered = ordersRes.value.data.filter((o: any) => o.status === 'DELIVERED');
-        const mapped: DeliveryRecord[] = delivered.map((o: any) => {
+        mappedDeliveries = delivered.map((o: any) => {
           const orderDate = new Date(o.deliveredAt || o.createdAt);
           return {
             id: o.id,
@@ -83,12 +384,102 @@ export const DeliveryHistoryScreen: React.FC = () => {
             rawDate: o.deliveredAt || o.createdAt,
           };
         });
-        setDeliveries(mapped);
+      }
+
+      // Determine if current user is specifically the demo rider account (rider@neighborplates.com)
+      const currentEmail = (
+        user?.email ||
+        (profileRes.status === 'fulfilled' ? profileRes.value?.data?.email : '') ||
+        ''
+      )
+        .trim()
+        .toLowerCase();
+      const isDemoRider = currentEmail === 'rider@neighborplates.com';
+
+      // Only load dummy demo data if the user is explicitly rider@neighborplates.com AND has no data
+      const needsDummyData =
+        isDemoRider &&
+        (mappedDeliveries.length === 0 ||
+          !summaryData ||
+          (summaryData.totalEarnings === 0 &&
+            (!summaryData.last7Days || summaryData.last7Days.every((d: any) => d.earnings === 0))));
+
+      if (needsDummyData) {
+        const { dummyDeliveries, dummySummary } = getDummyRiderData();
+        if (mappedDeliveries.length === 0) {
+          mappedDeliveries = dummyDeliveries;
+        }
+        if (
+          !summaryData ||
+          summaryData.totalEarnings === 0 ||
+          !summaryData.last7Days ||
+          summaryData.last7Days.every((d: any) => d.earnings === 0)
+        ) {
+          summaryData = {
+            ...dummySummary,
+            ...(summaryData || {}),
+            today: summaryData?.today?.earnings ? summaryData.today : dummySummary.today,
+            thisWeek: summaryData?.thisWeek?.earnings ? summaryData.thisWeek : dummySummary.thisWeek,
+            thisMonth: summaryData?.thisMonth?.earnings ? summaryData.thisMonth : dummySummary.thisMonth,
+            totalEarnings: summaryData?.totalEarnings || dummySummary.totalEarnings,
+            totalDeliveries: summaryData?.totalDeliveries || dummySummary.totalDeliveries,
+            last7Days:
+              summaryData?.last7Days && summaryData.last7Days.some((d: any) => d.earnings > 0)
+                ? summaryData.last7Days
+                : dummySummary.last7Days,
+          };
+        }
+      }
+
+      // If non-demo rider and summaryData is missing, ensure clean zero-value structure
+      if (!summaryData) {
+        summaryData = {
+          totalEarnings: 0,
+          totalDeliveries: 0,
+          activeDeliveries: 0,
+          today: { deliveryCount: 0, earnings: 0 },
+          thisWeek: { deliveryCount: 0, earnings: 0 },
+          thisMonth: { deliveryCount: 0, earnings: 0 },
+          last7Days: [
+            { dayLabel: 'M', count: 0, earnings: 0, isToday: false },
+            { dayLabel: 'T', count: 0, earnings: 0, isToday: false },
+            { dayLabel: 'W', count: 0, earnings: 0, isToday: false },
+            { dayLabel: 'T', count: 0, earnings: 0, isToday: false },
+            { dayLabel: 'F', count: 0, earnings: 0, isToday: false },
+            { dayLabel: 'S', count: 0, earnings: 0, isToday: false },
+            { dayLabel: 'S', count: 0, earnings: 0, isToday: true },
+          ],
+        };
+      }
+
+      setDeliveries(mappedDeliveries);
+      setSummary(summaryData);
+    } catch {
+      const emailToCheck = (user?.email || '').trim().toLowerCase();
+      if (emailToCheck === 'rider@neighborplates.com') {
+        const { dummyDeliveries, dummySummary } = getDummyRiderData();
+        setDeliveries(dummyDeliveries);
+        setSummary(dummySummary);
       } else {
         setDeliveries([]);
+        setSummary({
+          totalEarnings: 0,
+          totalDeliveries: 0,
+          activeDeliveries: 0,
+          today: { deliveryCount: 0, earnings: 0 },
+          thisWeek: { deliveryCount: 0, earnings: 0 },
+          thisMonth: { deliveryCount: 0, earnings: 0 },
+          last7Days: [
+            { dayLabel: 'M', count: 0, earnings: 0, isToday: false },
+            { dayLabel: 'T', count: 0, earnings: 0, isToday: false },
+            { dayLabel: 'W', count: 0, earnings: 0, isToday: false },
+            { dayLabel: 'T', count: 0, earnings: 0, isToday: false },
+            { dayLabel: 'F', count: 0, earnings: 0, isToday: false },
+            { dayLabel: 'S', count: 0, earnings: 0, isToday: false },
+            { dayLabel: 'S', count: 0, earnings: 0, isToday: true },
+          ],
+        });
       }
-    } catch {
-      setDeliveries([]);
     } finally {
       setLoading(false);
     }

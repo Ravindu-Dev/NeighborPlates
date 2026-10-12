@@ -325,13 +325,13 @@ public class OrderService {
                 }
                 break;
             case ACCEPTED:
-                if (next != OrderStatus.PREPARING) {
-                    throw new IllegalArgumentException("Accepted orders must transition to the preparing queue next");
+                if (next != OrderStatus.PREPARING && next != OrderStatus.DELIVERING) {
+                    throw new IllegalArgumentException("Accepted orders must transition to the preparing queue or pickup dispatch next");
                 }
                 break;
             case PREPARING:
-                if (next != OrderStatus.READY) {
-                    throw new IllegalArgumentException("Preparing meals must transition to a ready state before dispatch");
+                if (next != OrderStatus.READY && next != OrderStatus.DELIVERING) {
+                    throw new IllegalArgumentException("Preparing meals must transition to a ready state or pickup dispatch next");
                 }
                 break;
             case READY:

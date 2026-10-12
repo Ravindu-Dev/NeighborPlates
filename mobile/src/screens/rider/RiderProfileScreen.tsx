@@ -19,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { api } from '../../services/api';
 import { vehicleService } from '../../services/vehicleService';
+import { documentService } from '../../services/documentService';
 import { useAuthStore } from '../../store/authStore';
 import { Feather, Ionicons } from '@expo/vector-icons';
 
@@ -87,6 +88,8 @@ export const RiderProfileScreen: React.FC = () => {
   const [sosModalVisible, setSosModalVisible] = useState(false);
   const [taxModalVisible, setTaxModalVisible] = useState(false);
   const [insuranceModalVisible, setInsuranceModalVisible] = useState(false);
+  const [downloadingTaxDoc, setDownloadingTaxDoc] = useState(false);
+  const [downloadingInsuranceDoc, setDownloadingInsuranceDoc] = useState(false);
 
   // Fetch logged in rider's real data
   const fetchProfile = async () => {
@@ -357,6 +360,63 @@ export const RiderProfileScreen: React.FC = () => {
       Alert.alert('Error', 'Could not save payout method.');
     } finally {
       setSavingPayout(false);
+    }
+  };
+
+  // Download Tax Document (1099-NEC)
+  const handleDownloadTaxStatement = async () => {
+    setDownloadingTaxDoc(true);
+    try {
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      const success = await documentService.downloadTaxStatement({
+        name: riderName,
+        email: riderEmail,
+        phone: riderPhone,
+        year: 2023,
+        grossEarnings: 486200,
+        totalDeliveries: summary?.totalDeliveries || 142,
+      });
+      if (success) {
+        Alert.alert(
+          'Statement Downloaded',
+          'Your 2023 Form 1099-NEC statement was successfully downloaded / sent to print.'
+        );
+        setTaxModalVisible(false);
+      }
+    } catch (e: any) {
+      Alert.alert('Error', 'Could not generate tax document statement.');
+    } finally {
+      setDownloadingTaxDoc(false);
+    }
+  };
+
+  // Download Commercial Insurance Certificate
+  const handleDownloadInsuranceCertificate = async () => {
+    setDownloadingInsuranceDoc(true);
+    try {
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      const success = await documentService.downloadInsuranceCertificate({
+        name: riderName,
+        email: riderEmail,
+        policyNumber: 'NP-COV-88291',
+        vehicleModel,
+        plateNumber,
+      });
+      if (success) {
+        Alert.alert(
+          'Certificate Downloaded',
+          'Your commercial coverage certificate was successfully downloaded / sent to print.'
+        );
+        setInsuranceModalVisible(false);
+      }
+    } catch (e: any) {
+      Alert.alert('Error', 'Could not generate commercial coverage certificate.');
+    } finally {
+      setDownloadingInsuranceDoc(false);
     }
   };
 
@@ -1575,13 +1635,18 @@ export const RiderProfileScreen: React.FC = () => {
             </View>
 
             <TouchableOpacity
-              onPress={() => {
-                Alert.alert('Download Started', 'Your 1099-NEC PDF statement is downloading to your device.');
-                setTaxModalVisible(false);
-              }}
-              className="bg-[#7C2D12] py-4 rounded-2xl items-center shadow-md mb-2"
+              onPress={handleDownloadTaxStatement}
+              disabled={downloadingTaxDoc}
+              className="bg-[#7C2D12] py-4 rounded-2xl items-center shadow-md mb-2 flex-row justify-center"
             >
-              <Text className="text-white font-black text-sm">DOWNLOAD PDF STATEMENT</Text>
+              {downloadingTaxDoc ? (
+                <>
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <Text className="text-white font-black text-sm ml-2">PREPARING PDF...</Text>
+                </>
+              ) : (
+                <Text className="text-white font-black text-sm">DOWNLOAD PDF STATEMENT</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -1616,6 +1681,21 @@ export const RiderProfileScreen: React.FC = () => {
                 Valid through Nov 30, 2025. Covers comprehensive roadside third-party liability up to $1,000,000 and hot food loss compensation.
               </Text>
             </View>
+
+            <TouchableOpacity
+              onPress={handleDownloadInsuranceCertificate}
+              disabled={downloadingInsuranceDoc}
+              className="bg-[#2563EB] py-4 rounded-2xl items-center shadow-md mb-2.5 flex-row justify-center"
+            >
+              {downloadingInsuranceDoc ? (
+                <>
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <Text className="text-white font-black text-sm ml-2">PREPARING CERTIFICATE...</Text>
+                </>
+              ) : (
+                <Text className="text-white font-black text-sm">DOWNLOAD CERTIFICATE PDF</Text>
+              )}
+            </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => setInsuranceModalVisible(false)}
