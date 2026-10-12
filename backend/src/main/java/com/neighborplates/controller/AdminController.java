@@ -67,6 +67,14 @@ public class AdminController {
         return ResponseEntity.ok(reviews);
     }
 
+    @PutMapping("/reviews/{id}/flag")
+    public ResponseEntity<Review> flagReview(
+            @PathVariable String id,
+            @RequestParam(required = false, defaultValue = "Flagged by Administrator") String reason) {
+        Review review = adminService.flagReview(id, reason);
+        return ResponseEntity.ok(review);
+    }
+
     @PutMapping("/reviews/{id}/dismiss-flag")
     public ResponseEntity<Review> dismissReviewFlag(@PathVariable String id) {
         Review review = adminService.dismissReviewFlag(id);

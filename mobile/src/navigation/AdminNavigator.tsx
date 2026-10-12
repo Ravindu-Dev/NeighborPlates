@@ -19,10 +19,23 @@ const Tab = createBottomTabNavigator<AdminTabParamList>();
 
 export const AdminNavigator = () => {
   return (
-    <Tab.Navigator 
+    <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarActiveTintColor: '#1A1A2E',
+        tabBarActiveTintColor: '#FF6B35',
         tabBarInactiveTintColor: '#9CA3AF',
+        tabBarStyle: {
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#F3F4F6',
+          borderTopWidth: 1,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 4,
+        },
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '700',
+        },
+        headerShown: false,
         tabBarIcon: ({ color, size }) => {
           const icons: Record<string, keyof typeof Feather.glyphMap> = {
             Operations: 'activity',
@@ -37,9 +50,9 @@ export const AdminNavigator = () => {
       })}
     >
       <Tab.Screen name="Operations" component={LiveOperationsScreen} options={{ title: 'Live Ops' }} />
-      <Tab.Screen name="Users" component={UserManagementScreen} options={{ title: 'Verify Cooks' }} />
-      <Tab.Screen name="Moderation" component={ContentModerationScreen} options={{ title: 'Content Moderation' }} />
-      <Tab.Screen name="Analytics" component={AnalyticsScreen} options={{ title: 'Platform Stats' }} />
+      <Tab.Screen name="Users" component={UserManagementScreen} options={{ title: 'Users' }} />
+      <Tab.Screen name="Moderation" component={ContentModerationScreen} options={{ title: 'Moderation' }} />
+      <Tab.Screen name="Analytics" component={AnalyticsScreen} options={{ title: 'Analytics' }} />
       <Tab.Screen name="Profile" component={AdminProfileScreen} options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );

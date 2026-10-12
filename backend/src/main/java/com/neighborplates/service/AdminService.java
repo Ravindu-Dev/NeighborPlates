@@ -73,20 +73,57 @@ public class AdminService {
         long totalUsers = users.size();
         long totalCustomers = users.stream().filter(u -> u.getRole() == UserRole.CUSTOMER).count();
         long totalCooks = users.stream().filter(u -> u.getRole() == UserRole.COOK).count();
+        long totalRiders = users.stream().filter(u -> u.getRole() == UserRole.RIDER).count();
+
+        long pendingCookVerifications = users.stream()
+                .filter(u -> u.getRole() == UserRole.COOK && u.getProfile() != null && !u.getProfile().isHygieneVerified())
+                .count();
+        long pendingRiderVerifications = users.stream()
+                .filter(u -> u.getRole() == UserRole.RIDER && u.getProfile() != null && !u.getProfile().isRiderVerified())
+                .count();
+
+        java.util.List<OrderStatus> activeStatuses = java.util.List.of(
+                OrderStatus.PLACED, OrderStatus.ACCEPTED, OrderStatus.PREPARING,
+                OrderStatus.READY, OrderStatus.DELIVERING
+        );
+        long activeOrdersCount = orders.stream()
+                .filter(o -> activeStatuses.contains(o.getStatus()))
+                .count();
 
         long totalOrders = orders.size();
         double totalRevenue = orders.stream().mapToDouble(Order::getTotalAmount).sum();
         double totalCommission = orders.stream().mapToDouble(Order::getPlatformFee).sum();
 
+        List<Order> deliveredOrders = orders.stream()
+                .filter(o -> o.getStatus() == OrderStatus.DELIVERED)
+                .collect(Collectors.toList());
+
+        double totalPendingCookPayouts = deliveredOrders.stream()
+                .filter(o -> !o.isCookPayoutSettled())
+                .mapToDouble(Order::getCookEarnings)
+                .sum();
+
+        double totalPendingRiderPayouts = deliveredOrders.stream()
+                .filter(o -> !o.isRiderPayoutSettled() && o.getRiderEarnings() != null)
+                .mapToDouble(o -> o.getRiderEarnings() == null ? 0.0 : o.getRiderEarnings())
+                .sum();
+
         return new AdminAnalyticsResponse(
                 totalUsers,
                 totalCustomers,
                 totalCooks,
+                totalRiders,
                 totalOrders,
+                activeOrdersCount,
+                pendingCookVerifications,
+                pendingRiderVerifications,
                 totalRevenue,
-                totalCommission
+                totalCommission,
+                totalPendingCookPayouts,
+                totalPendingRiderPayouts
         );
     }
+
 
     public List<Meal> getAllMeals() {
         return mealRepository.findAll();
@@ -107,11 +144,21 @@ public class AdminService {
         return reviewRepository.findAllByOrderByCreatedAtDesc();
     }
 
+    public Review flagReview(String id, String reason) {
+        Review review = reviewRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Review not found"));
+        review.setFlagged(true);
+        review.setFlaggedReason(reason != null && !reason.trim().isEmpty() ? reason : "Flagged by Administrator");
+        review.setUpdatedAt(java.time.Instant.now());
+        return reviewRepository.save(review);
+    }
+
     public Review dismissReviewFlag(String id) {
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Review not found"));
         review.setFlagged(false);
         review.setFlaggedReason(null);
+        review.setUpdatedAt(java.time.Instant.now());
         return reviewRepository.save(review);
     }
 
@@ -122,31 +169,44 @@ public class AdminService {
         reviewRepository.delete(review);
 
         // Update embedded review in the associated Meal
-        Meal meal = mealRepository.findById(review.getMealId()).orElse(null);
-        if (meal != null) {
-            // Remove review from recentReviews list
-            meal.getRecentReviews().removeIf(r -> r.getUserId().equals(review.getCustomerId()) && (review.getComment() == null ? r.getComment() == null : review.getComment().equals(r.getComment())));
+        if (review.getMealId() != null) {
+            Meal meal = mealRepository.findById(review.getMealId()).orElse(null);
+            if (meal != null) {
+                // Remove review from recentReviews list
+                if (meal.getRecentReviews() != null) {
+                    meal.getRecentReviews().removeIf(r ->
+                            r != null &&
+                            ((r.getReviewId() != null && r.getReviewId().equals(review.getId())) ||
+                             (r.getUserId() != null && r.getUserId().equals(review.getCustomerId())))
+                    );
+                }
 
-            // Re-calculate meal rating averages
-            List<Review> mealReviews = reviewRepository.findByMealIdOrderByCreatedAtDesc(meal.getId());
-            double mealAvg = mealReviews.stream()
-                    .mapToDouble(Review::getRating)
-                    .average()
-                    .orElse(0.0);
-            meal.setAvgRating(mealAvg);
-            mealRepository.save(meal);
+                // Re-calculate meal rating averages
+                List<Review> mealReviews = reviewRepository.findByMealIdOrderByCreatedAtDesc(meal.getId());
+                double mealAvg = mealReviews.stream()
+                        .mapToDouble(Review::getRating)
+                        .average()
+                        .orElse(0.0);
+                meal.setAvgRating(mealAvg);
+                mealRepository.save(meal);
+            }
         }
 
         // Re-calculate cook rating averages
-        User cook = userRepository.findById(review.getCookId()).orElse(null);
-        if (cook != null) {
-            List<Review> cookReviews = reviewRepository.findByCookIdOrderByCreatedAtDesc(cook.getId());
-            double cookAvg = cookReviews.stream()
-                    .mapToDouble(Review::getRating)
-                    .average()
-                    .orElse(0.0);
-            cook.getStats().setAvgRating(cookAvg);
-            userRepository.save(cook);
+        if (review.getCookId() != null) {
+            User cook = userRepository.findById(review.getCookId()).orElse(null);
+            if (cook != null) {
+                List<Review> cookReviews = reviewRepository.findByCookIdOrderByCreatedAtDesc(cook.getId());
+                double cookAvg = cookReviews.stream()
+                        .mapToDouble(Review::getRating)
+                        .average()
+                        .orElse(0.0);
+                if (cook.getStats() == null) {
+                    cook.setStats(new User.UserStats());
+                }
+                cook.getStats().setAvgRating(cookAvg);
+                userRepository.save(cook);
+            }
         }
     }
 
