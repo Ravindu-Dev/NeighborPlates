@@ -4,7 +4,8 @@ import { View, Text, Platform } from 'react-native';
 let WebView: any = null;
 if (Platform.OS !== 'web') {
   try {
-    WebView = require('react-native-webview').WebView;
+    const pkg = require('react-native-webview');
+    WebView = pkg.WebView || pkg.default || pkg;
   } catch (e) {
     console.warn("react-native-webview not loaded", e);
   }
@@ -32,6 +33,8 @@ export const KitchenDiscoveryMap: React.FC<KitchenDiscoveryMapProps> = ({
   customerLat = 7.8731,
   customerLon = 80.7718
 }) => {
+  const safeCooksJson = JSON.stringify(cooks || []).replace(/</g, '\\u003c');
+
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -81,17 +84,15 @@ export const KitchenDiscoveryMap: React.FC<KitchenDiscoveryMapProps> = ({
           font-size: 10px;
           text-decoration: none;
           box-shadow: 0 4px 6px -1px rgba(255, 107, 53, 0.2);
-          transition: background-color 0.2s ease;
-        }
-        .popup-btn:hover {
-          background-color: #E05621;
+          cursor: pointer;
+          border: none;
+          width: 100%;
         }
       </style>
     </head>
     <body>
       <div id="map"></div>
       <script>
-        // Set map centered on customer coordinates
         var map = L.map('map', { zoomControl: false }).setView([${customerLat}, ${customerLon}], 8);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -99,8 +100,7 @@ export const KitchenDiscoveryMap: React.FC<KitchenDiscoveryMapProps> = ({
           attribution: '© OpenStreetMap'
         }).addTo(map);
 
-        // Inject active kitchen locations
-        var cooksList = ${JSON.stringify(cooks)};
+        var cooksList = ${safeCooksJson};
         cooksList.forEach(function(cook) {
           if (cook.lat && cook.lng) {
             var marker = L.marker([cook.lat, cook.lng], {
@@ -111,13 +111,23 @@ export const KitchenDiscoveryMap: React.FC<KitchenDiscoveryMapProps> = ({
               })
             }).addTo(map);
 
+            var safeName = (cook.kitchenName || 'Kitchen').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            var safeCuisine = (cook.cuisine || 'Home-style').replace(/&/g, '&amp;').replace(/</g, '&lt;');
             var popupHtml = '<div class="popup-container">' +
-                            '  <div class="popup-title">' + cook.kitchenName + '</div>' +
-                            '  <div class="popup-sub">⭐ ' + cook.rating + ' • ' + cook.cuisine + '</div>' +
-                            '  <a href="javascript:void(0);" onclick="triggerSelection(\\'' + cook.id + '\\', \\'' + cook.kitchenName.replace(/'/g, "\\'") + '\\')" class="popup-btn">VIEW MENU</a>' +
+                            '  <div class="popup-title">' + safeName + '</div>' +
+                            '  <div class="popup-sub">⭐ ' + cook.rating + ' • ' + safeCuisine + '</div>' +
+                            '  <button id="cook-btn-' + cook.id + '" class="popup-btn">VIEW MENU</button>' +
                             '</div>';
             
             marker.bindPopup(popupHtml);
+            marker.on('popupopen', function() {
+              var btn = document.getElementById('cook-btn-' + cook.id);
+              if (btn) {
+                btn.onclick = function() {
+                  triggerSelection(cook.id, cook.kitchenName);
+                };
+              }
+            });
           }
         });
 
@@ -134,14 +144,13 @@ export const KitchenDiscoveryMap: React.FC<KitchenDiscoveryMapProps> = ({
     </html>
   `;
 
-  // Listen to message sent from Leaflet inside Web preview
   useEffect(() => {
     if (Platform.OS === 'web') {
       const handleWebMessage = (event: MessageEvent) => {
         let data;
         try {
           data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        } catch (e) {
+        } catch {
           return;
         }
         if (data && data.type === 'selectCook') {
@@ -157,7 +166,7 @@ export const KitchenDiscoveryMap: React.FC<KitchenDiscoveryMapProps> = ({
     let data;
     try {
       data = JSON.parse(event.nativeEvent.data);
-    } catch (e) {
+    } catch {
       return;
     }
     if (data && data.type === 'selectCook') {
@@ -177,20 +186,23 @@ export const KitchenDiscoveryMap: React.FC<KitchenDiscoveryMapProps> = ({
 
   if (WebView) {
     return (
-      <WebView
-        originWhitelist={['*']}
-        source={{ html: htmlContent }}
-        style={{ flex: 1 }}
-        onMessage={handleNativeMessage}
-        javaScriptEnabled
-        domStorageEnabled
-      />
+      <View style={{ flex: 1, minHeight: 350 }}>
+        <WebView
+          originWhitelist={['*']}
+          source={{ html: htmlContent }}
+          style={{ flex: 1 }}
+          onMessage={handleNativeMessage}
+          javaScriptEnabled
+          domStorageEnabled
+          scalesPageToFit
+        />
+      </View>
     );
   }
 
   return (
     <View className="flex-1 justify-center items-center p-6">
-      <Text className="text-textSecondary font-bold text-center">WebView not available</Text>
+      <Text className="text-textSecondary font-bold text-center">Interactive map is available on Web & full builds.</Text>
     </View>
   );
 };
