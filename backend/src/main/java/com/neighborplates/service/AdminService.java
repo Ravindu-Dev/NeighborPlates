@@ -73,20 +73,57 @@ public class AdminService {
         long totalUsers = users.size();
         long totalCustomers = users.stream().filter(u -> u.getRole() == UserRole.CUSTOMER).count();
         long totalCooks = users.stream().filter(u -> u.getRole() == UserRole.COOK).count();
+        long totalRiders = users.stream().filter(u -> u.getRole() == UserRole.RIDER).count();
+
+        long pendingCookVerifications = users.stream()
+                .filter(u -> u.getRole() == UserRole.COOK && u.getProfile() != null && !u.getProfile().isHygieneVerified())
+                .count();
+        long pendingRiderVerifications = users.stream()
+                .filter(u -> u.getRole() == UserRole.RIDER && u.getProfile() != null && !u.getProfile().isRiderVerified())
+                .count();
+
+        java.util.List<OrderStatus> activeStatuses = java.util.List.of(
+                OrderStatus.PLACED, OrderStatus.ACCEPTED, OrderStatus.PREPARING,
+                OrderStatus.READY, OrderStatus.DELIVERING
+        );
+        long activeOrdersCount = orders.stream()
+                .filter(o -> activeStatuses.contains(o.getStatus()))
+                .count();
 
         long totalOrders = orders.size();
         double totalRevenue = orders.stream().mapToDouble(Order::getTotalAmount).sum();
         double totalCommission = orders.stream().mapToDouble(Order::getPlatformFee).sum();
 
+        List<Order> deliveredOrders = orders.stream()
+                .filter(o -> o.getStatus() == OrderStatus.DELIVERED)
+                .collect(Collectors.toList());
+
+        double totalPendingCookPayouts = deliveredOrders.stream()
+                .filter(o -> !o.isCookPayoutSettled())
+                .mapToDouble(Order::getCookEarnings)
+                .sum();
+
+        double totalPendingRiderPayouts = deliveredOrders.stream()
+                .filter(o -> !o.isRiderPayoutSettled() && o.getRiderEarnings() != null)
+                .mapToDouble(o -> o.getRiderEarnings() == null ? 0.0 : o.getRiderEarnings())
+                .sum();
+
         return new AdminAnalyticsResponse(
                 totalUsers,
                 totalCustomers,
                 totalCooks,
+                totalRiders,
                 totalOrders,
+                activeOrdersCount,
+                pendingCookVerifications,
+                pendingRiderVerifications,
                 totalRevenue,
-                totalCommission
+                totalCommission,
+                totalPendingCookPayouts,
+                totalPendingRiderPayouts
         );
     }
+
 
     public List<Meal> getAllMeals() {
         return mealRepository.findAll();

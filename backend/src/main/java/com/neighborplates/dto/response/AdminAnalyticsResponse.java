@@ -11,7 +11,14 @@ public class AdminAnalyticsResponse {
     private long totalUsers;
     private long totalCustomers;
     private long totalCooks;
+    private long totalRiders;
     private long totalOrders;
+    private long activeOrdersCount;
+    private long pendingCookVerifications;
+    private long pendingRiderVerifications;
     private double totalRevenue;
     private double totalCommission;
+    private double totalPendingCookPayouts;
+    private double totalPendingRiderPayouts;
 }
+
