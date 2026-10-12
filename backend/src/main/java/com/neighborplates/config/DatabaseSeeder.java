@@ -123,6 +123,12 @@ public class DatabaseSeeder implements CommandLineRunner {
             logger.info("Default rider seeded successfully with Email: '{}' and Password: 'rider123'", riderEmail);
         } else {
             logger.info("Rider user check: Present.");
+            userRepository.findByEmail(riderEmail).ifPresent(r -> {
+                if (!r.isActive()) {
+                    r.setActive(true);
+                    userRepository.save(r);
+                }
+            });
         }
     }
 

@@ -9,6 +9,7 @@ import { RiderProfileScreen } from '../screens/rider/RiderProfileScreen';
 import { ActiveDeliveryScreen } from '../screens/rider/ActiveDeliveryScreen';
 import { DeliveryConfirmationScreen } from '../screens/rider/DeliveryConfirmationScreen';
 import { RiderOnboardingScreen } from '../screens/rider/RiderOnboardingScreen';
+import { RiderVehicleManagementScreen } from '../screens/rider/RiderVehicleManagementScreen';
 import { Feather } from '@expo/vector-icons';
 
 export type RiderTabParamList = {
@@ -27,6 +28,7 @@ export type RiderStackParamList = {
   Tabs: undefined;
   ActiveDelivery: { orderId: string };
   DeliveryConfirmation: { orderId: string; earnings: number };
+  VehicleManagement: undefined;
 };
 
 const Tab = createBottomTabNavigator<RiderTabParamList>();
@@ -132,6 +134,7 @@ export const RiderNavigator = () => {
       <Stack.Screen name="Tabs" component={RiderTabNavigator} />
       <Stack.Screen name="ActiveDelivery" component={ActiveDeliveryScreen} />
       <Stack.Screen name="DeliveryConfirmation" component={DeliveryConfirmationScreen} />
+      <Stack.Screen name="VehicleManagement" component={RiderVehicleManagementScreen} />
     </Stack.Navigator>
   );
 };

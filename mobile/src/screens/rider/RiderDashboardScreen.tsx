@@ -20,6 +20,8 @@ import {
   getCachedRiderLocation,
   getCachedRiderLocationLabel,
   cacheRiderLocation,
+  isManualRiderLocation,
+  clearManualRiderLocation,
   reverseGeocodeCoords,
   searchAddressCoords,
   SRI_LANKA_PRESETS,
@@ -420,16 +422,28 @@ export const RiderDashboardScreen: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      // 1. Fetch real GPS location first
+      // 1. Fetch location - honor manual pinned location if set
       let currentCoords = riderLocation;
       try {
-        const locResult = await getRealLocation();
-        currentCoords = locResult.coords;
-        setRiderLocation(locResult.coords);
-        if (locResult.label) setLocationLabel(locResult.label);
-        setIsRealGps(locResult.isRealGps);
-        if (locResult.isRealGps) {
-          syncRiderLocationToServer(locResult.coords);
+        const isManual = await isManualRiderLocation();
+        if (isManual) {
+          const cached = await getCachedRiderLocation();
+          const cachedLabel = await getCachedRiderLocationLabel();
+          if (cached) {
+            currentCoords = cached;
+            setRiderLocation(cached);
+            if (cachedLabel) setLocationLabel(cachedLabel);
+            setIsRealGps(true);
+          }
+        } else {
+          const locResult = await getRealLocation();
+          currentCoords = locResult.coords;
+          setRiderLocation(locResult.coords);
+          if (locResult.label) setLocationLabel(locResult.label);
+          setIsRealGps(locResult.isRealGps);
+          if (locResult.isRealGps) {
+            syncRiderLocationToServer(locResult.coords);
+          }
         }
       } catch (locErr) {
         console.warn('[RiderDashboard] Location retrieval error:', locErr);
@@ -536,6 +550,14 @@ export const RiderDashboardScreen: React.FC = () => {
 
   useEffect(() => {
     const checkOnboarding = async () => {
+      // Pre-load any cached/manual location immediately
+      const cached = await getCachedRiderLocation();
+      const cachedLabel = await getCachedRiderLocationLabel();
+      if (cached) {
+        setRiderLocation(cached);
+        if (cachedLabel) setLocationLabel(cachedLabel);
+      }
+
       const done = await AsyncStorage.getItem(`rider_onboarded_${user?.id}`);
       if (!done && user?.role === 'RIDER') {
         navigation.navigate('Onboarding');
@@ -656,7 +678,7 @@ export const RiderDashboardScreen: React.FC = () => {
         setIsRealGps(true);
         const lbl = await reverseGeocodeCoords(data.lat, data.lon);
         setLocationLabel(lbl);
-        await cacheRiderLocation(newCoords, lbl);
+        await cacheRiderLocation(newCoords, lbl, true);
         syncRiderLocationToServer(newCoords);
       }
     } catch (e) {}
@@ -666,7 +688,7 @@ export const RiderDashboardScreen: React.FC = () => {
     setRiderLocation(coords);
     setLocationLabel(label);
     setIsRealGps(true);
-    await cacheRiderLocation(coords, label);
+    await cacheRiderLocation(coords, label, true);
     syncRiderLocationToServer(coords);
     setLocationPickerVisible(false);
     if (Platform.OS !== 'web') {
@@ -677,12 +699,13 @@ export const RiderDashboardScreen: React.FC = () => {
   const handleTriggerDetectGps = async () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setGpsDetecting(true);
-    const loc = await getRealLocation();
+    await clearManualRiderLocation();
+    const loc = await getRealLocation(true);
     setRiderLocation(loc.coords);
     setIsRealGps(loc.isRealGps);
     if (loc.label) setLocationLabel(loc.label);
     if (loc.isRealGps) {
-      await cacheRiderLocation(loc.coords, loc.label);
+      await cacheRiderLocation(loc.coords, loc.label, false);
       syncRiderLocationToServer(loc.coords);
       Alert.alert(
         'GPS Location Active',
@@ -1126,21 +1149,7 @@ export const RiderDashboardScreen: React.FC = () => {
 
                 {/* Recenter / GPS Detect Button */}
                 <TouchableOpacity
-                  onPress={async () => {
-                    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    setGpsDetecting(true);
-                    const loc = await getRealLocation();
-                    setRiderLocation(loc.coords);
-                    setIsRealGps(loc.isRealGps);
-                    if (loc.isRealGps) {
-                      syncRiderLocationToServer(loc.coords);
-                      Alert.alert('GPS Location', `Real GPS coordinates detected: ${loc.coords.latitude.toFixed(4)}, ${loc.coords.longitude.toFixed(4)}`);
-                    } else {
-                      Alert.alert('Location Notice', loc.error || 'Could not acquire real GPS signal. Please allow location permissions in device settings.');
-                    }
-                    setGpsDetecting(false);
-                    fetchData();
-                  }}
+                  onPress={handleTriggerDetectGps}
                   activeOpacity={0.8}
                   className="absolute bottom-3 right-3 w-10 h-10 rounded-2xl bg-white items-center justify-center shadow-md border border-gray-100"
                 >
