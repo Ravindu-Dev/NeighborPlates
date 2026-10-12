@@ -110,7 +110,25 @@ public class OrderService {
 
         Order.DeliveryAddress address = new Order.DeliveryAddress();
         address.setLabel(request.getAddress().getLabel());
-        address.setCoordinates(request.getAddress().getCoordinates() != null ? request.getAddress().getCoordinates() : new ArrayList<>());
+        List<Double> orderCoords = request.getAddress().getCoordinates();
+        // If order coordinates are default Colombo or empty/0,0, align with customer's town/district
+        if (orderCoords == null || orderCoords.isEmpty()
+                || (orderCoords.get(0) == 79.8612 && orderCoords.get(1) == 6.9271)
+                || (orderCoords.get(0) == 0.0 && orderCoords.get(1) == 0.0)) {
+            String lbl = request.getAddress().getLabel() != null ? request.getAddress().getLabel().toLowerCase() : "";
+            if (!lbl.contains("colombo") && customer.getProfile() != null) {
+                User.UserProfile cp = customer.getProfile();
+                if (cp.getLocation() != null && cp.getLocation().getCoordinates() != null
+                        && cp.getLocation().getCoordinates().size() == 2
+                        && (cp.getLocation().getCoordinates().get(0) != 0.0 || cp.getLocation().getCoordinates().get(1) != 0.0)
+                        && (cp.getLocation().getCoordinates().get(0) != 79.8612 || cp.getLocation().getCoordinates().get(1) != 6.9271)) {
+                    orderCoords = cp.getLocation().getCoordinates();
+                } else {
+                    orderCoords = UserService.getDefaultCoordinatesForArea(cp.getTown(), cp.getDistrict());
+                }
+            }
+        }
+        address.setCoordinates(orderCoords != null ? new ArrayList<>(orderCoords) : new ArrayList<>());
         order.setAddress(address);
 
         order.setScheduledFor(request.getScheduledFor() != null ? request.getScheduledFor() : Instant.now().plusSeconds(3600)); // Default 1 hour delay if not set
@@ -128,7 +146,7 @@ public class OrderService {
 
         Order savedOrder = orderRepository.save(order);
         firebaseNotificationService.updateOrderTrackingStatus(savedOrder.getId(), "PLACED");
-        return mapToOrderResponse(savedOrder, customer.getProfile().getName(), cook.getProfile().getName(), null);
+        return mapToOrderResponse(savedOrder, customer, cook, null);
     }
 
     public List<OrderResponse> getAvailableOrdersForRiders() {
@@ -366,6 +384,29 @@ public class OrderService {
         String cookAddress = cookName + "'s Kitchen";
         List<Double> cookCoords = cook != null && cook.getProfile() != null && cook.getProfile().getLocation() != null 
                 ? cook.getProfile().getLocation().getCoordinates() : null;
+        if (cookCoords == null || cookCoords.isEmpty() || (cookCoords.get(0) == 0.0 && cookCoords.get(1) == 0.0)) {
+            if (cook != null && cook.getProfile() != null) {
+                cookCoords = UserService.getDefaultCoordinatesForArea(cook.getProfile().getTown(), cook.getProfile().getDistrict());
+            }
+        }
+
+        Order.DeliveryAddress addr = order.getAddress();
+        if (addr != null) {
+            List<Double> cCoords = addr.getCoordinates();
+            if ((cCoords == null || cCoords.isEmpty() || (cCoords.get(0) == 79.8612 && cCoords.get(1) == 6.9271) || (cCoords.get(0) == 0.0 && cCoords.get(1) == 0.0))
+                    && customer != null && customer.getProfile() != null) {
+                String lbl = addr.getLabel() != null ? addr.getLabel().toLowerCase() : "";
+                if (!lbl.contains("colombo")) {
+                    List<Double> resolved = UserService.getDefaultCoordinatesForArea(customer.getProfile().getTown(), customer.getProfile().getDistrict());
+                    if (resolved.get(0) != 79.8612 || resolved.get(1) != 6.9271) {
+                        Order.DeliveryAddress patched = new Order.DeliveryAddress();
+                        patched.setLabel(addr.getLabel());
+                        patched.setCoordinates(new ArrayList<>(resolved));
+                        addr = patched;
+                    }
+                }
+            }
+        }
 
         return new OrderResponse(
                 order.getId(),
@@ -381,7 +422,7 @@ public class OrderService {
                 order.getStatus().name(),
                 order.getStatusHistory(),
                 order.getDeliveryMethod(),
-                order.getAddress(),
+                addr,
                 order.getScheduledFor(),
                 order.getSpecialInstructions(),
                 order.getPaymentTransactionId(),

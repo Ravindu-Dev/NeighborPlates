@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { api } from '../../services/api';
+import { resolveAddressCoordinates } from '../../services/locationService';
 
 interface EditOrderModalProps {
   visible: boolean;
@@ -55,12 +56,20 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
 
     setSaving(true);
     try {
+      let coords = order.address?.coordinates || [79.8612, 6.9271];
+      try {
+        const resolved = await resolveAddressCoordinates(addressLabel.trim());
+        if (resolved && (resolved.longitude !== 79.8612 || resolved.latitude !== 6.9271)) {
+          coords = [resolved.longitude, resolved.latitude];
+        }
+      } catch (_) {}
+
       await api.put(`/api/orders/${order.id}`, {
         specialInstructions: specialInstructions.trim(),
         deliveryMethod,
         address: {
           label: addressLabel.trim() || 'Self Pickup at Kitchen',
-          coordinates: order.address?.coordinates || [79.8612, 6.9271],
+          coordinates: coords,
         },
       });
 

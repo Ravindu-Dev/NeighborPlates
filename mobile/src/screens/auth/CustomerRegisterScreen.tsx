@@ -8,6 +8,7 @@ import { DropdownPicker } from '../../components/common/DropdownPicker';
 import { DISTRICT_TOWN_DATA } from '../../constants/filterConstants';
 import { useAuthStore } from '../../store/authStore';
 import { AuthTopBar, AuthRoleTabs, UserRoleType } from '../../components/auth/AuthRoleSwitcher';
+import { getCoordinatesForTownAndDistrict } from '../../services/locationService';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'CustomerRegister'>;
 
@@ -36,6 +37,7 @@ export const CustomerRegisterScreen: React.FC<Props> = ({ navigation }) => {
     }
 
     try {
+      const coords = getCoordinatesForTownAndDistrict(town, district);
       await register({
         name: name.trim(),
         email: email.trim(),
@@ -44,6 +46,7 @@ export const CustomerRegisterScreen: React.FC<Props> = ({ navigation }) => {
         role: 'CUSTOMER',
         district: district || undefined,
         town: town || undefined,
+        coordinates: [coords.longitude, coords.latitude],
       });
     } catch (err) {
       // Error is caught by authStore and rendered in UI
