@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { api } from '../../services/api';
+import { vehicleService } from '../../services/vehicleService';
 import { useAuthStore } from '../../store/authStore';
 import { Feather, Ionicons } from '@expo/vector-icons';
 
@@ -67,7 +68,15 @@ export const RiderProfileScreen: React.FC = () => {
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editAvatarUrl, setEditAvatarUrl] = useState('');
+  const [editDistrict, setEditDistrict] = useState('Colombo');
+  const [editTown, setEditTown] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [profileErrors, setProfileErrors] = useState<{ [key: string]: string }>({});
   const [savingProfile, setSavingProfile] = useState(false);
+
+  // Modals: Deactivate Account
+  const [deactivateModalVisible, setDeactivateModalVisible] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
 
   // Modals: Payout Edit
   const [payoutModalVisible, setPayoutModalVisible] = useState(false);
@@ -172,6 +181,9 @@ export const RiderProfileScreen: React.FC = () => {
         setEditName(u.profile?.name || user?.name || '');
         setEditPhone(u.profile?.phone || '');
         setEditAvatarUrl(u.profile?.avatarUrl || user?.avatarUrl || '');
+        setEditDistrict(u.profile?.district || 'Colombo');
+        setEditTown(u.profile?.town || '');
+        setEditBio(u.profile?.bio || '');
       }
 
       if (ordersRes.status === 'fulfilled' && Array.isArray(ordersRes.value.data)) {
@@ -247,12 +259,27 @@ export const RiderProfileScreen: React.FC = () => {
     }
   };
 
-  // Save personal profile edit modal
+  // Save personal profile edit modal with field-level validation
   const handleSaveProfileInfo = async () => {
+    const errors: { [key: string]: string } = {};
     if (!editName.trim()) {
-      Alert.alert('Validation Error', 'Name cannot be empty.');
+      errors.name = 'Full legal name cannot be empty.';
+    } else if (editName.trim().length < 2) {
+      errors.name = 'Name must be at least 2 characters.';
+    }
+
+    if (!editPhone.trim()) {
+      errors.phone = 'Phone number is required.';
+    } else if (editPhone.trim().length < 7) {
+      errors.phone = 'Please enter a valid phone number.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setProfileErrors(errors);
       return;
     }
+
+    setProfileErrors({});
     setSavingProfile(true);
     try {
       if (Platform.OS !== 'web') {
@@ -262,6 +289,9 @@ export const RiderProfileScreen: React.FC = () => {
         name: editName.trim(),
         phone: editPhone.trim(),
         avatarUrl: editAvatarUrl.trim() || undefined,
+        district: editDistrict.trim() || undefined,
+        town: editTown.trim() || undefined,
+        bio: editBio.trim() || undefined,
       });
 
       // Update in local auth store so whole app reflects changes
@@ -271,12 +301,38 @@ export const RiderProfileScreen: React.FC = () => {
       });
 
       setProfileEditModalVisible(false);
-      Alert.alert('Success', 'Profile details updated!');
+      Alert.alert('Success', 'Courier profile successfully updated!');
       fetchProfile();
-    } catch (err) {
-      Alert.alert('Error', 'Failed to update profile.');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to update profile.';
+      Alert.alert('Error', msg);
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  // Safe Courier Account Deactivation (Audit safe)
+  const handleDeactivateAccount = async () => {
+    setDeactivating(true);
+    try {
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      }
+      await vehicleService.deactivateRiderAccount();
+      setDeactivateModalVisible(false);
+      Alert.alert(
+        'Account Deactivated',
+        'Your rider courier account has been deactivated. Historical delivery records, customer ratings, and audit records remain preserved.'
+      );
+      logout();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Cannot deactivate account while active deliveries exist. Please finish deliveries first.';
+      Alert.alert('Deactivation Restricted', msg);
+    } finally {
+      setDeactivating(false);
     }
   };
 
@@ -633,36 +689,58 @@ export const RiderProfileScreen: React.FC = () => {
               </View>
             </View>
 
-            {/* Registered Vehicle Pill */}
-            <View className="bg-[#EFF6FF] rounded-2xl p-3.5 flex-row items-center justify-between">
-              <View className="flex-row items-center flex-1 mr-2">
-                <View className="w-10 h-10 rounded-2xl bg-white border border-blue-100 items-center justify-center mr-3 shadow-xs">
-                  <Text style={{ fontSize: 18 }}>
-                    {selectedVehicle === 'E-Bike'
-                      ? '🚲'
-                      : selectedVehicle === 'Scooter'
-                      ? '🛵'
-                      : selectedVehicle === 'Bicycle'
-                      ? '🚲'
-                      : '🚗'}
-                  </Text>
+            {/* Registered Vehicle Card & Fleet Management */}
+            <View className="bg-[#EFF6FF] rounded-2xl p-3.5 mb-2">
+              <View className="flex-row items-center justify-between mb-2.5">
+                <View className="flex-row items-center flex-1 mr-2">
+                  <View className="w-10 h-10 rounded-2xl bg-white border border-blue-100 items-center justify-center mr-3 shadow-xs">
+                    <Text style={{ fontSize: 18 }}>
+                      {selectedVehicle === 'E-Bike'
+                        ? '🚲'
+                        : selectedVehicle === 'Scooter'
+                        ? '🛵'
+                        : selectedVehicle === 'Bicycle'
+                        ? '🚲'
+                        : '🚗'}
+                    </Text>
+                  </View>
+                  <View className="flex-1">
+                    <View className="flex-row items-center">
+                      <Text className="text-textPrimary font-extrabold text-sm mr-1.5" numberOfLines={1}>
+                        {vehicleModel || 'No Active Ride'}
+                      </Text>
+                      <View className="bg-emerald-50 px-1.5 py-0.2 rounded-full border border-emerald-200">
+                        <Text className="text-[#059669] font-black text-[9px]">Active</Text>
+                      </View>
+                    </View>
+                    <Text className="text-textMuted text-[11px] font-medium mt-0.5">
+                      Plate / Fleet: {plateNumber || 'None'}
+                    </Text>
+                  </View>
                 </View>
-                <View className="flex-1">
-                  <Text className="text-textPrimary font-extrabold text-sm" numberOfLines={1}>
-                    {vehicleModel}
-                  </Text>
-                  <Text className="text-textMuted text-[11px] font-medium mt-0.5">
-                    Plate / Fleet: {plateNumber}
-                  </Text>
-                </View>
+
+                <TouchableOpacity
+                  onPress={() => setVehicleModalVisible(true)}
+                  activeOpacity={0.8}
+                  className="bg-white border border-gray-200 px-3 py-1.5 rounded-xl shadow-xs"
+                >
+                  <Text className="text-textPrimary font-bold text-xs">Quick Edit</Text>
+                </TouchableOpacity>
               </View>
 
+              {/* Dedicated Vehicle Management Navigation Button */}
               <TouchableOpacity
-                onPress={() => setVehicleModalVisible(true)}
-                activeOpacity={0.8}
-                className="bg-white border border-gray-200 px-3.5 py-1.5 rounded-xl shadow-xs"
+                onPress={() => navigation.navigate('VehicleManagement')}
+                activeOpacity={0.85}
+                className="bg-white border border-blue-200 py-2.5 px-3.5 rounded-xl flex-row items-center justify-between shadow-xs"
               >
-                <Text className="text-textPrimary font-bold text-xs">Edit</Text>
+                <View className="flex-row items-center">
+                  <Feather name="layers" size={14} color="#2563EB" />
+                  <Text className="text-blue-700 font-bold text-xs ml-2">
+                    Manage Fleet (Add / Edit / Remove Vehicles)
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={15} color="#2563EB" />
               </TouchableOpacity>
             </View>
           </View>
@@ -1142,7 +1220,35 @@ export const RiderProfileScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* ── 7. Go Offline & Log Out Button ── */}
+          {/* ── Courier Account Lifecycle & Compliance Card ── */}
+          <View className="bg-white rounded-3xl p-5 border border-gray-150 shadow-sm mb-3">
+            <View className="flex-row items-center justify-between mb-2">
+              <View className="flex-row items-center">
+                <Feather name="shield" size={16} color="#4B5563" />
+                <Text className="text-textPrimary font-black text-sm ml-2">
+                  Account Lifecycle & Compliance
+                </Text>
+              </View>
+              <View className="bg-gray-100 px-2 py-0.5 rounded-full">
+                <Text className="text-gray-600 font-bold text-[10px]">Audit Safe</Text>
+              </View>
+            </View>
+            <Text className="text-textSecondary text-xs leading-5 mb-3.5">
+              Completed deliveries, ratings, and financial records are preserved for platform audit and safety. You can deactivate your courier account when stepping away from deliveries.
+            </Text>
+            <TouchableOpacity
+              onPress={() => setDeactivateModalVisible(true)}
+              activeOpacity={0.85}
+              className="bg-red-50 border border-red-200 py-3 rounded-2xl items-center flex-row justify-center"
+            >
+              <Feather name="pause-circle" size={15} color="#DC2626" />
+              <Text className="text-[#DC2626] font-black text-xs ml-2">
+                Deactivate Courier Account
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ── 8. Go Offline & Log Out Button ── */}
           <TouchableOpacity
             onPress={handleLogout}
             activeOpacity={0.85}
@@ -1250,62 +1356,140 @@ export const RiderProfileScreen: React.FC = () => {
         onRequestClose={() => setProfileEditModalVisible(false)}
       >
         <View className="flex-1 bg-black/60 justify-end">
-          <View className="bg-white rounded-t-3xl p-6 border-t border-gray-150">
+          <View className="bg-white rounded-t-3xl p-6 border-t border-gray-150 max-h-[90%]">
             <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-textPrimary font-black text-lg">
-                Edit Courier Profile
-              </Text>
+              <View>
+                <Text className="text-textPrimary font-black text-lg">
+                  Edit Courier Profile
+                </Text>
+                <Text className="text-textMuted text-xs font-semibold">
+                  Update your personal courier identity & service area
+                </Text>
+              </View>
               <TouchableOpacity
-                onPress={() => setProfileEditModalVisible(false)}
+                onPress={() => {
+                  setProfileErrors({});
+                  setProfileEditModalVisible(false);
+                }}
                 className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center"
               >
                 <Feather name="x" size={18} color="#6B7280" />
               </TouchableOpacity>
             </View>
 
-            <Text className="text-textMuted text-xs font-bold uppercase mb-1">
-              Full Legal Name
-            </Text>
-            <TextInput
-              value={editName}
-              onChangeText={setEditName}
-              placeholder="Courier name"
-              className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-textPrimary mb-3"
-            />
-
-            <Text className="text-textMuted text-xs font-bold uppercase mb-1">
-              Phone Number
-            </Text>
-            <TextInput
-              value={editPhone}
-              onChangeText={setEditPhone}
-              placeholder="+94 77 123 4567"
-              keyboardType="phone-pad"
-              className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-textPrimary mb-3"
-            />
-
-            <Text className="text-textMuted text-xs font-bold uppercase mb-1">
-              Avatar Image URL
-            </Text>
-            <TextInput
-              value={editAvatarUrl}
-              onChangeText={setEditAvatarUrl}
-              placeholder="https://..."
-              autoCapitalize="none"
-              className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-textPrimary mb-5"
-            />
-
-            <TouchableOpacity
-              onPress={handleSaveProfileInfo}
-              disabled={savingProfile}
-              className="bg-[#9A3412] py-4 rounded-2xl items-center shadow-md flex-row justify-center"
-            >
-              {savingProfile ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Full Legal Name */}
+              <Text className="text-textMuted text-xs font-bold uppercase mb-1">
+                Full Legal Name *
+              </Text>
+              <TextInput
+                value={editName}
+                onChangeText={(t) => {
+                  setEditName(t);
+                  if (profileErrors.name) setProfileErrors((p) => ({ ...p, name: '' }));
+                }}
+                placeholder="Courier name"
+                className={`bg-gray-50 border rounded-2xl px-4 py-3 text-sm text-textPrimary ${
+                  profileErrors.name ? 'border-red-500' : 'border-gray-200'
+                }`}
+              />
+              {profileErrors.name ? (
+                <Text className="text-red-500 text-[11px] font-semibold mt-1 mb-2">
+                  {profileErrors.name}
+                </Text>
               ) : (
-                <Text className="text-white font-black text-sm">SAVE PROFILE CHANGES</Text>
+                <View className="mb-3" />
               )}
-            </TouchableOpacity>
+
+              {/* Phone Number */}
+              <Text className="text-textMuted text-xs font-bold uppercase mb-1">
+                Contact Phone Number *
+              </Text>
+              <TextInput
+                value={editPhone}
+                onChangeText={(t) => {
+                  setEditPhone(t);
+                  if (profileErrors.phone) setProfileErrors((p) => ({ ...p, phone: '' }));
+                }}
+                placeholder="+94 77 123 4567"
+                keyboardType="phone-pad"
+                className={`bg-gray-50 border rounded-2xl px-4 py-3 text-sm text-textPrimary ${
+                  profileErrors.phone ? 'border-red-500' : 'border-gray-200'
+                }`}
+              />
+              {profileErrors.phone ? (
+                <Text className="text-red-500 text-[11px] font-semibold mt-1 mb-2">
+                  {profileErrors.phone}
+                </Text>
+              ) : (
+                <View className="mb-3" />
+              )}
+
+              {/* District & Town in a row */}
+              <View className="flex-row gap-3 mb-3">
+                <View className="flex-1">
+                  <Text className="text-textMuted text-xs font-bold uppercase mb-1">
+                    District
+                  </Text>
+                  <TextInput
+                    value={editDistrict}
+                    onChangeText={setEditDistrict}
+                    placeholder="e.g. Colombo, Kandy"
+                    className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-textPrimary"
+                  />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-textMuted text-xs font-bold uppercase mb-1">
+                    Town / Area
+                  </Text>
+                  <TextInput
+                    value={editTown}
+                    onChangeText={setEditTown}
+                    placeholder="e.g. Colombo 03"
+                    className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-textPrimary"
+                  />
+                </View>
+              </View>
+
+              {/* Courier Bio / About */}
+              <Text className="text-textMuted text-xs font-bold uppercase mb-1">
+                Courier Bio & Notes (Optional)
+              </Text>
+              <TextInput
+                value={editBio}
+                onChangeText={setEditBio}
+                placeholder="e.g. Eco-conscious courier equipped with heated warmer pod and HACCP certified."
+                multiline
+                numberOfLines={3}
+                style={{ textAlignVertical: 'top' }}
+                className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-textPrimary mb-3 min-h-[70px]"
+              />
+
+              {/* Avatar Image URL */}
+              <Text className="text-textMuted text-xs font-bold uppercase mb-1">
+                Profile Avatar URL (Optional)
+              </Text>
+              <TextInput
+                value={editAvatarUrl}
+                onChangeText={setEditAvatarUrl}
+                placeholder="https://images.unsplash.com/..."
+                autoCapitalize="none"
+                className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-textPrimary mb-5"
+              />
+
+              {/* Save Button */}
+              <TouchableOpacity
+                onPress={handleSaveProfileInfo}
+                disabled={savingProfile}
+                className="bg-[#9A3412] py-4 rounded-2xl items-center shadow-md flex-row justify-center mb-6"
+              >
+                {savingProfile ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text className="text-white font-black text-sm">SAVE PROFILE CHANGES</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1489,6 +1673,51 @@ export const RiderProfileScreen: React.FC = () => {
                 Request Roadside Tire / Mechanical Aid
               </Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Modal 7: Safe Courier Deactivation Modal (Audit Safe) ── */}
+      <Modal
+        visible={deactivateModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeactivateModalVisible(false)}
+      >
+        <View className="flex-1 bg-black/60 items-center justify-center px-6">
+          <View className="bg-white rounded-3xl p-6 w-full max-w-sm border border-gray-150 shadow-xl">
+            <View className="w-12 h-12 rounded-full bg-red-100 items-center justify-center self-center mb-4">
+              <Feather name="alert-triangle" size={24} color="#DC2626" />
+            </View>
+
+            <Text className="text-textPrimary font-black text-center text-lg mb-1">
+              Deactivate Courier Account?
+            </Text>
+            <Text className="text-textSecondary text-xs text-center leading-5 mb-5">
+              Your active courier status will be deactivated and you will go offline. Historical completed deliveries, customer ratings, and platform audit records will remain preserved in accordance with safety standards.
+            </Text>
+
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => setDeactivateModalVisible(false)}
+                disabled={deactivating}
+                className="flex-1 py-3.5 bg-gray-100 rounded-2xl items-center"
+              >
+                <Text className="text-textPrimary font-bold text-sm">Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleDeactivateAccount}
+                disabled={deactivating}
+                className="flex-1 py-3.5 bg-[#DC2626] rounded-2xl items-center flex-row justify-center shadow-sm"
+              >
+                {deactivating ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text className="text-white font-black text-sm">Deactivate</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

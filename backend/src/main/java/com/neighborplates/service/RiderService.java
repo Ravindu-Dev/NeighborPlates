@@ -164,4 +164,41 @@ public class RiderService {
                 .surge(0.0)
                 .build();
     }
+
+    public void deactivateRiderAccount(String riderEmail) {
+        User rider = userRepository.findByEmail(riderEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Rider not found"));
+
+        if (rider.getRole() != UserRole.RIDER) {
+            throw new UnauthorizedException("Only riders can deactivate rider accounts");
+        }
+
+        List<Order> activeOrders = orderRepository.findByRiderIdOrderByCreatedAtDesc(rider.getId())
+                .stream()
+                .filter(o -> o.getStatus() == OrderStatus.READY || o.getStatus() == OrderStatus.DELIVERING)
+                .collect(Collectors.toList());
+
+        if (!activeOrders.isEmpty()) {
+            throw new IllegalStateException("Cannot deactivate account while you have active deliveries in progress (" + activeOrders.size() + " active). Please complete all deliveries first.");
+        }
+
+        rider.setActive(false);
+        if (rider.getProfile() != null) {
+            rider.getProfile().setIsAvailable(false);
+        }
+        rider.setUpdatedAt(Instant.now());
+        userRepository.save(rider);
+    }
+
+    public void reactivateRiderAccount(String riderEmail) {
+        User rider = userRepository.findByEmail(riderEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Rider not found"));
+        rider.setActive(true);
+        if (rider.getProfile() != null) {
+            rider.getProfile().setIsAvailable(true);
+        }
+        rider.setUpdatedAt(Instant.now());
+        userRepository.save(rider);
+    }
 }
+

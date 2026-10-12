@@ -41,6 +41,22 @@ export const SRI_LANKA_PRESETS = [
 
 const STORAGE_KEY_LAST_LOCATION = 'neighborplates_last_rider_location';
 const STORAGE_KEY_LOCATION_LABEL = 'neighborplates_last_rider_location_label';
+const STORAGE_KEY_IS_MANUAL_LOCATION = 'neighborplates_is_manual_location';
+
+export async function isManualRiderLocation(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEY_IS_MANUAL_LOCATION);
+    return raw === 'true';
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function clearManualRiderLocation(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEY_IS_MANUAL_LOCATION);
+  } catch (e) {}
+}
 
 /**
  * Calculates straight-line distance in kilometers between two coordinates using Haversine formula
@@ -106,11 +122,18 @@ export async function getCachedRiderLocationLabel(): Promise<string | null> {
 /**
  * Save coordinates and optional human label to local storage cache
  */
-export async function cacheRiderLocation(coords: Coordinates, label?: string): Promise<void> {
+export async function cacheRiderLocation(
+  coords: Coordinates,
+  label?: string,
+  isManual: boolean = false
+): Promise<void> {
   try {
     await AsyncStorage.setItem(STORAGE_KEY_LAST_LOCATION, JSON.stringify(coords));
     if (label) {
       await AsyncStorage.setItem(STORAGE_KEY_LOCATION_LABEL, label);
+    }
+    if (isManual) {
+      await AsyncStorage.setItem(STORAGE_KEY_IS_MANUAL_LOCATION, 'true');
     }
   } catch (e) {}
 }
@@ -196,7 +219,23 @@ export async function searchAddressCoords(query: string): Promise<{ label: strin
  * Request location permission and obtain rider's real GPS position.
  * Robust across iOS, Android, and Web with multi-stage fallbacks including IP Geolocation.
  */
-export async function getRealLocation(): Promise<LocationResult> {
+export async function getRealLocation(forceFreshGps: boolean = false): Promise<LocationResult> {
+  // If user has chosen a manual area (e.g. Kandy), honor their choice unless explicitly forcing fresh GPS
+  if (!forceFreshGps) {
+    const isManual = await isManualRiderLocation();
+    if (isManual) {
+      const cached = await getCachedRiderLocation();
+      const cachedLabel = await getCachedRiderLocationLabel();
+      if (cached) {
+        return {
+          coords: cached,
+          isRealGps: true,
+          label: cachedLabel || `${cached.latitude.toFixed(4)}, ${cached.longitude.toFixed(4)}`,
+        };
+      }
+    }
+  }
+
   // ── 1. On Web: Use Native Browser Geolocation directly (fastest & most reliable) ──
   if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.geolocation) {
     try {
@@ -227,7 +266,9 @@ export async function getRealLocation(): Promise<LocationResult> {
       });
 
       const label = await reverseGeocodeCoords(webPos.latitude, webPos.longitude);
-      await cacheRiderLocation(webPos, label);
+      if (forceFreshGps || !(await isManualRiderLocation())) {
+        await cacheRiderLocation(webPos, label, false);
+      }
       return {
         coords: webPos,
         isRealGps: true,
@@ -257,7 +298,9 @@ export async function getRealLocation(): Promise<LocationResult> {
               longitude: lastKnown.coords.longitude,
             };
             const label = await reverseGeocodeCoords(coords.latitude, coords.longitude);
-            await cacheRiderLocation(coords, label);
+            if (forceFreshGps || !(await isManualRiderLocation())) {
+              await cacheRiderLocation(coords, label, false);
+            }
             return { coords, isRealGps: true, label };
           }
         } catch (lastErr) {}
@@ -279,7 +322,9 @@ export async function getRealLocation(): Promise<LocationResult> {
               longitude: position.coords.longitude,
             };
             const label = await reverseGeocodeCoords(coords.latitude, coords.longitude);
-            await cacheRiderLocation(coords, label);
+            if (forceFreshGps || !(await isManualRiderLocation())) {
+              await cacheRiderLocation(coords, label, false);
+            }
             return { coords, isRealGps: true, label };
           }
         } catch (currErr) {
@@ -293,7 +338,9 @@ export async function getRealLocation(): Promise<LocationResult> {
                 longitude: coarsePos.coords.longitude,
               };
               const label = await reverseGeocodeCoords(coords.latitude, coords.longitude);
-              await cacheRiderLocation(coords, label);
+              if (forceFreshGps || !(await isManualRiderLocation())) {
+                await cacheRiderLocation(coords, label, false);
+              }
               return { coords, isRealGps: true, label };
             }
           } catch (coarseErr) {}
@@ -315,7 +362,9 @@ export async function getRealLocation(): Promise<LocationResult> {
       if (data && data.success && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
         const coords = { latitude: data.latitude, longitude: data.longitude };
         const label = data.city || data.region || 'Network Location';
-        await cacheRiderLocation(coords, label);
+        if (forceFreshGps || !(await isManualRiderLocation())) {
+          await cacheRiderLocation(coords, label, false);
+        }
         return {
           coords,
           isRealGps: true,
@@ -355,16 +404,22 @@ export async function watchRealLocation(
   onUpdate: (coords: Coordinates, label?: string) => void,
   onError?: (err: any) => void
 ): Promise<{ remove: () => void }> {
+  // If rider manually selected a city, do not let GPS background watcher override it
+  if (await isManualRiderLocation()) {
+    return { remove: () => {} };
+  }
+
   // Web watcher
   if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.geolocation) {
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
+        if (await isManualRiderLocation()) return;
         const coords = {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
         };
         const label = await reverseGeocodeCoords(coords.latitude, coords.longitude);
-        await cacheRiderLocation(coords, label);
+        await cacheRiderLocation(coords, label, false);
         onUpdate(coords, label);
       },
       (err) => {
