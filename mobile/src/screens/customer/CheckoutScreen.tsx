@@ -6,6 +6,12 @@ import { useCartStore } from '../../store/cartStore';
 import { Button } from '../../components/common/Button';
 import { TextInput } from '../../components/common/TextInput';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { api } from '../../services/api';
+import { 
+  getCoordinatesForTownAndDistrict, 
+  resolveAddressCoordinates, 
+  Coordinates 
+} from '../../services/locationService';
 
 let WebView: any = null;
 if (Platform.OS !== 'web') {
@@ -115,10 +121,71 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
   const [longitude, setLongitude] = useState('79.8612');
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapCenter, setMapCenter] = useState({ lat: 6.9271, lng: 79.8612 });
+  const [customerProfile, setCustomerProfile] = useState<any>(null);
+  const [detectedAreaName, setDetectedAreaName] = useState<string>('');
   
   // Validation error states
   const [addressError, setAddressError] = useState('');
   const [scheduleError, setScheduleError] = useState('');
+
+  // Fetch customer profile on mount to capture actual district, town & coordinates
+  useEffect(() => {
+    let isMounted = true;
+    const fetchProfileLocation = async () => {
+      try {
+        const res = await api.get('/api/users/profile');
+        if (!isMounted || !res.data) return;
+        setCustomerProfile(res.data);
+        const p = res.data.profile || {};
+        const town = p.town || '';
+        const district = p.district || '';
+
+        let resolvedCoords: Coordinates | null = null;
+        if (p.location?.coordinates && p.location.coordinates.length === 2) {
+          const [lon, lat] = p.location.coordinates;
+          if (lon !== 0 || lat !== 0) {
+            resolvedCoords = { latitude: lat, longitude: lon };
+          }
+        }
+
+        if (!resolvedCoords && (town || district)) {
+          resolvedCoords = getCoordinatesForTownAndDistrict(town, district);
+        }
+
+        if (resolvedCoords) {
+          setLatitude(resolvedCoords.latitude.toFixed(6));
+          setLongitude(resolvedCoords.longitude.toFixed(6));
+          setMapCenter({ lat: resolvedCoords.latitude, lng: resolvedCoords.longitude });
+        }
+
+        const area = [town, district].filter(Boolean).join(', ');
+        if (area) {
+          setDetectedAreaName(area);
+          setStreetAddress((prev) => (prev.trim() ? prev : area));
+        }
+      } catch (err) {
+        console.warn('Failed to load profile in CheckoutScreen:', err);
+      }
+    };
+    fetchProfileLocation();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleAddressChange = async (text: string) => {
+    setStreetAddress(text);
+    if (text.trim()) setAddressError('');
+
+    // If user text mentions a town or district, automatically align coordinates
+    const p = customerProfile?.profile || {};
+    const coords = await resolveAddressCoordinates(text, p.town, p.district);
+    if (coords && (coords.latitude !== 6.9271 || coords.longitude !== 79.8612)) {
+      setLatitude(coords.latitude.toFixed(6));
+      setLongitude(coords.longitude.toFixed(6));
+      setMapCenter({ lat: coords.latitude, lng: coords.longitude });
+    }
+  };
 
   const updateAddressFromCoords = async (latVal: number, lonVal: number) => {
     setStreetAddress("Fetching address details...");
@@ -367,12 +434,13 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
               label="STREET ADDRESS *"
               placeholder="Enter complete delivery address details..."
               value={streetAddress}
-              onChangeText={(text) => {
-                setStreetAddress(text);
-                if (text.trim()) setAddressError('');
-              }}
+              onChangeText={handleAddressChange}
               error={addressError}
-              helperText="Please select your location on the map or type your street address."
+              helperText={
+                detectedAreaName
+                  ? `📍 Initialized with your area: ${detectedAreaName}. Edit or adjust pin on map.`
+                  : "Please select your location on the map or type your street address."
+              }
               multiline
             />
           </View>

@@ -8,6 +8,10 @@ import { TextInput } from '../../components/common/TextInput';
 import { EditOrderModal } from '../../components/customer/EditOrderModal';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { pickImageFromGallery, uploadImageToImgBB } from '../../services/imageService';
+import { 
+  getCoordinatesForTownAndDistrict, 
+  resolveAddressCoordinates 
+} from '../../services/locationService';
 
 let WebView: any = null;
 if (Platform.OS !== 'web') {
@@ -19,11 +23,28 @@ if (Platform.OS !== 'web') {
 }
 
 const getTrackingMapHtml = (cookCoords: number[], customerCoords: number[], status: string) => {
-  // Fallbacks scattered slightly around Colombo center if coords are 0/empty
-  const cookLon = cookCoords[0] && cookCoords[0] !== 0 ? cookCoords[0] : 79.865;
-  const cookLat = cookCoords[1] && cookCoords[1] !== 0 ? cookCoords[1] : 6.932;
-  const custLon = customerCoords[0] && customerCoords[0] !== 0 ? customerCoords[0] : 79.861;
-  const custLat = customerCoords[1] && customerCoords[1] !== 0 ? customerCoords[1] : 6.927;
+  let custLon = customerCoords?.[0] && customerCoords[0] !== 0 ? customerCoords[0] : 0;
+  let custLat = customerCoords?.[1] && customerCoords[1] !== 0 ? customerCoords[1] : 0;
+  let cookLon = cookCoords?.[0] && cookCoords[0] !== 0 ? cookCoords[0] : 0;
+  let cookLat = cookCoords?.[1] && cookCoords[1] !== 0 ? cookCoords[1] : 0;
+
+  // If one coordinate is valid, keep the other in the same local neighborhood
+  if (custLat === 0 && cookLat !== 0) {
+    custLat = cookLat - 0.006;
+    custLon = cookLon - 0.008;
+  }
+  if (cookLat === 0 && custLat !== 0) {
+    cookLat = custLat + 0.006;
+    cookLon = custLon + 0.008;
+  }
+  if (custLat === 0 && custLon === 0) {
+    custLat = 6.927;
+    custLon = 79.861;
+  }
+  if (cookLat === 0 && cookLon === 0) {
+    cookLat = 6.932;
+    cookLon = 79.865;
+  }
 
   return `
     <!DOCTYPE html>
@@ -117,6 +138,7 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
   const { orderId } = route.params;
   const [order, setOrder] = useState<any>(null);
   const [cookCoords, setCookCoords] = useState<number[] | null>(null);
+  const [customerCoords, setCustomerCoords] = useState<number[] | null>(null);
   const [loading, setLoading] = useState(true);
   
   // Review inputs
@@ -166,6 +188,25 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
       setOrder(target);
 
       if (target) {
+        // Resolve customer coordinates if they defaulted to Colombo or are missing
+        let custCoords = target.address?.coordinates;
+        if (target.address?.label) {
+          try {
+            const resolvedCust = await resolveAddressCoordinates(target.address.label);
+            if (resolvedCust && (resolvedCust.longitude !== 79.8612 || resolvedCust.latitude !== 6.9271)) {
+              if (
+                !custCoords ||
+                custCoords.length !== 2 ||
+                (custCoords[0] === 0 && custCoords[1] === 0) ||
+                (custCoords[0] === 79.8612 && custCoords[1] === 6.9271)
+              ) {
+                custCoords = [resolvedCust.longitude, resolvedCust.latitude];
+              }
+            }
+          } catch (_) {}
+        }
+        setCustomerCoords(custCoords || [79.8612, 6.9271]);
+
         // Fetch existing reviews for this order
         try {
           const reviewsRes = await api.get(`/api/reviews/order/${orderId}`);
@@ -178,13 +219,30 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
         if (target.cookId && !cookCoords) {
           try {
             const cookRes = await api.get(`/api/users/cooks/${target.cookId}`);
-            if (cookRes.data && cookRes.data.profile && cookRes.data.profile.location) {
-              setCookCoords(cookRes.data.profile.location.coordinates);
+            if (cookRes.data && cookRes.data.profile) {
+              const p = cookRes.data.profile;
+              if (
+                p.location?.coordinates &&
+                p.location.coordinates.length === 2 &&
+                (p.location.coordinates[0] !== 0 || p.location.coordinates[1] !== 0)
+              ) {
+                setCookCoords(p.location.coordinates);
+              } else {
+                const cResolved = getCoordinatesForTownAndDistrict(p.town, p.district);
+                if (cResolved.longitude !== 79.8612 || cResolved.latitude !== 6.9271) {
+                  setCookCoords([cResolved.longitude, cResolved.latitude]);
+                } else if (custCoords && custCoords.length === 2 && custCoords[0] !== 0) {
+                  setCookCoords([custCoords[0] + 0.008, custCoords[1] + 0.006]);
+                }
+              }
             }
           } catch (e) {
             console.warn("Failed fetching cook coordinates:", e);
-            // Scatter fallback coordinates for demo
-            setCookCoords([79.865, 6.932]);
+            if (custCoords && custCoords.length === 2 && custCoords[0] !== 0) {
+              setCookCoords([custCoords[0] + 0.008, custCoords[1] + 0.006]);
+            } else {
+              setCookCoords([79.865, 6.932]);
+            }
           }
         }
       }
@@ -424,7 +482,7 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
               <View className="bg-white rounded-3xl overflow-hidden border border-gray-150 shadow-sm mb-6 h-60">
                 {Platform.OS === 'web' ? (
                   <iframe
-                    srcDoc={getTrackingMapHtml(cookCoords, order.address?.coordinates || [79.8612, 6.9271], order.status)}
+                    srcDoc={getTrackingMapHtml(cookCoords, customerCoords || order.address?.coordinates || [79.8612, 6.9271], order.status)}
                     style={{ width: '100%', height: '100%', border: 'none' }}
                     title="Live Delivery Map"
                   />
@@ -432,7 +490,7 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({ route,
                   WebView && (
                     <WebView
                       originWhitelist={['*']}
-                      source={{ html: getTrackingMapHtml(cookCoords, order.address?.coordinates || [79.8612, 6.9271], order.status) }}
+                      source={{ html: getTrackingMapHtml(cookCoords, customerCoords || order.address?.coordinates || [79.8612, 6.9271], order.status) }}
                       style={{ flex: 1 }}
                       javaScriptEnabled
                       domStorageEnabled

@@ -12,6 +12,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { pickImageFromGallery, uploadImageToImgBB } from '../../services/imageService';
 import { DropdownPicker } from '../../components/common/DropdownPicker';
 import { DISTRICT_TOWN_DATA } from '../../constants/filterConstants';
+import { getCoordinatesForTownAndDistrict } from '../../services/locationService';
 
 // Types
 type ActiveModal = 'addresses' | 'dietary' | 'wallet' | 'help' | 'orders' | 'editProfile' | 'changePassword' | 'favorites' | null;
@@ -194,6 +195,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation: propNa
     }
     setEditSaving(true);
     try {
+      const coords = getCoordinatesForTownAndDistrict(editTown, editDistrict);
       await api.put('/api/users/profile', {
         name: editName.trim(),
         phone: editPhone.trim(),
@@ -201,6 +203,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation: propNa
         district: editDistrict || undefined,
         town: editTown || undefined,
         avatarUrl: editAvatarUrl.trim(),
+        location: {
+          type: 'Point',
+          coordinates: [coords.longitude, coords.latitude],
+        },
       });
       await fetchProfile();
       setActiveModal(null);

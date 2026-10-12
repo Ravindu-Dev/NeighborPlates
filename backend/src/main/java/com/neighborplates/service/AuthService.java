@@ -54,16 +54,15 @@ public class AuthService {
         profile.setDeliveryRadius(request.getDeliveryRadius());
         profile.setHygieneVerified(false);
 
-        if (request.getCoordinates() != null && request.getCoordinates().size() == 2) {
+        if (request.getCoordinates() != null && request.getCoordinates().size() == 2
+                && (request.getCoordinates().get(0) != 0.0 || request.getCoordinates().get(1) != 0.0)) {
             User.GeoJsonPoint point = new User.GeoJsonPoint();
             point.setCoordinates(request.getCoordinates());
             profile.setLocation(point);
         } else {
             User.GeoJsonPoint point = new User.GeoJsonPoint();
-            // Default coordinate fallback [0.0, 0.0]
-            point.setCoordinates(new ArrayList<>());
-            point.getCoordinates().add(0.0);
-            point.getCoordinates().add(0.0);
+            point.setType("Point");
+            point.setCoordinates(new ArrayList<>(UserService.getDefaultCoordinatesForArea(request.getTown(), request.getDistrict())));
             profile.setLocation(point);
         }
 

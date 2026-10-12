@@ -34,9 +34,62 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    public static List<Double> getDefaultCoordinatesForArea(String town, String district) {
+        if (town != null) {
+            String t = town.trim().toLowerCase();
+            if (t.contains("peradeniya")) return List.of(80.5975, 7.2600);
+            if (t.contains("kandy")) return List.of(80.6337, 7.2906);
+            if (t.contains("katugastota")) return List.of(80.6186, 7.3245);
+            if (t.contains("gampola")) return List.of(80.5694, 7.1643);
+            if (t.contains("kundasale")) return List.of(80.6865, 7.2842);
+            if (t.contains("digana")) return List.of(80.7300, 7.3000);
+            if (t.contains("kurunegala")) return List.of(80.3623, 7.4863);
+            if (t.contains("galle")) return List.of(80.2210, 6.0535);
+            if (t.contains("matara")) return List.of(80.5550, 5.9549);
+            if (t.contains("jaffna")) return List.of(80.0255, 9.6615);
+            if (t.contains("anuradhapura")) return List.of(80.4037, 8.3114);
+            if (t.contains("badulla")) return List.of(81.0550, 6.9934);
+            if (t.contains("nuwara eliya")) return List.of(80.7891, 6.9497);
+            if (t.contains("ratnapura")) return List.of(80.4000, 6.6828);
+            if (t.contains("negombo")) return List.of(79.8736, 7.2008);
+            if (t.contains("gampaha")) return List.of(79.9990, 7.0840);
+            if (t.contains("kalutara")) return List.of(79.9607, 6.5854);
+            if (t.contains("panadura")) return List.of(79.9074, 6.7131);
+        }
+        if (district != null) {
+            String d = district.trim().toLowerCase();
+            if (d.contains("kandy")) return List.of(80.6337, 7.2906);
+            if (d.contains("kurunegala")) return List.of(80.3623, 7.4863);
+            if (d.contains("galle")) return List.of(80.2210, 6.0535);
+            if (d.contains("matara")) return List.of(80.5550, 5.9549);
+            if (d.contains("jaffna")) return List.of(80.0255, 9.6615);
+            if (d.contains("anuradhapura")) return List.of(80.4037, 8.3114);
+            if (d.contains("badulla")) return List.of(81.0550, 6.9934);
+            if (d.contains("nuwara eliya")) return List.of(80.7891, 6.9497);
+            if (d.contains("ratnapura")) return List.of(80.4000, 6.6828);
+            if (d.contains("gampaha")) return List.of(79.9990, 7.0840);
+            if (d.contains("kalutara")) return List.of(79.9607, 6.5854);
+        }
+        return List.of(79.8612, 6.9271); // Default Colombo [lon, lat]
+    }
+
     public User getOwnProfile(String email) {
-        return userRepository.findByEmail(email)
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User profile not found"));
+        if (user.getProfile() != null) {
+            User.UserProfile p = user.getProfile();
+            if (p.getLocation() == null || p.getLocation().getCoordinates() == null || p.getLocation().getCoordinates().isEmpty()
+                    || (p.getLocation().getCoordinates().get(0) == 0.0 && p.getLocation().getCoordinates().get(1) == 0.0)) {
+                if (p.getTown() != null || p.getDistrict() != null) {
+                    User.GeoJsonPoint pt = new User.GeoJsonPoint();
+                    pt.setType("Point");
+                    pt.setCoordinates(new ArrayList<>(getDefaultCoordinatesForArea(p.getTown(), p.getDistrict())));
+                    p.setLocation(pt);
+                    user = userRepository.save(user);
+                }
+            }
+        }
+        return user;
     }
 
     public User updateProfile(String email, User.UserProfile update) {
@@ -69,6 +122,12 @@ public class UserService {
 
         if (update.getLocation() != null && update.getLocation().getCoordinates() != null && update.getLocation().getCoordinates().size() == 2) {
             current.setLocation(update.getLocation());
+        } else if (current.getLocation() == null || current.getLocation().getCoordinates() == null || current.getLocation().getCoordinates().isEmpty()
+                || (current.getLocation().getCoordinates().get(0) == 0.0 && current.getLocation().getCoordinates().get(1) == 0.0)) {
+            User.GeoJsonPoint point = new User.GeoJsonPoint();
+            point.setType("Point");
+            point.setCoordinates(new ArrayList<>(getDefaultCoordinatesForArea(current.getTown(), current.getDistrict())));
+            current.setLocation(point);
         }
 
         user.setUpdatedAt(Instant.now());
