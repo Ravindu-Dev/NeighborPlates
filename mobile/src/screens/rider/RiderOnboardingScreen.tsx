@@ -1,55 +1,54 @@
 import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity,
-  Alert, Platform,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RiderStackParamList } from '../../navigation/RiderNavigator';
 import { Button } from '../../components/common/Button';
 import { Feather } from '@expo/vector-icons';
-import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { getRealLocation } from '../../services/locationService';
 
 type Props = NativeStackScreenProps<RiderStackParamList, 'Onboarding'>;
 
-const VEHICLE_OPTIONS = ['Motorcycle', 'Bicycle', 'Car', 'Walking'];
-
 export const RiderOnboardingScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuthStore();
-  const [selectedVehicle, setSelectedVehicle] = useState<string>('Motorcycle');
   const [saving, setSaving] = useState(false);
 
   const handleContinue = async () => {
     setSaving(true);
     try {
-      // Save vehicle type to profile
-      await api.put('/api/users/profile', { vehicleType: selectedVehicle });
+      // Request location permission optionally without failing or blocking continuation
+      try {
+        await getRealLocation(true);
+      } catch (locErr) {
+        console.log('[Onboarding] Optional location permission skipped or denied:', locErr);
+      }
 
-      // Mark onboarding done
-      await AsyncStorage.setItem(`rider_onboarded_${user?.id}`, 'true');
+      // Mark onboarding as completed for this rider
+      if (user?.id) {
+        await AsyncStorage.setItem(`rider_onboarded_${user.id}`, 'true');
+      }
 
       navigation.replace('Tabs');
     } catch (err) {
-      Alert.alert(
-        'Could not save',
-        'We couldn\'t save your vehicle info. You can update it later in your profile.',
-        [
-          { text: 'Try Again', onPress: () => setSaving(false) },
-          { text: 'Skip', style: 'cancel', onPress: () => {
-              AsyncStorage.setItem(`rider_onboarded_${user?.id}`, 'true').then(() =>
-                navigation.replace('Tabs')
-              );
-            }
-          },
-        ]
-      );
+      if (user?.id) {
+        await AsyncStorage.setItem(`rider_onboarded_${user.id}`, 'true');
+      }
+      navigation.replace('Tabs');
+    } finally {
       setSaving(false);
     }
   };
 
   const handleSkip = async () => {
-    await AsyncStorage.setItem(`rider_onboarded_${user?.id}`, 'true');
+    if (user?.id) {
+      await AsyncStorage.setItem(`rider_onboarded_${user.id}`, 'true');
+    }
     navigation.replace('Tabs');
   };
 
@@ -59,110 +58,80 @@ export const RiderOnboardingScreen: React.FC<Props> = ({ navigation }) => {
       contentContainerStyle={{ flexGrow: 1 }}
       showsVerticalScrollIndicator={false}
     >
-      <View className="flex-1 px-6 pt-16 pb-10">
-        {/* Hero */}
-        <View className="items-center mb-10">
-          <View
-            className="w-20 h-20 rounded-full items-center justify-center mb-5"
-            style={{ backgroundColor: '#EEF2FF' }}
-          >
-            <Text style={{ fontSize: 38 }}>🛵</Text>
-          </View>
-          <Text className="text-textPrimary text-2xl font-extrabold text-center mb-2">
-            Welcome, Rider!
-          </Text>
-          <Text className="text-textSecondary text-sm text-center leading-5">
-            Deliver home-cooked meals from neighbors to neighbors.{'\n'}Let's get you set up quickly.
-          </Text>
-        </View>
-
-        {/* Location Permission Explainer */}
-        <View
-          className="rounded-2xl p-4 mb-6 border border-indigo-100"
-          style={{ backgroundColor: '#EEF2FF' }}
-        >
-          <View className="flex-row items-start">
+      <View className="flex-1 px-6 pt-16 pb-10 justify-between max-w-lg w-full self-center">
+        <View>
+          {/* Centered Scooter Hero */}
+          <View className="items-center mb-8">
             <View
-              className="w-9 h-9 rounded-full items-center justify-center mr-3 mt-0.5"
-              style={{ backgroundColor: '#6366F1' }}
+              className="w-24 h-24 rounded-full items-center justify-center mb-5 shadow-xs"
+              style={{ backgroundColor: '#FFF7ED' }}
             >
-              <Feather name="map-pin" size={16} color="#FFFFFF" />
+              <Text style={{ fontSize: 44 }}>🛵</Text>
             </View>
-            <View className="flex-1">
-              <Text className="text-indigo-800 font-bold text-sm mb-1">
-                Why we need your location
-              </Text>
-              <Text className="text-indigo-700 text-xs leading-4">
-                We use your GPS to show you nearby READY orders and let customers
-                track their delivery in real time. We only use location while you're
-                on an active delivery — never in the background.
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Vehicle Selection */}
-        <Text className="text-textPrimary font-bold text-sm mb-3 ml-1">
-          YOUR VEHICLE
-        </Text>
-        <View className="flex-row flex-wrap gap-2 mb-8">
-          {VEHICLE_OPTIONS.map((v) => {
-            const icons: Record<string, string> = {
-              Motorcycle: '🛵',
-              Bicycle: '🚲',
-              Car: '🚗',
-              Walking: '🚶',
-            };
-            const selected = selectedVehicle === v;
-            return (
-              <TouchableOpacity
-                key={v}
-                onPress={() => setSelectedVehicle(v)}
-                activeOpacity={0.8}
-                accessibilityRole="radio"
-                accessibilityState={{ selected }}
-                className={`flex-row items-center px-4 py-2.5 rounded-xl border mr-2 mb-2 ${
-                  selected
-                    ? 'bg-indigo-500 border-indigo-500'
-                    : 'bg-white border-gray-200'
-                }`}
-              >
-                <Text className="text-base mr-1.5">{icons[v]}</Text>
-                <Text
-                  className={`font-bold text-sm ${
-                    selected ? 'text-white' : 'text-textPrimary'
-                  }`}
-                >
-                  {v}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Location Card Note */}
-        <View className="bg-amber-50 border border-amber-100 rounded-2xl p-4 mb-8">
-          <View className="flex-row items-center">
-            <Feather name="info" size={14} color="#D97706" />
-            <Text className="text-amber-700 text-xs font-semibold ml-2">
-              After tapping Continue, your device will ask for location permission.
-              Tap "Allow While Using App" for the best experience.
+            <Text className="text-textPrimary text-2xl font-black text-center mb-2">
+              Welcome, Rider!
+            </Text>
+            <Text className="text-textSecondary text-sm text-center leading-5 px-3">
+              Deliver home-cooked meals from neighbors to neighbors.{'\n'}
+              Let's get you set up quickly to receive nearby orders.
             </Text>
           </View>
+
+          {/* Location Permission Explainer Card */}
+          <View
+            className="rounded-2xl p-4.5 mb-5 border border-indigo-100"
+            style={{ backgroundColor: '#EEF2FF' }}
+          >
+            <View className="flex-row items-start">
+              <View
+                className="w-10 h-10 rounded-full items-center justify-center mr-3.5 mt-0.5"
+                style={{ backgroundColor: '#6366F1' }}
+              >
+                <Feather name="map-pin" size={18} color="#FFFFFF" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-indigo-900 font-extrabold text-sm mb-1">
+                  Why we need your location
+                </Text>
+                <Text className="text-indigo-700 text-xs leading-5">
+                  We use your GPS to show you nearby READY orders and let customers
+                  track their delivery in real time. We only use location while you're
+                  on an active delivery — never in the background.
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* GPS Information Note Card */}
+          <View className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6">
+            <View className="flex-row items-start">
+              <Feather name="info" size={16} color="#D97706" style={{ marginTop: 2 }} />
+              <Text className="text-amber-800 text-xs font-semibold ml-2.5 flex-1 leading-5">
+                After tapping Continue, your device will ask for location permission.
+                Tap "Allow While Using App" for the best delivery dispatch experience.
+              </Text>
+            </View>
+          </View>
         </View>
 
-        {/* CTA */}
-        <Button
-          title="Continue & Allow GPS"
-          onPress={handleContinue}
-          loading={saving}
-          variant="primary"
-          size="lg"
-          className="mb-3 w-full bg-indigo-500 border-indigo-500"
-        />
-        <TouchableOpacity onPress={handleSkip} className="items-center py-2">
-          <Text className="text-textMuted text-sm font-medium">Skip for now</Text>
-        </TouchableOpacity>
+        {/* Action Buttons: Continue & Allow GPS (Orange) and Skip for now */}
+        <View className="pt-4">
+          <Button
+            title="Continue & Allow GPS"
+            onPress={handleContinue}
+            loading={saving}
+            variant="primary"
+            size="lg"
+            className="mb-3 w-full bg-[#EA580C] border-[#EA580C]"
+          />
+          <TouchableOpacity
+            onPress={handleSkip}
+            activeOpacity={0.7}
+            className="items-center py-3"
+          >
+            <Text className="text-textMuted text-sm font-semibold">Skip for now</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );

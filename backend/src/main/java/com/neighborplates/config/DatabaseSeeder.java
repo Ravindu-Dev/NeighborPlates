@@ -13,8 +13,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Component
 public class DatabaseSeeder implements CommandLineRunner {
@@ -36,6 +39,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         seedAdminUser();
         seedRiderUser();
         seedSampleAvailableOrders();
+        seedCompletedOrdersForRider();
     }
 
     private void seedAdminUser() {
@@ -252,5 +256,105 @@ public class DatabaseSeeder implements CommandLineRunner {
         orderRepository.save(o3);
 
         logger.info("Successfully seeded live dispatch orders for riders.");
+    }
+
+    private void seedCompletedOrdersForRider() {
+        String riderEmail = "rider@neighborplates.com";
+        Optional<User> riderOpt = userRepository.findByEmail(riderEmail);
+        if (riderOpt.isEmpty()) {
+            return;
+        }
+        User rider = riderOpt.get();
+
+        List<Order> existingCompleted = orderRepository.findByRiderIdOrderByCreatedAtDesc(rider.getId()).stream()
+                .filter(o -> o.getStatus() == OrderStatus.DELIVERED)
+                .collect(Collectors.toList());
+
+        if (existingCompleted.size() >= 5) {
+            logger.info("Rider has {} completed deliveries. Skipping delivery history seeding.", existingCompleted.size());
+            return;
+        }
+
+        logger.info("Seeding realistic delivery history for rider '{}' to power charts and reports...", riderEmail);
+
+        User cook = userRepository.findByEmail("nimali.cook@neighborplates.com")
+                .or(() -> userRepository.findAll().stream().filter(u -> u.getRole() == UserRole.COOK).findFirst())
+                .orElse(null);
+
+        User customer = userRepository.findByEmail("customer.demo@neighborplates.com")
+                .or(() -> userRepository.findAll().stream().filter(u -> u.getRole() == UserRole.CUSTOMER).findFirst())
+                .orElse(null);
+
+        if (cook == null || customer == null) {
+            logger.warn("Cook or Customer missing. Unable to seed completed rider orders.");
+            return;
+        }
+
+        Instant now = Instant.now();
+        Object[][] sampleData = new Object[][] {
+                // daysAgo, hoursAgo, earnings, orderAmount, cookName, itemTitle, dropoffLabel
+                { 0, 2, 285.0, 1850.0, "Amma's Spice Garden", "Chicken Biryani Claypot", "12/A Flower Road, Colombo 07" },
+                { 0, 4, 217.5, 1450.0, "Nimali's Home Kitchen", "Dutch-Burgher Lamprais", "45 High Level Road, Nugegoda" },
+                { 1, 19, 350.0, 2200.0, "Curry Leaf Kitchen", "Mutton Kottu Roti Feast", "14 Havelock Town, Colombo 05" },
+                { 1, 22, 310.0, 1900.0, "Green Leaf Vegetarian", "Paneer Tikka Rice Bowl", "32 Duplication Road, Kollupitiya" },
+                { 2, 45, 240.0, 1500.0, "Nimali's Home Kitchen", "String Hoppers & Kiri Hodi", "102 Kynsey Road, Borella" },
+                { 2, 50, 310.0, 1950.0, "Village Claypot Rice", "Traditional Red Rice & Fish", "25 Baseline Road, Dematagoda" },
+                { 3, 70, 430.0, 2600.0, "Grandma's Lamprais", "Seafood Special Lamprais", "6 Ward Place, Colombo 07" },
+                { 3, 75, 390.0, 2400.0, "Ceylon Biryani House", "Kandy Spiced Dum Biryani", "77 Havelock Road, Colombo 05" },
+                { 4, 94, 360.0, 2150.0, "Curry Leaf Kitchen", "Egg Roti & Devilled Chicken", "15 Park Street, Colombo 02" },
+                { 5, 118, 420.0, 2550.0, "Authentic Jaffna Crab Pots", "Crab Curry with Roast Paan", "68 Torrington Square, Colombo 07" },
+                { 6, 140, 360.0, 2200.0, "Grandma's Lamprais", "Beef Rendang & Yellow Rice", "22 Rosmead Place, Colombo 07" }
+        };
+
+        for (int i = 0; i < sampleData.length; i++) {
+            Object[] row = sampleData[i];
+            int daysAgo = (Integer) row[0];
+            int hoursAgo = (Integer) row[1];
+            double riderEarnings = (Double) row[2];
+            double totalAmount = (Double) row[3];
+            String itemTitle = (String) row[5];
+            String dropoffLabel = (String) row[6];
+
+            Instant deliveredTime = now.minus(daysAgo, ChronoUnit.DAYS).minus(hoursAgo % 24, ChronoUnit.HOURS);
+
+            Order order = new Order();
+            order.setOrderNumber("NP-" + (System.currentTimeMillis() + 100 + i) % 1000000 + "-DL");
+            order.setCustomerId(customer.getId());
+            order.setCookId(cook.getId());
+            order.setRiderId(rider.getId());
+            order.setStatus(OrderStatus.DELIVERED);
+            order.setDeliveryMethod("RIDER");
+            order.setTotalAmount(totalAmount);
+            order.setPlatformFee(totalAmount * 0.05);
+            order.setCookEarnings(totalAmount * 0.80);
+            order.setRiderEarnings(riderEarnings);
+            order.setCreatedAt(deliveredTime.minus(35, ChronoUnit.MINUTES));
+            order.setScheduledFor(deliveredTime.minus(10, ChronoUnit.MINUTES));
+            order.setDeliveredAt(deliveredTime);
+            order.setUpdatedAt(deliveredTime);
+
+            order.setItems(List.of(new Order.OrderItem("m-" + i, itemTitle, totalAmount, 1)));
+
+            Order.DeliveryAddress addr = new Order.DeliveryAddress();
+            addr.setLabel(dropoffLabel);
+            addr.setCoordinates(List.of(79.8612, 6.9271));
+            order.setAddress(addr);
+
+            orderRepository.save(order);
+        }
+
+        // Update rider user stats with lifetime earnings
+        double addedEarnings = 0;
+        for (Object[] r : sampleData) {
+            addedEarnings += (Double) r[2];
+        }
+        User.UserStats stats = rider.getStats() != null ? rider.getStats() : new User.UserStats();
+        stats.setTotalOrders(stats.getTotalOrders() + sampleData.length);
+        stats.setTotalEarnings(486200.0);
+        stats.setAvgRating(4.95);
+        rider.setStats(stats);
+        userRepository.save(rider);
+
+        logger.info("Successfully seeded {} completed orders for rider '{}'.", sampleData.length, riderEmail);
     }
 }

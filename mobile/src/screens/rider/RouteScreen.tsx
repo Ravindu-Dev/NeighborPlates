@@ -207,6 +207,7 @@ export const RouteScreen: React.FC = () => {
   const [messageModalVisible, setMessageModalVisible] = useState(false);
   const [customMessage, setCustomMessage] = useState('');
   const [messageSentToast, setMessageSentToast] = useState(false);
+  const [confirmingStatus, setConfirmingStatus] = useState(false);
 
   // Real GPS Location state
   const [riderCoords, setRiderCoords] = useState<Coordinates>(DEFAULT_COORDINATES);
@@ -287,35 +288,50 @@ export const RouteScreen: React.FC = () => {
     }
   }, [isFocused, passedOrderId]);
 
-  // Handle stage transitions
-  const handleConfirmArrivalOrPickup = async () => {
-    if (!activeOrder) return;
+  // Handle stage transitions with robust loading, duplicate prevention, and error recovery
+  const handleConfirmArrivalOrPickup = async (): Promise<boolean> => {
+    if (!activeOrder || confirmingStatus) return false;
+    setConfirmingStatus(true);
 
     if (stage === 1) {
-      if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
       try {
         const res = await api.put(`/api/orders/${activeOrder.id}/status?status=DELIVERING`);
+        if (Platform.OS !== 'web') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
         setActiveOrder(res.data);
         setStage(2);
+        return true;
       } catch (e: any) {
-        const msg = e?.response?.data?.message || 'Could not update to in-transit status.';
-        Alert.alert('Status Error', msg);
+        if (Platform.OS !== 'web') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
+        const msg = e?.response?.data?.message || 'Could not update to in-transit status. Please retry.';
+        Alert.alert('Pickup Confirmation Error', msg);
+        return false;
+      } finally {
+        setConfirmingStatus(false);
       }
     } else {
-      if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
       try {
         const res = await api.put(`/api/orders/${activeOrder.id}/status?status=DELIVERED`);
+        if (Platform.OS !== 'web') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
         navigation.replace('DeliveryConfirmation', {
           orderId: activeOrder.id,
           earnings: res.data.riderEarnings ?? activeOrder.riderEarnings ?? 0,
         });
+        return true;
       } catch (e: any) {
-        const msg = e?.response?.data?.message || 'Could not complete delivery.';
-        Alert.alert('Status Error', msg);
+        if (Platform.OS !== 'web') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
+        const msg = e?.response?.data?.message || 'Could not complete delivery. Please retry.';
+        Alert.alert('Delivery Confirmation Error', msg);
+        return false;
+      } finally {
+        setConfirmingStatus(false);
       }
     }
   };
@@ -700,9 +716,12 @@ export const RouteScreen: React.FC = () => {
         {/* ── Slide to Confirm Arrival / Delivery ── */}
         <SlideToConfirm
           label={stage === 1 ? 'Slide to Confirm Pickup' : 'Slide to Complete Delivery'}
+          confirmingLabel={stage === 1 ? 'Confirming Pickup...' : 'Completing Delivery...'}
           onConfirm={handleConfirmArrivalOrPickup}
-          knobColor="#C25E00"
-          backgroundColor="#1E293B"
+          loading={confirmingStatus}
+          knobColor="#EA580C"
+          backgroundColor="#0F172A"
+          accessibilityLabel={stage === 1 ? 'Slide to Confirm Pickup' : 'Slide to Complete Delivery'}
         />
       </View>
 
