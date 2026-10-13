@@ -164,9 +164,9 @@ const getDeliveryJobsMapHtml = (
     var riderLon = ${riderLon};
     var isRealGps = ${isRealGps};
     var map = L.map('map', { zoomControl: false }).setView([riderLat, riderLon], 14);
-    L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png?api_key=sk-OP85plgYVLRSP0UYseCWtvvDJITdJ3mgrBVjGmh9OzAnaVWL', {
-      maxZoom: 20,
-      attribution: '&copy; Stadia Maps &copy; OpenStreetMap'
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
     // Radar Nearby Range Zone (< 3 km)

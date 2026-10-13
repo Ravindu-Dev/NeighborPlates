@@ -10,18 +10,7 @@ import { Button } from '../../components/common/Button';
 import { TextInput } from '../../components/common/TextInput';
 import { Feather } from '@expo/vector-icons';
 import { AdminHeader } from '../../components/admin/AdminHeader';
-
-interface OrderOperationalDetail {
-  order: any;
-  customerName: string;
-  customerPhone?: string;
-  cookName: string;
-  cookPhone?: string;
-  riderName?: string;
-  riderPhone?: string;
-  delayed: boolean;
-  delayReason?: string;
-}
+import { LiveOperationsMap, OrderOperationalDetail } from '../../components/admin/LiveOperationsMap';
 
 interface LiveOpsData {
   activeOrdersCount: number;
@@ -80,6 +69,7 @@ export const LiveOperationsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'LIVE' | 'DELAYED' | 'DISPUTES'>('LIVE');
+  const [viewMode, setViewMode] = useState<'MAP' | 'LIST'>('MAP');
 
   const [selectedItem, setSelectedItem] = useState<OrderOperationalDetail | null>(null);
   const [reassignModalVisible, setReassignModalVisible] = useState(false);
@@ -270,29 +260,101 @@ export const LiveOperationsScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Segmented Tabs */}
-      <View className="px-4 pt-3 pb-1">
-        <View className="flex-row bg-gray-100 p-1 rounded-xl">
-          {tabConfig.map((tab) => (
-            <TouchableOpacity
-              key={tab.id}
-              onPress={() => setActiveTab(tab.id)}
-              className={`flex-1 py-2 items-center rounded-lg ${activeTab === tab.id ? 'bg-white shadow-sm' : ''}`}
-              activeOpacity={0.7}
+      {/* View Mode Switcher */}
+      <View className="px-4 pt-2.5 pb-1 flex-row items-center justify-between">
+        <View className="flex-row bg-gray-200/80 p-0.5 rounded-xl">
+          <TouchableOpacity
+            onPress={() => setViewMode('MAP')}
+            className={`flex-row items-center px-3 py-1.5 rounded-lg ${viewMode === 'MAP' ? 'bg-white shadow-sm' : ''}`}
+            activeOpacity={0.8}
+          >
+            <Feather
+              name="map"
+              size={13}
+              color={viewMode === 'MAP' ? '#FF6B35' : '#6B7280'}
+              style={{ marginRight: 5 }}
+            />
+            <Text
+              className={`text-xs font-bold ${
+                viewMode === 'MAP' ? 'text-primary' : 'text-gray-500'
+              }`}
             >
-              <Text
-                className={`text-xs font-bold ${activeTab === tab.id ? tab.activeColor : 'text-textMuted'}`}
-              >
-                {tab.label} ({tab.count})
-              </Text>
-            </TouchableOpacity>
-          ))}
+              Live Map 🗺️
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setViewMode('LIST')}
+            className={`flex-row items-center px-3 py-1.5 rounded-lg ${viewMode === 'LIST' ? 'bg-white shadow-sm' : ''}`}
+            activeOpacity={0.8}
+          >
+            <Feather
+              name="list"
+              size={13}
+              color={viewMode === 'LIST' ? '#FF6B35' : '#6B7280'}
+              style={{ marginRight: 5 }}
+            />
+            <Text
+              className={`text-xs font-bold ${
+                viewMode === 'LIST' ? 'text-primary' : 'text-gray-500'
+              }`}
+            >
+              List View
+            </Text>
+          </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          onPress={handleRefresh}
+          className="flex-row items-center bg-white border border-gray-200 px-3 py-1.5 rounded-xl shadow-xs"
+          activeOpacity={0.8}
+        >
+          <Feather name="refresh-cw" size={11} color="#FF6B35" style={{ marginRight: 4 }} />
+          <Text className="text-xs font-bold text-gray-700">Sync</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Orders List */}
-      <ScrollView
-        className="flex-1 px-4"
+      {viewMode === 'MAP' ? (
+        <LiveOperationsMap
+          liveOrders={liveOrders}
+          availableRiders={data?.availableRiders || []}
+          onReassignRider={(order) => {
+            setSelectedItem(order);
+            setReassignModalVisible(true);
+          }}
+          onResolveDispute={(order) => {
+            setSelectedItem(order);
+            setAdminNotes('');
+            setNotesError('');
+            setResolveAction('REFUND');
+            setResolveModalVisible(true);
+          }}
+          onForceStatus={handleForceStatus}
+        />
+      ) : (
+        <>
+          {/* Segmented Tabs */}
+          <View className="px-4 pt-2 pb-1">
+            <View className="flex-row bg-gray-100 p-1 rounded-xl">
+              {tabConfig.map((tab) => (
+                <TouchableOpacity
+                  key={tab.id}
+                  onPress={() => setActiveTab(tab.id)}
+                  className={`flex-1 py-2 items-center rounded-lg ${activeTab === tab.id ? 'bg-white shadow-sm' : ''}`}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    className={`text-xs font-bold ${activeTab === tab.id ? tab.activeColor : 'text-textMuted'}`}
+                  >
+                    {tab.label} ({tab.count})
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Orders List */}
+          <ScrollView
+            className="flex-1 px-4"
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#FF6B35']} tintColor="#FF6B35" />
@@ -461,6 +523,8 @@ export const LiveOperationsScreen: React.FC = () => {
           })
         )}
       </ScrollView>
+        </>
+      )}
 
       {/* Reassign Rider Modal */}
       <Modal visible={reassignModalVisible} transparent animationType="slide">
