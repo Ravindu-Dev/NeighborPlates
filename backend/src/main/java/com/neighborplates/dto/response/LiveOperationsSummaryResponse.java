@@ -32,5 +32,24 @@ public class LiveOperationsSummaryResponse {
         private String riderPhone;
         private boolean delayed;
         private String delayReason; // e.g. "Preparation delayed (>15 mins)", "Rider assignment delayed"
+        private List<Double> cookLocation; // [lng, lat]
+        private String cookDistrict;
+        private String cookTown;
+        private List<Double> customerLocation; // [lng, lat]
+        private List<Double> riderLocation; // [lng, lat]
+
+        public OrderOperationalDetail(Order order, String customerName, String customerPhone,
+                                      String cookName, String cookPhone, String riderName,
+                                      String riderPhone, boolean delayed, String delayReason) {
+            this.order = order;
+            this.customerName = customerName;
+            this.customerPhone = customerPhone;
+            this.cookName = cookName;
+            this.cookPhone = cookPhone;
+            this.riderName = riderName;
+            this.riderPhone = riderPhone;
+            this.delayed = delayed;
+            this.delayReason = delayReason;
+        }
     }
 }

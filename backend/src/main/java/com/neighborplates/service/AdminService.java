@@ -406,6 +406,21 @@ public class AdminService {
 
             if (isDelayed) delayedCount++;
 
+            List<Double> cookLocation = (cook != null && cook.getProfile() != null && cook.getProfile().getLocation() != null)
+                    ? cook.getProfile().getLocation().getCoordinates() : null;
+            String cookDistrict = cook != null && cook.getProfile() != null ? cook.getProfile().getDistrict() : null;
+            String cookTown = cook != null && cook.getProfile() != null ? cook.getProfile().getTown() : null;
+
+            List<Double> customerLocation = null;
+            if (o.getAddress() != null && o.getAddress().getCoordinates() != null && !o.getAddress().getCoordinates().isEmpty()) {
+                customerLocation = o.getAddress().getCoordinates();
+            } else if (customer != null && customer.getProfile() != null && customer.getProfile().getLocation() != null) {
+                customerLocation = customer.getProfile().getLocation().getCoordinates();
+            }
+
+            List<Double> riderLocation = (rider != null && rider.getProfile() != null && rider.getProfile().getLocation() != null)
+                    ? rider.getProfile().getLocation().getCoordinates() : null;
+
             operationalDetails.add(new com.neighborplates.dto.response.LiveOperationsSummaryResponse.OrderOperationalDetail(
                     o,
                     customer != null && customer.getProfile() != null ? customer.getProfile().getName() : "Customer",
@@ -415,7 +430,12 @@ public class AdminService {
                     rider != null && rider.getProfile() != null ? rider.getProfile().getName() : null,
                     rider != null && rider.getProfile() != null ? rider.getProfile().getPhone() : null,
                     isDelayed,
-                    delayReason
+                    delayReason,
+                    cookLocation,
+                    cookDistrict,
+                    cookTown,
+                    customerLocation,
+                    riderLocation
             ));
         }
 
@@ -426,6 +446,22 @@ public class AdminService {
             User customer = userRepository.findById(o.getCustomerId()).orElse(null);
             User cook = userRepository.findById(o.getCookId()).orElse(null);
             User rider = o.getRiderId() != null ? userRepository.findById(o.getRiderId()).orElse(null) : null;
+
+            List<Double> cookLocation = (cook != null && cook.getProfile() != null && cook.getProfile().getLocation() != null)
+                    ? cook.getProfile().getLocation().getCoordinates() : null;
+            String cookDistrict = cook != null && cook.getProfile() != null ? cook.getProfile().getDistrict() : null;
+            String cookTown = cook != null && cook.getProfile() != null ? cook.getProfile().getTown() : null;
+
+            List<Double> customerLocation = null;
+            if (o.getAddress() != null && o.getAddress().getCoordinates() != null && !o.getAddress().getCoordinates().isEmpty()) {
+                customerLocation = o.getAddress().getCoordinates();
+            } else if (customer != null && customer.getProfile() != null && customer.getProfile().getLocation() != null) {
+                customerLocation = customer.getProfile().getLocation().getCoordinates();
+            }
+
+            List<Double> riderLocation = (rider != null && rider.getProfile() != null && rider.getProfile().getLocation() != null)
+                    ? rider.getProfile().getLocation().getCoordinates() : null;
+
             operationalDetails.add(new com.neighborplates.dto.response.LiveOperationsSummaryResponse.OrderOperationalDetail(
                     o,
                     customer != null && customer.getProfile() != null ? customer.getProfile().getName() : "Customer",
@@ -435,7 +471,12 @@ public class AdminService {
                     rider != null && rider.getProfile() != null ? rider.getProfile().getName() : null,
                     rider != null && rider.getProfile() != null ? rider.getProfile().getPhone() : null,
                     false,
-                    null
+                    null,
+                    cookLocation,
+                    cookDistrict,
+                    cookTown,
+                    customerLocation,
+                    riderLocation
             ));
         }
 

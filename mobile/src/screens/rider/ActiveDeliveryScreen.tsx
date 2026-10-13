@@ -51,7 +51,7 @@ const getMapHtml = (
   <script>
     var map = L.map('map', { zoomControl: false }).fitBounds([[${rLat},${rLon}],[${cookLat},${cookLon}],[${custLat},${custLon}]], { padding: [40,40] });
     L.control.zoom({ position: 'bottomright' }).addTo(map);
-    L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png?api_key=sk-OP85plgYVLRSP0UYseCWtvvDJITdJ3mgrBVjGmh9OzAnaVWL', { maxZoom: 20, attribution: '&copy; Stadia Maps &copy; OpenStreetMap contributors' }).addTo(map);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
     // Cook
     L.marker([${cookLat},${cookLon}], {
       icon: L.divIcon({ html: '<div style="background:#FF6B35;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 0 8px rgba(255,107,53,.8)"></div>', className:'m', iconSize:[14,14] })
