@@ -213,9 +213,86 @@ public class AdminService {
     public User toggleUserActiveStatus(String id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        user.setActive(!user.isActive());
+        boolean nextActive = !user.isActive();
+        user.setActive(nextActive);
+        if (nextActive) {
+            user.setSuspensionReason(null);
+            if (user.getNoticeCount() >= 5) {
+                user.setNoticeCount(4); // Restores user on final warning
+            }
+        } else if (user.getSuspensionReason() == null) {
+            user.setSuspensionReason("Account suspended by Administrator.");
+        }
         user.setUpdatedAt(java.time.Instant.now());
         return userRepository.save(user);
+    }
+
+    public User issueUserNotice(String id, String notice, String issuedBy) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        int nextCount = user.getNoticeCount() + 1;
+        user.setNoticeCount(nextCount);
+        user.setAdminNotice(notice);
+        user.setNoticeIssuedAt(java.time.Instant.now());
+
+        if (user.getNoticeHistory() == null) {
+            user.setNoticeHistory(new ArrayList<>());
+        }
+        user.getNoticeHistory().add(new User.NoticeItem(
+                notice,
+                java.time.Instant.now(),
+                nextCount,
+                issuedBy != null ? issuedBy : "Admin"
+        ));
+
+        // 5-Strike Auto-Ban check: If 5 or more notices received, automatically suspend/ban the account
+        if (nextCount >= 5) {
+            user.setActive(false);
+            user.setSuspensionReason("Account automatically suspended: Exceeded the maximum threshold of 5 administrative warning notices.");
+        }
+
+        user.setUpdatedAt(java.time.Instant.now());
+        return userRepository.save(user);
+    }
+
+    public User clearUserNotice(String id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        user.setAdminNotice(null);
+        user.setNoticeIssuedAt(null);
+        user.setUpdatedAt(java.time.Instant.now());
+        return userRepository.save(user);
+    }
+
+    public User resetUserStrikes(String id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        user.setNoticeCount(0);
+        user.setAdminNotice(null);
+        user.setNoticeIssuedAt(null);
+        user.setActive(true);
+        user.setSuspensionReason(null);
+        user.setUpdatedAt(java.time.Instant.now());
+        return userRepository.save(user);
+    }
+
+    public Meal issueMealNotice(String id, String notice) {
+        Meal meal = mealRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Meal not found"));
+        meal.setAdminNotice(notice);
+        meal.setNoticeIssuedAt(java.time.Instant.now());
+        meal.setUpdatedAt(java.time.Instant.now());
+        return mealRepository.save(meal);
+    }
+
+    public Meal clearMealNotice(String id) {
+        Meal meal = mealRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Meal not found"));
+        meal.setAdminNotice(null);
+        meal.setNoticeIssuedAt(null);
+        meal.setUpdatedAt(java.time.Instant.now());
+        return mealRepository.save(meal);
     }
 
     public AdminPayoutSummaryResponse getPayoutSummary() {

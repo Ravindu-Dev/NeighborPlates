@@ -113,15 +113,20 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: async () => {
     set({ isLoading: true });
-    await AsyncStorage.multiRemove(['token', 'refreshToken', 'user']);
-    set({
-      token: null,
-      refreshToken: null,
-      user: null,
-      isAuthenticated: false,
-      isLoading: false,
-      error: null,
-    });
+    try {
+      await AsyncStorage.multiRemove(['token', 'refreshToken', 'user']);
+    } catch (e) {
+      console.warn('AsyncStorage error during logout', e);
+    } finally {
+      set({
+        token: null,
+        refreshToken: null,
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+      });
+    }
   },
 
   checkAuth: async () => {

@@ -64,6 +64,10 @@ public class Meal {
     private double originalTotalPrice = 0.0; // Sum of individual meal prices
     private double discountPercentage = 0.0; // e.g., 15.0 for 15% off
 
+    // Administrative notice / warning on specific meal
+    private String adminNotice;
+    private Instant noticeIssuedAt;
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

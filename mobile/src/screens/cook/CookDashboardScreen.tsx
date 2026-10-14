@@ -173,6 +173,24 @@ const MealCard: React.FC<{ meal: any; onEdit: () => void; onDelete: () => void }
           <Text style={[styles.mealActionText, { color: '#EF4444' }]}>Del</Text>
         </TouchableOpacity>
       </View>
+      {!!meal.adminNotice && (
+        <View style={{
+          backgroundColor: '#78350F30',
+          borderWidth: 1,
+          borderColor: '#F59E0B60',
+          borderRadius: 8,
+          padding: 8,
+          marginHorizontal: 12,
+          marginBottom: 10,
+          flexDirection: 'row',
+          alignItems: 'center',
+        }}>
+          <Feather name="alert-triangle" size={12} color="#F59E0B" style={{ marginRight: 6 }} />
+          <Text style={{ color: '#FDE68A', fontSize: 11, flex: 1, fontWeight: '500' }}>
+            Notice: {meal.adminNotice}
+          </Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -487,6 +505,49 @@ export const CookDashboardScreen: React.FC = () => {
 
         {/* BODY */}
         <View style={styles.body}>
+          {/* ADMINISTRATIVE WARNING / ADVISORY NOTICE */}
+          {!!profile?.adminNotice && (
+            <View style={{
+              marginBottom: 18,
+              backgroundColor: (profile?.noticeCount || 0) >= 4 ? '#7F1D1D25' : '#78350F25',
+              borderWidth: 1.5,
+              borderColor: (profile?.noticeCount || 0) >= 4 ? '#EF4444' : '#F59E0B',
+              borderRadius: 16,
+              padding: 14,
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+            }}>
+              <Feather
+                name="alert-triangle"
+                size={20}
+                color={(profile?.noticeCount || 0) >= 4 ? '#EF4444' : '#F59E0B'}
+                style={{ marginTop: 2, marginRight: 10 }}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={{
+                  color: (profile?.noticeCount || 0) >= 4 ? '#F87171' : '#FBBF24',
+                  fontWeight: '800',
+                  fontSize: 12,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                }}>
+                  Official Warning (Strike {profile?.noticeCount || 1}/5)
+                </Text>
+                <Text style={{ color: '#F1F5F9', fontSize: 13, fontWeight: '600', marginTop: 4, lineHeight: 18 }}>
+                  {profile.adminNotice}
+                </Text>
+                <Text style={{
+                  color: (profile?.noticeCount || 0) >= 4 ? '#FCA5A5' : '#CBD5E1',
+                  fontSize: 11,
+                  marginTop: 6,
+                  fontStyle: 'italic',
+                }}>
+                  ⚠️ Reaching 5 warning notices will result in automatic and permanent account suspension.
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* Stats */}
           <View style={styles.statsRow}>
             <AnimatedStatCard

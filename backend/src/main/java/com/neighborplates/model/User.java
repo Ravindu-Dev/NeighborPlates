@@ -37,6 +37,16 @@ public class User {
 
     private Boolean active = true;
 
+    private int noticeCount = 0; // Number of administrative warning notices / strikes received (>= 5 leads to auto-ban)
+
+    private String adminNotice; // Active warning notice message currently displayed to the user
+
+    private Instant noticeIssuedAt; // Timestamp when the active notice was issued
+
+    private String suspensionReason; // Reason why the account was suspended/banned
+
+    private List<NoticeItem> noticeHistory = new ArrayList<>(); // History of all notices issued to this user
+
     public Boolean getActive() {
         return active == null ? true : active;
     }
@@ -96,5 +106,15 @@ public class User {
     public static class GeoJsonPoint {
         private String type = "Point";
         private List<Double> coordinates = new ArrayList<>(); // [longitude, latitude]
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class NoticeItem {
+        private String notice;
+        private Instant issuedAt = Instant.now();
+        private int strikeNumber;
+        private String issuedBy;
     }
 }

@@ -10,6 +10,7 @@ import {
   Modal,
   ScrollView,
   Image,
+  TextInput,
 } from 'react-native';
 import { api } from '../../services/api';
 import { Card } from '../../components/common/Card';
@@ -54,11 +55,18 @@ export const UserManagementScreen: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [selectedAvatarUrl, setSelectedAvatarUrl] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   // Search & filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [verificationFilter, setVerificationFilter] = useState<VerificationFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+
+  // Notice & Strike Modal State
+  const [noticeModalVisible, setNoticeModalVisible] = useState(false);
+  const [noticeTargetUser, setNoticeTargetUser] = useState<any | null>(null);
+  const [noticeText, setNoticeText] = useState('');
+  const [noticeLoading, setNoticeLoading] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -201,12 +209,124 @@ export const UserManagementScreen: React.FC = () => {
           style: currentActive ? 'destructive' : 'default',
           onPress: async () => {
             setActionLoading(true);
+            setActionLoadingId(userId);
             try {
-              await api.put(`/api/admin/users/${userId}/toggle-active`);
+              const res = await api.put(`/api/admin/users/${userId}/toggle-active`);
+              if (res.data) {
+                setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, ...res.data } : u)));
+                setSelectedUser((curr: any) => (curr && curr.id === userId ? { ...curr, ...res.data } : curr));
+              }
               await fetchUsers();
               Alert.alert('Done', `User account ${currentActive ? 'suspended' : 'reactivated'}.`);
             } catch (error: any) {
               Alert.alert('Error', error.response?.data?.message || 'Failed to update account status.');
+            } finally {
+              setActionLoading(false);
+              setActionLoadingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleOpenNoticeModal = (targetUser: any) => {
+    setNoticeTargetUser(targetUser);
+    setNoticeText('');
+    setNoticeModalVisible(true);
+  };
+
+  const handleIssueNotice = async () => {
+    if (!noticeTargetUser || !noticeText.trim()) {
+      Alert.alert('Notice Required', 'Please enter a warning notice or reason for this user.');
+      return;
+    }
+    const currentStrikes = noticeTargetUser.noticeCount || 0;
+    const isAutoBan = currentStrikes + 1 >= 5;
+
+    const doSubmit = async () => {
+      setNoticeLoading(true);
+      try {
+        const response = await api.put(`/api/admin/users/${noticeTargetUser.id}/notice`, {
+          notice: noticeText.trim(),
+        });
+        const updatedUser = response.data;
+        setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+        if (selectedUser?.id === updatedUser.id) {
+          setSelectedUser(updatedUser);
+        }
+        setNoticeModalVisible(false);
+        setNoticeText('');
+        if (isAutoBan) {
+          Alert.alert(
+            'Account Auto-Banned 🔴',
+            `${updatedUser.profile?.name || updatedUser.email} has received 5 notices and their account was automatically SUSPENDED.`
+          );
+        } else {
+          Alert.alert(
+            'Notice Issued ⚠️',
+            `Notice recorded successfully. User now has ${updatedUser.noticeCount}/5 warning strikes.`
+          );
+        }
+      } catch (error: any) {
+        Alert.alert('Error', error.response?.data?.message || 'Failed to issue notice.');
+      } finally {
+        setNoticeLoading(false);
+      }
+    };
+
+    if (isAutoBan) {
+      Alert.alert(
+        'Auto-Ban Warning! ⚠️',
+        `This is strike 5 of 5 for ${noticeTargetUser.profile?.name || 'this user'}. Issuing this notice will immediately and automatically BAN the account. Do you wish to proceed?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Yes, Ban Account', style: 'destructive', onPress: doSubmit },
+        ]
+      );
+    } else {
+      await doSubmit();
+    }
+  };
+
+  const handleClearNotice = async (userId: string) => {
+    setActionLoading(true);
+    try {
+      const response = await api.delete(`/api/admin/users/${userId}/notice`);
+      const updatedUser = response.data;
+      setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+      if (selectedUser?.id === updatedUser.id) {
+        setSelectedUser(updatedUser);
+      }
+      Alert.alert('Notice Cleared', 'Active warning notice was removed from this user.');
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to clear notice.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResetStrikes = async (userId: string) => {
+    Alert.alert(
+      'Reset All Strikes',
+      'This will reset the strike count to 0, clear any active notice, and reactivate the user if they were suspended.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset to 0',
+          style: 'destructive',
+          onPress: async () => {
+            setActionLoading(true);
+            try {
+              const response = await api.put(`/api/admin/users/${userId}/reset-strikes`);
+              const updatedUser = response.data;
+              setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+              if (selectedUser?.id === updatedUser.id) {
+                setSelectedUser(updatedUser);
+              }
+              Alert.alert('Strikes Reset', 'Strikes have been reset to 0/5 and account is restored.');
+            } catch (error: any) {
+              Alert.alert('Error', error.response?.data?.message || 'Failed to reset strikes.');
             } finally {
               setActionLoading(false);
             }
@@ -276,6 +396,16 @@ export const UserManagementScreen: React.FC = () => {
             label={item.active !== false ? 'Active' : 'Suspended'}
             variant={item.active !== false ? 'success' : 'error'}
           />
+          {item.noticeCount > 0 && (
+            <Badge
+              label={
+                item.active === false && item.noticeCount >= 5
+                  ? 'Auto-Banned (5/5)'
+                  : `⚠️ ${item.noticeCount}/5 Strikes`
+              }
+              variant={item.noticeCount >= 5 ? 'error' : item.noticeCount >= 3 ? 'warning' : 'neutral'}
+            />
+          )}
           {isCook && (
             <Badge
               label={item.profile?.hygieneVerified ? 'Verified ✓' : 'Unverified'}
@@ -312,14 +442,28 @@ export const UserManagementScreen: React.FC = () => {
           )}
         </View>
 
+        {/* Active Notice Banner on Card */}
+        {!!item.adminNotice && (
+          <View className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 mb-3 flex-row items-start">
+            <Feather name="alert-triangle" size={13} color="#D97706" style={{ marginTop: 2, marginRight: 6 }} />
+            <View className="flex-1">
+              <Text className="text-amber-900 font-bold text-[11px]">
+                Active Notice (Strike {item.noticeCount || 1}/5):
+              </Text>
+              <Text className="text-amber-800 text-xs mt-0.5 leading-snug">{item.adminNotice}</Text>
+            </View>
+          </View>
+        )}
+
         {/* Quick Actions */}
-        <View className="flex-row gap-2 border-t border-gray-100 pt-3">
+        <View className="flex-row flex-wrap gap-2 border-t border-gray-100 pt-3">
           {isCook && !item.profile?.hygieneVerified && item.active !== false && (
             <Button
               title="VERIFY"
               onPress={() => handleVerify(item.id)}
               size="sm"
-              className="flex-1"
+              loading={actionLoadingId === item.id}
+              className="flex-1 min-w-[70px]"
             />
           )}
           {isRider && item.active !== false && (
@@ -328,16 +472,25 @@ export const UserManagementScreen: React.FC = () => {
               onPress={() => handleVerifyRider(item.id, item.profile?.riderVerified)}
               variant={item.profile?.riderVerified ? 'outline' : 'primary'}
               size="sm"
-              className="flex-1"
+              loading={actionLoadingId === item.id}
+              className="flex-1 min-w-[70px]"
             />
           )}
+          <Button
+            title="NOTICE"
+            onPress={() => handleOpenNoticeModal(item)}
+            variant="outline"
+            size="sm"
+            className="flex-1 min-w-[70px]"
+          />
           {item.email !== currentUser?.email && (
             <Button
               title={item.active !== false ? 'SUSPEND' : 'ACTIVATE'}
               onPress={() => handleToggleActive(item.id, item.active !== false)}
-              variant="outline"
+              variant={item.active !== false ? 'outline' : 'primary'}
               size="sm"
-              className="flex-1"
+              loading={actionLoadingId === item.id}
+              className="flex-1 min-w-[80px]"
             />
           )}
           <Button
@@ -345,7 +498,7 @@ export const UserManagementScreen: React.FC = () => {
             onPress={() => setSelectedUser(item)}
             variant="outline"
             size="sm"
-            className="flex-1"
+            className="flex-1 min-w-[70px]"
           />
         </View>
       </Card>
@@ -768,6 +921,108 @@ export const UserManagementScreen: React.FC = () => {
                 </View>
               )}
 
+              {/* Warnings & Strike Status Card */}
+              <View className="bg-amber-50/70 p-4 rounded-2xl border border-amber-200 mb-4">
+                <View className="flex-row items-center justify-between mb-2">
+                  <View className="flex-row items-center">
+                    <Feather name="alert-triangle" size={15} color="#D97706" />
+                    <Text className="font-extrabold text-xs text-amber-900 uppercase tracking-wider ml-1.5">
+                      Warning Notices & Strikes
+                    </Text>
+                  </View>
+                  <Badge
+                    label={`${selectedUser?.noticeCount || 0} / 5 Strikes`}
+                    variant={
+                      (selectedUser?.noticeCount || 0) >= 5
+                        ? 'error'
+                        : (selectedUser?.noticeCount || 0) >= 3
+                        ? 'warning'
+                        : 'neutral'
+                    }
+                  />
+                </View>
+
+                {selectedUser?.active === false && (selectedUser?.noticeCount || 0) >= 5 && (
+                  <View className="bg-red-100 p-2.5 rounded-xl border border-red-300 mb-3">
+                    <Text className="text-red-900 font-black text-xs">🔴 Account Auto-Banned</Text>
+                    <Text className="text-red-800 text-[11px] mt-0.5">
+                      This user exceeded the maximum threshold of 5 administrative notices.
+                    </Text>
+                  </View>
+                )}
+
+                {selectedUser?.adminNotice ? (
+                  <View className="bg-white p-3 rounded-xl border border-amber-200 mb-3">
+                    <Text className="text-[10px] text-amber-800 font-bold uppercase mb-1">
+                      Current Active Warning Notice
+                    </Text>
+                    <Text className="text-xs text-textPrimary font-semibold leading-relaxed">
+                      &ldquo;{selectedUser.adminNotice}&rdquo;
+                    </Text>
+                    {selectedUser.noticeIssuedAt && (
+                      <Text className="text-[10px] text-textMuted mt-1">
+                        Issued: {new Date(selectedUser.noticeIssuedAt).toLocaleString()}
+                      </Text>
+                    )}
+                    <TouchableOpacity
+                      onPress={() => handleClearNotice(selectedUser.id)}
+                      className="mt-2.5 bg-gray-100 self-start px-3 py-1.5 rounded-lg border border-gray-200 flex-row items-center"
+                    >
+                      <Feather name="check-circle" size={12} color="#4B5563" />
+                      <Text className="text-[11px] font-bold text-gray-700 ml-1.5">Clear Active Notice</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <Text className="text-[11px] text-amber-800 mb-2">
+                    No active notice currently displayed to this user.
+                  </Text>
+                )}
+
+                {/* Strike History */}
+                {selectedUser?.noticeHistory && selectedUser.noticeHistory.length > 0 && (
+                  <View className="mt-1">
+                    <Text className="text-[10px] text-amber-900 font-bold uppercase mb-1.5">
+                      Notice History ({selectedUser.noticeHistory.length})
+                    </Text>
+                    {selectedUser.noticeHistory.map((h: any, idx: number) => (
+                      <View key={idx} className="bg-white/80 p-2 rounded-lg border border-amber-100 mb-1.5">
+                        <View className="flex-row justify-between items-center">
+                          <Text className="text-[10px] font-bold text-amber-900">Strike #{h.strikeNumber || idx + 1}</Text>
+                          <Text className="text-[9px] text-textMuted">
+                            {h.issuedAt ? new Date(h.issuedAt).toLocaleDateString() : ''}
+                          </Text>
+                        </View>
+                        <Text className="text-[11px] text-textSecondary mt-0.5">{h.notice}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                <View className="flex-row gap-2 mt-2">
+                  <TouchableOpacity
+                    onPress={() => {
+                      const u = selectedUser;
+                      setSelectedUser(null);
+                      handleOpenNoticeModal(u);
+                    }}
+                    className="flex-1 bg-amber-600 py-2 rounded-xl items-center justify-center flex-row"
+                  >
+                    <Feather name="plus-circle" size={13} color="#FFFFFF" />
+                    <Text className="text-white font-bold text-xs ml-1.5">Issue Notice (+1)</Text>
+                  </TouchableOpacity>
+
+                  {(selectedUser?.noticeCount || 0) > 0 && (
+                    <TouchableOpacity
+                      onPress={() => handleResetStrikes(selectedUser.id)}
+                      className="bg-white border border-amber-300 px-3 py-2 rounded-xl items-center justify-center flex-row"
+                    >
+                      <Feather name="rotate-ccw" size={13} color="#B45309" />
+                      <Text className="text-amber-800 font-bold text-xs ml-1">Reset Strikes</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
               {/* Action Buttons */}
               <View className="gap-2 mt-1">
                 {selectedUser?.role === 'COOK' && !selectedUser?.profile?.hygieneVerified && selectedUser?.active !== false && (
@@ -791,8 +1046,8 @@ export const UserManagementScreen: React.FC = () => {
                   <Button
                     title={selectedUser?.active !== false ? 'SUSPEND USER ACCOUNT' : 'ACTIVATE USER ACCOUNT'}
                     onPress={() => handleToggleActive(selectedUser.id, selectedUser.active !== false)}
-                    variant="outline"
-                    loading={actionLoading}
+                    variant={selectedUser?.active !== false ? 'outline' : 'primary'}
+                    loading={actionLoading || actionLoadingId === selectedUser?.id}
                     size="md"
                   />
                 )}
@@ -804,6 +1059,121 @@ export const UserManagementScreen: React.FC = () => {
                 />
               </View>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Issue Notice Modal */}
+      <Modal
+        visible={noticeModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setNoticeModalVisible(false)}
+      >
+        <View className="flex-1 bg-black/60 justify-center items-center p-5">
+          <View className="bg-white rounded-3xl p-5 w-full max-w-md border border-gray-100 shadow-2xl">
+            <View className="flex-row items-center justify-between mb-3 border-b border-gray-100 pb-3">
+              <View className="flex-row items-center flex-1">
+                <View className="w-9 h-9 rounded-full bg-amber-100 items-center justify-center mr-2.5">
+                  <Feather name="alert-triangle" size={18} color="#D97706" />
+                </View>
+                <View className="flex-1">
+                  <Text className="font-black text-base text-textPrimary">Issue Warning Notice</Text>
+                  <Text className="text-textMuted text-xs" numberOfLines={1}>
+                    {noticeTargetUser?.profile?.name || noticeTargetUser?.email}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setNoticeModalVisible(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center"
+              >
+                <Feather name="x" size={16} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Strikes counter info */}
+            <View
+              className={`p-3 rounded-2xl mb-3 border ${
+                (noticeTargetUser?.noticeCount || 0) >= 4
+                  ? 'bg-red-50 border-red-200'
+                  : 'bg-amber-50 border-amber-200'
+              }`}
+            >
+              <View className="flex-row items-center justify-between">
+                <Text className="text-xs font-bold text-textPrimary">Current Strikes Threshold:</Text>
+                <Badge
+                  label={`${noticeTargetUser?.noticeCount || 0} of 5`}
+                  variant={(noticeTargetUser?.noticeCount || 0) >= 4 ? 'error' : 'warning'}
+                />
+              </View>
+              {(noticeTargetUser?.noticeCount || 0) === 4 ? (
+                <Text className="text-red-700 text-xs font-black mt-1.5 leading-snug">
+                  ⚠️ CRITICAL: Issuing this notice is Strike #5 and will AUTOMATICALLY BAN this user immediately!
+                </Text>
+              ) : (
+                <Text className="text-amber-800 text-[11px] mt-1">
+                  This notice will be displayed prominently on the user&apos;s app. Reaching 5 notices will trigger automatic account ban.
+                </Text>
+              )}
+            </View>
+
+            {/* Preset quick buttons */}
+            <Text className="text-[11px] font-bold text-textSecondary uppercase tracking-wider mb-1.5">
+              Quick Reasons:
+            </Text>
+            <View className="flex-row flex-wrap gap-1.5 mb-3">
+              {[
+                'Hygiene & Food Safety Standard',
+                'Late Delivery / Delayed Order',
+                'Misleading Details or Photos',
+                'Customer Complaint / Conduct',
+              ].map((preset, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  onPress={() => setNoticeText(preset)}
+                  className="bg-gray-100 px-2.5 py-1.5 rounded-lg border border-gray-200"
+                >
+                  <Text className="text-gray-700 text-[11px] font-medium">{preset}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Notice Input */}
+            <Text className="text-[11px] font-bold text-textSecondary uppercase tracking-wider mb-1">
+              Notice Description:
+            </Text>
+            <TextInput
+              value={noticeText}
+              onChangeText={setNoticeText}
+              placeholder="Type detailed warning message here..."
+              placeholderTextColor="#9CA3AF"
+              multiline
+              numberOfLines={3}
+              style={{ minHeight: 70, textAlignVertical: 'top' }}
+              className="bg-gray-50 border border-gray-200 rounded-2xl p-3 text-xs text-textPrimary mb-4"
+            />
+
+            <View className="flex-row gap-2">
+              <Button
+                title="CANCEL"
+                onPress={() => setNoticeModalVisible(false)}
+                variant="outline"
+                className="flex-1"
+                size="md"
+              />
+              <Button
+                title={
+                  (noticeTargetUser?.noticeCount || 0) >= 4
+                    ? 'SEND & BAN ACCOUNT'
+                    : 'SEND NOTICE (+1)'
+                }
+                onPress={handleIssueNotice}
+                loading={noticeLoading}
+                className="flex-1"
+                size="md"
+              />
+            </View>
           </View>
         </View>
       </Modal>

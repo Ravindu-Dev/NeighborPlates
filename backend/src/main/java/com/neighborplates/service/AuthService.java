@@ -99,6 +99,14 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
+        User existingUser = userRepository.findByEmail(request.getEmail()).orElse(null);
+        if (existingUser != null && !existingUser.isActive()) {
+            String reason = existingUser.getSuspensionReason() != null
+                    ? existingUser.getSuspensionReason()
+                    : "Account has been suspended by administration.";
+            throw new UnauthorizedException("Account Suspended: " + reason);
+        }
+
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );

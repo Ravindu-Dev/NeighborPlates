@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   View, Text, FlatList, ActivityIndicator, Alert,
-  TouchableOpacity, RefreshControl, Image, Modal, ScrollView
+  TouchableOpacity, RefreshControl, Image, Modal, ScrollView, TextInput
 } from 'react-native';
 import { api } from '../../services/api';
 import { Card } from '../../components/common/Card';
@@ -42,6 +42,12 @@ export const ContentModerationScreen: React.FC = () => {
   const [selectedMeal, setSelectedMeal] = useState<any | null>(null);
   const [selectedReview, setSelectedReview] = useState<any | null>(null);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+
+  // Meal Notice Modal State
+  const [mealNoticeModalVisible, setMealNoticeModalVisible] = useState(false);
+  const [mealNoticeTarget, setMealNoticeTarget] = useState<any | null>(null);
+  const [mealNoticeText, setMealNoticeText] = useState('');
+  const [mealNoticeLoading, setMealNoticeLoading] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -87,10 +93,10 @@ export const ContentModerationScreen: React.FC = () => {
               const response = await api.put(`/api/admin/meals/${meal.id}/toggle-active`);
               const updatedMeal = response.data;
               setMeals((prev) =>
-                prev.map((m) => (m.id === meal.id ? { ...m, active: updatedMeal.active } : m))
+                prev.map((m) => (m.id === meal.id ? { ...m, ...updatedMeal } : m))
               );
               if (selectedMeal?.id === meal.id) {
-                setSelectedMeal((prev: any) => ({ ...prev, active: updatedMeal.active }));
+                setSelectedMeal((prev: any) => ({ ...prev, ...updatedMeal }));
               }
               Alert.alert(
                 'Success',
@@ -105,6 +111,53 @@ export const ContentModerationScreen: React.FC = () => {
         },
       ]
     );
+  };
+
+  const handleOpenMealNotice = (meal: any) => {
+    setMealNoticeTarget(meal);
+    setMealNoticeText(meal.adminNotice || '');
+    setMealNoticeModalVisible(true);
+  };
+
+  const handleIssueMealNotice = async () => {
+    if (!mealNoticeTarget || !mealNoticeText.trim()) {
+      Alert.alert('Notice Required', 'Please enter an advisory notice for this meal listing.');
+      return;
+    }
+    setMealNoticeLoading(true);
+    try {
+      const response = await api.put(`/api/admin/meals/${mealNoticeTarget.id}/notice`, {
+        notice: mealNoticeText.trim(),
+      });
+      const updated = response.data;
+      setMeals((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+      if (selectedMeal?.id === updated.id) {
+        setSelectedMeal(updated);
+      }
+      setMealNoticeModalVisible(false);
+      Alert.alert('Notice Recorded ⚠️', `Advisory notice recorded for "${updated.name}". The cook will see this notice.`);
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to issue meal notice.');
+    } finally {
+      setMealNoticeLoading(false);
+    }
+  };
+
+  const handleClearMealNotice = async (mealId: string) => {
+    setActionLoadingId(mealId);
+    try {
+      const response = await api.delete(`/api/admin/meals/${mealId}/notice`);
+      const updated = response.data;
+      setMeals((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+      if (selectedMeal?.id === updated.id) {
+        setSelectedMeal(updated);
+      }
+      Alert.alert('Notice Cleared', 'Advisory notice was removed from this meal.');
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to clear notice.');
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   const handleFlagReview = (review: any) => {
@@ -324,12 +377,31 @@ export const ContentModerationScreen: React.FC = () => {
           </View>
         </TouchableOpacity>
 
-        <View className="border-t border-gray-100 pt-3 mt-3">
+        {/* Active Advisory Notice Banner */}
+        {!!item.adminNotice && (
+          <View className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 mt-3 flex-row items-start">
+            <Feather name="alert-triangle" size={13} color="#D97706" style={{ marginTop: 2, marginRight: 6 }} />
+            <View className="flex-1">
+              <Text className="text-amber-900 font-bold text-[11px]">Active Advisory Notice:</Text>
+              <Text className="text-amber-800 text-xs mt-0.5 leading-snug">{item.adminNotice}</Text>
+            </View>
+          </View>
+        )}
+
+        <View className="border-t border-gray-100 pt-3 mt-3 flex-row gap-2">
           <Button
-            title={!isSuspended ? 'SUSPEND LISTING' : 'ACTIVATE LISTING'}
+            title="NOTICE"
+            onPress={() => handleOpenMealNotice(item)}
+            variant="outline"
+            size="sm"
+            className="flex-1"
+          />
+          <Button
+            title={!isSuspended ? 'SUSPEND' : 'ACTIVATE'}
             onPress={() => handleToggleMeal(item)}
             variant={!isSuspended ? 'outline' : 'primary'}
             size="sm"
+            className="flex-1"
             loading={isActionLoading}
           />
         </View>
@@ -752,7 +824,60 @@ export const ContentModerationScreen: React.FC = () => {
                 </View>
               )}
 
-              <View className="mt-6 gap-2">
+              {/* Advisory Notice Section */}
+              <View className="bg-amber-50/70 p-4 rounded-2xl border border-amber-200 mt-4 mb-2">
+                <View className="flex-row items-center justify-between mb-2">
+                  <View className="flex-row items-center">
+                    <Feather name="alert-triangle" size={15} color="#D97706" />
+                    <Text className="font-extrabold text-xs text-amber-900 uppercase tracking-wider ml-1.5">
+                      Advisory Notice for Cook
+                    </Text>
+                  </View>
+                  {selectedMeal?.adminNotice && (
+                    <Badge label="Notice Active" variant="warning" />
+                  )}
+                </View>
+
+                {selectedMeal?.adminNotice ? (
+                  <View className="bg-white p-3 rounded-xl border border-amber-200 mb-3">
+                    <Text className="text-xs text-textPrimary font-semibold leading-relaxed">
+                      &ldquo;{selectedMeal.adminNotice}&rdquo;
+                    </Text>
+                    {selectedMeal.noticeIssuedAt && (
+                      <Text className="text-[10px] text-textMuted mt-1">
+                        Issued: {new Date(selectedMeal.noticeIssuedAt).toLocaleString()}
+                      </Text>
+                    )}
+                    <TouchableOpacity
+                      onPress={() => handleClearMealNotice(selectedMeal.id)}
+                      className="mt-2.5 bg-gray-100 self-start px-3 py-1.5 rounded-lg border border-gray-200 flex-row items-center"
+                    >
+                      <Feather name="check-circle" size={12} color="#4B5563" />
+                      <Text className="text-[11px] font-bold text-gray-700 ml-1.5">Clear Notice</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <Text className="text-[11px] text-amber-800 mb-2">
+                    No active notice on this meal. You can send an advisory note to the cook without suspending this listing.
+                  </Text>
+                )}
+
+                <TouchableOpacity
+                  onPress={() => {
+                    const m = selectedMeal;
+                    setSelectedMeal(null);
+                    handleOpenMealNotice(m);
+                  }}
+                  className="bg-amber-600 py-2 rounded-xl items-center justify-center flex-row"
+                >
+                  <Feather name="edit-3" size={13} color="#FFFFFF" />
+                  <Text className="text-white font-bold text-xs ml-1.5">
+                    {selectedMeal?.adminNotice ? 'Edit Advisory Notice' : 'Send Advisory Notice'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View className="mt-4 gap-2">
                 <Button
                   title={
                     selectedMeal?.active !== false ? 'SUSPEND LISTING' : 'ACTIVATE LISTING'
@@ -879,6 +1004,96 @@ export const ContentModerationScreen: React.FC = () => {
                 <Button title="CLOSE" onPress={() => setSelectedReview(null)} variant="outline" size="md" />
               </View>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Meal Notice Modal */}
+      <Modal
+        visible={mealNoticeModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setMealNoticeModalVisible(false)}
+      >
+        <View className="flex-1 bg-black/60 justify-center items-center p-5">
+          <View className="bg-white rounded-3xl p-5 w-full max-w-md border border-gray-100 shadow-2xl">
+            <View className="flex-row items-center justify-between mb-3 border-b border-gray-100 pb-3">
+              <View className="flex-row items-center flex-1">
+                <View className="w-9 h-9 rounded-full bg-amber-100 items-center justify-center mr-2.5">
+                  <Feather name="alert-triangle" size={18} color="#D97706" />
+                </View>
+                <View className="flex-1">
+                  <Text className="font-black text-base text-textPrimary">Meal Advisory Notice</Text>
+                  <Text className="text-textMuted text-xs" numberOfLines={1}>
+                    {mealNoticeTarget?.name}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setMealNoticeModalVisible(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center"
+              >
+                <Feather name="x" size={16} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <View className="bg-amber-50 border border-amber-200 p-3 rounded-2xl mb-3">
+              <Text className="text-amber-900 text-xs font-bold">ℹ️ Note to Cook</Text>
+              <Text className="text-amber-800 text-[11px] mt-0.5 leading-snug">
+                This notice will be visible to the cook on their Meal Management dashboard so they can adjust packaging, ingredients, or photos.
+              </Text>
+            </View>
+
+            <Text className="text-[11px] font-bold text-textSecondary uppercase tracking-wider mb-1.5">
+              Quick Suggestions:
+            </Text>
+            <View className="flex-row flex-wrap gap-1.5 mb-3">
+              {[
+                'Please update allergen warning details',
+                'Upload a clearer real meal photograph',
+                'Ensure portion sizes match description',
+                'Review ingredient compliance with standards',
+              ].map((preset, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  onPress={() => setMealNoticeText(preset)}
+                  className="bg-gray-100 px-2.5 py-1.5 rounded-lg border border-gray-200"
+                >
+                  <Text className="text-gray-700 text-[11px] font-medium">{preset}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text className="text-[11px] font-bold text-textSecondary uppercase tracking-wider mb-1">
+              Notice Description:
+            </Text>
+            <TextInput
+              value={mealNoticeText}
+              onChangeText={setMealNoticeText}
+              placeholder="Type specific instructions for the cook..."
+              placeholderTextColor="#9CA3AF"
+              multiline
+              numberOfLines={3}
+              style={{ minHeight: 70, textAlignVertical: 'top' }}
+              className="bg-gray-50 border border-gray-200 rounded-2xl p-3 text-xs text-textPrimary mb-4"
+            />
+
+            <View className="flex-row gap-2">
+              <Button
+                title="CANCEL"
+                onPress={() => setMealNoticeModalVisible(false)}
+                variant="outline"
+                className="flex-1"
+                size="md"
+              />
+              <Button
+                title="SAVE NOTICE"
+                onPress={handleIssueMealNotice}
+                loading={mealNoticeLoading}
+                className="flex-1"
+                size="md"
+              />
+            </View>
           </View>
         </View>
       </Modal>
