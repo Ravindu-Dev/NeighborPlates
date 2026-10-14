@@ -93,6 +93,42 @@ public class AdminController {
         return ResponseEntity.ok(user);
     }
 
+    @PutMapping("/users/{id}/notice")
+    public ResponseEntity<User> issueUserNotice(
+            @PathVariable String id,
+            @jakarta.validation.Valid @RequestBody com.neighborplates.dto.request.AdminNoticeRequest request,
+            org.springframework.security.core.Authentication authentication) {
+        String adminName = authentication != null ? authentication.getName() : "Admin";
+        User user = adminService.issueUserNotice(id, request.getNotice(), adminName);
+        return ResponseEntity.ok(user);
+    }
+
+    @DeleteMapping("/users/{id}/notice")
+    public ResponseEntity<User> clearUserNotice(@PathVariable String id) {
+        User user = adminService.clearUserNotice(id);
+        return ResponseEntity.ok(user);
+    }
+
+    @PutMapping("/users/{id}/reset-strikes")
+    public ResponseEntity<User> resetUserStrikes(@PathVariable String id) {
+        User user = adminService.resetUserStrikes(id);
+        return ResponseEntity.ok(user);
+    }
+
+    @PutMapping("/meals/{id}/notice")
+    public ResponseEntity<Meal> issueMealNotice(
+            @PathVariable String id,
+            @jakarta.validation.Valid @RequestBody com.neighborplates.dto.request.AdminNoticeRequest request) {
+        Meal meal = adminService.issueMealNotice(id, request.getNotice());
+        return ResponseEntity.ok(meal);
+    }
+
+    @DeleteMapping("/meals/{id}/notice")
+    public ResponseEntity<Meal> clearMealNotice(@PathVariable String id) {
+        Meal meal = adminService.clearMealNotice(id);
+        return ResponseEntity.ok(meal);
+    }
+
     @GetMapping("/payouts/summary")
     public ResponseEntity<AdminPayoutSummaryResponse> getPayoutSummary() {
         AdminPayoutSummaryResponse response = adminService.getPayoutSummary();

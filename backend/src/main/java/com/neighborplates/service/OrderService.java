@@ -50,11 +50,19 @@ public class OrderService {
             throw new UnauthorizedException("Only customers can place order requests");
         }
 
+        if (!customer.isActive()) {
+            throw new UnauthorizedException("Your customer account is currently suspended.");
+        }
+
         User cook = userRepository.findById(request.getCookId())
                 .orElseThrow(() -> new ResourceNotFoundException("Cook not found"));
 
         if (cook.getRole() != UserRole.COOK) {
             throw new IllegalArgumentException("Specified user is not registered as a cook");
+        }
+
+        if (!cook.isActive()) {
+            throw new IllegalArgumentException("This cook is currently suspended and cannot accept orders.");
         }
 
         double totalAmount = 0.0;
@@ -170,6 +178,10 @@ public class OrderService {
             throw new UnauthorizedException("Only riders can accept orders for delivery");
         }
 
+        if (!user.isActive()) {
+            throw new UnauthorizedException("Your rider account is currently suspended.");
+        }
+
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
 
@@ -253,6 +265,10 @@ public class OrderService {
 
         User cook = userRepository.findById(order.getCookId())
                 .orElseThrow(() -> new ResourceNotFoundException("Cook account not found"));
+
+        if (!user.isActive()) {
+            throw new UnauthorizedException("Your account is currently suspended.");
+        }
 
         // Validate security access permissions
         if (user.getRole() == UserRole.CUSTOMER) {

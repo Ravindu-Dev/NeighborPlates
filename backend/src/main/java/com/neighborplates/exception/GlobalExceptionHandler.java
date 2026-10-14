@@ -30,6 +30,12 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(new ApiResponse(false, ex.getMessage()), HttpStatus.UNAUTHORIZED);
     }
 
+    @ExceptionHandler(org.springframework.security.authentication.DisabledException.class)
+    public ResponseEntity<ApiResponse> handleDisabledException(org.springframework.security.authentication.DisabledException ex) {
+        logger.warn("DisabledException: {}", ex.getMessage());
+        return new ResponseEntity<>(new ApiResponse(false, "Account is suspended. Please contact support or administration."), HttpStatus.FORBIDDEN);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse> handleIllegalArgument(IllegalArgumentException ex) {
         logger.warn("IllegalArgumentException: {}", ex.getMessage());

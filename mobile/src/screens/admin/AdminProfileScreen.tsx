@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, ActivityIndicator, ScrollView, Alert, TouchableOpacity, Platform } from 'react-native';
 import { Button } from '../../components/common/Button';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
@@ -53,25 +53,39 @@ export const AdminProfileScreen: React.FC = () => {
   }, []);
 
   const handleLogout = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out of the admin panel?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            setLoggingOut(true);
-            try {
-              await logout();
-            } catch {
-              setLoggingOut(false);
-            }
+    const doLogout = async () => {
+      setLoggingOut(true);
+      try {
+        await logout();
+      } catch (err) {
+        console.error('Logout error:', err);
+      } finally {
+        setLoggingOut(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm) {
+        if (window.confirm('Are you sure you want to sign out of the admin panel?')) {
+          doLogout();
+        }
+      } else {
+        doLogout();
+      }
+    } else {
+      Alert.alert(
+        'Sign Out',
+        'Are you sure you want to sign out of the admin panel?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Sign Out',
+            style: 'destructive',
+            onPress: doLogout,
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const displayName = profile?.profile?.name || 'Administrator';
@@ -110,10 +124,17 @@ export const AdminProfileScreen: React.FC = () => {
         <Text className="text-textMuted text-xs text-center mb-6 leading-relaxed">{error}</Text>
         <TouchableOpacity
           onPress={() => { setLoading(true); fetchProfile(); }}
-          className="bg-primary px-6 py-3 rounded-2xl"
+          className="bg-primary px-6 py-3 rounded-2xl w-full items-center mb-3"
           activeOpacity={0.8}
         >
           <Text className="text-white font-bold text-sm">Try Again</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleLogout}
+          className="bg-red-50 border border-red-200 px-6 py-3 rounded-2xl w-full items-center"
+          activeOpacity={0.8}
+        >
+          <Text className="text-red-600 font-bold text-sm">Sign Out</Text>
         </TouchableOpacity>
       </View>
     );

@@ -40,6 +40,10 @@ public class MealService {
             throw new UnauthorizedException("Only registered cooks can create meal listings");
         }
 
+        if (!cook.isActive()) {
+            throw new UnauthorizedException("Your cook account is currently suspended. You cannot create new meal listings.");
+        }
+
         Meal meal = new Meal();
         meal.setCookId(cook.getId());
         meal.setName(request.getName());
@@ -80,6 +84,10 @@ public class MealService {
 
         if (!meal.getCookId().equals(cook.getId())) {
             throw new UnauthorizedException("You are not authorized to edit this meal listing");
+        }
+
+        if (!cook.isActive()) {
+            throw new UnauthorizedException("Your cook account is currently suspended.");
         }
 
         meal.setName(request.getName());
@@ -190,6 +198,10 @@ public class MealService {
             throw new UnauthorizedException("You are not authorized to edit this meal listing");
         }
 
+        if (!cook.isActive()) {
+            throw new UnauthorizedException("Your cook account is currently suspended.");
+        }
+
         boolean nextActive = !meal.isActive();
         meal.setActive(nextActive);
         if (nextActive && meal.getPortionsRemaining() <= 0) {
@@ -216,6 +228,10 @@ public class MealService {
             throw new UnauthorizedException("You are not authorized to edit this meal listing");
         }
 
+        if (!cook.isActive()) {
+            throw new UnauthorizedException("Your cook account is currently suspended.");
+        }
+
         meal.setPortionsRemaining(Math.max(0, portions));
         meal.setPortionLimit(Math.max(meal.getPortionLimit(), portions));
         meal.setUpdatedAt(Instant.now());
@@ -229,6 +245,10 @@ public class MealService {
 
         User cook = userRepository.findById(meal.getCookId())
                 .orElseThrow(() -> new ResourceNotFoundException("Cook associated with this meal not found"));
+
+        if (!cook.isActive()) {
+            throw new ResourceNotFoundException("This kitchen is currently suspended or inactive.");
+        }
 
         return mapToMealResponse(meal, cook);
     }
@@ -260,7 +280,7 @@ public class MealService {
 
         for (Meal meal : activeMeals) {
             User cook = userRepository.findById(meal.getCookId()).orElse(null);
-            if (cook == null) continue;
+            if (cook == null || !cook.isActive()) continue;
 
             // Geospatial Haversine validation filter
             if (customerLon != null && customerLat != null && maxDistanceKm != null) {

@@ -803,6 +803,35 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation: propNa
         contentContainerStyle={{ padding: 24, paddingBottom: 48 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Official Warning / Strike Notice Banner */}
+        {!!profile?.adminNotice && (
+          <View className={`rounded-3xl p-4 mb-5 border flex-row items-start ${
+            (profile?.noticeCount || 0) >= 4 ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-300'
+          }`}>
+            <Feather
+              name="alert-triangle"
+              size={20}
+              color={(profile?.noticeCount || 0) >= 4 ? '#DC2626' : '#D97706'}
+              style={{ marginTop: 2, marginRight: 10 }}
+            />
+            <View className="flex-1">
+              <Text className={`font-black text-xs uppercase tracking-wider ${
+                (profile?.noticeCount || 0) >= 4 ? 'text-red-800' : 'text-amber-800'
+              }`}>
+                Official Notice (Strike {profile.noticeCount || 1}/5)
+              </Text>
+              <Text className="text-gray-900 font-bold text-xs mt-1 leading-snug">
+                {profile.adminNotice}
+              </Text>
+              <Text className={`text-[11px] mt-1.5 font-medium ${
+                (profile?.noticeCount || 0) >= 4 ? 'text-red-700' : 'text-amber-700'
+              }`}>
+                ⚠️ Warning: Reaching 5 administrative notices will result in automatic and permanent account suspension.
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Profile Hero Card */}
         <View className="bg-white rounded-3xl p-5 mb-5 shadow-sm border border-gray-100 items-center relative overflow-hidden">
           <View className="w-20 h-20 rounded-full bg-orange-100 border border-orange-200 items-center justify-center shadow-inner mb-3 overflow-hidden">
