@@ -84,8 +84,8 @@ export const AvailableOrdersScreen: React.FC = () => {
         return {
           ...order,
           distanceKm: distKm,
-          pickupDistance: `${distStr} to pickup`,
-          distancePickup: `${distStr} away`,
+          pickupDistance: distStr,
+          distancePickup: `${distStr} to pickup`,
         };
       }).sort((a: any, b: any) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0));
 

@@ -148,8 +148,8 @@ public class DatabaseSeeder implements CommandLineRunner {
 
         logger.info("Live rider order count is {}. Seeding realistic dispatch jobs...", existing.size());
 
-        // Find or create default Cook
-        User cook = userRepository.findByEmail("malinda@gmail.com")
+        // Find or create Cook 1 (Malinda / Nimali)
+        User cook1 = userRepository.findByEmail("malinda@gmail.com")
                 .or(() -> userRepository.findAll().stream().filter(u -> u.getRole() == UserRole.COOK).findFirst())
                 .orElseGet(() -> {
                     User newCook = new User();
@@ -165,6 +165,42 @@ public class DatabaseSeeder implements CommandLineRunner {
                     p.setLocation(pt);
                     newCook.setProfile(p);
                     return userRepository.save(newCook);
+                });
+
+        // Find or create Cook 2 (Sunil)
+        User cook2 = userRepository.findByEmail("sunil.cook@neighborplates.com")
+                .orElseGet(() -> {
+                    User c2 = new User();
+                    c2.setEmail("sunil.cook@neighborplates.com");
+                    c2.setPasswordHash(passwordEncoder.encode("cook123"));
+                    c2.setRole(UserRole.COOK);
+                    User.UserProfile p = new User.UserProfile();
+                    p.setName("Sunil's Kottu Shack");
+                    p.setPhone("+94 77 345 6789");
+                    User.GeoJsonPoint pt = new User.GeoJsonPoint();
+                    pt.setType("Point");
+                    pt.setCoordinates(List.of(79.8587, 6.8920)); // Bambalapitiya
+                    p.setLocation(pt);
+                    c2.setProfile(p);
+                    return userRepository.save(c2);
+                });
+
+        // Find or create Cook 3 (Fatima)
+        User cook3 = userRepository.findByEmail("fatima.cook@neighborplates.com")
+                .orElseGet(() -> {
+                    User c3 = new User();
+                    c3.setEmail("fatima.cook@neighborplates.com");
+                    c3.setPasswordHash(passwordEncoder.encode("cook123"));
+                    c3.setRole(UserRole.COOK);
+                    User.UserProfile p = new User.UserProfile();
+                    p.setName("Fatima's Spice Pot");
+                    p.setPhone("+94 71 876 5432");
+                    User.GeoJsonPoint pt = new User.GeoJsonPoint();
+                    pt.setType("Point");
+                    pt.setCoordinates(List.of(79.8524, 6.9074)); // Kollupitiya
+                    p.setLocation(pt);
+                    c3.setProfile(p);
+                    return userRepository.save(c3);
                 });
 
         // Find or create default Customer
@@ -186,7 +222,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         Order o1 = new Order();
         o1.setOrderNumber("NP-" + System.currentTimeMillis() % 1000000 + "-LP");
         o1.setCustomerId(customer.getId());
-        o1.setCookId(cook.getId());
+        o1.setCookId(cook1.getId());
         o1.setStatus(OrderStatus.READY);
         o1.setDeliveryMethod("RIDER");
         o1.setTotalAmount(1450.0);
@@ -211,7 +247,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         Order o2 = new Order();
         o2.setOrderNumber("NP-" + (System.currentTimeMillis() + 1) % 1000000 + "-KT");
         o2.setCustomerId(customer.getId());
-        o2.setCookId(cook.getId());
+        o2.setCookId(cook2.getId());
         o2.setStatus(OrderStatus.READY);
         o2.setDeliveryMethod("RIDER");
         o2.setTotalAmount(1200.0);
@@ -235,7 +271,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         Order o3 = new Order();
         o3.setOrderNumber("NP-" + (System.currentTimeMillis() + 2) % 1000000 + "-SH");
         o3.setCustomerId(customer.getId());
-        o3.setCookId(cook.getId());
+        o3.setCookId(cook3.getId());
         o3.setStatus(OrderStatus.PREPARING);
         o3.setDeliveryMethod("RIDER");
         o3.setTotalAmount(850.0);

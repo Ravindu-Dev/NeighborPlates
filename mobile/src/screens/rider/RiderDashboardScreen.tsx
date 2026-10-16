@@ -28,6 +28,25 @@ import {
   DEFAULT_COORDINATES,
   Coordinates,
 } from '../../services/locationService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const getDishImageFallback = (foodName?: string, orderImageUrl?: string) => {
+  if (orderImageUrl) return orderImageUrl;
+  const name = (foodName || '').toLowerCase();
+  if (name.includes('lamprais') || name.includes('rice') || name.includes('biryani')) {
+    return 'https://images.unsplash.com/photo-1596797038530-2c107229654b?auto=format&fit=crop&w=400&q=80';
+  }
+  if (name.includes('kottu')) {
+    return 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=400&q=80';
+  }
+  if (name.includes('hopper') || name.includes('roti') || name.includes('dhal')) {
+    return 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=400&q=80';
+  }
+  if (name.includes('juice') || name.includes('drink') || name.includes('tea')) {
+    return 'https://images.unsplash.com/photo-1534353473418-4cfa6c56fd38?auto=format&fit=crop&w=400&q=80';
+  }
+  return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80';
+};
 
 let WebView: any = null;
 if (Platform.OS !== 'web') {
@@ -325,6 +344,7 @@ const getDeliveryJobsMapHtml = (
 
 export const RiderDashboardScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
 
   const [profile, setProfile] = useState<any>(null);
@@ -515,7 +535,7 @@ export const RiderDashboardScreen: React.FC = () => {
               type: 'ready_now' as const,
               text: 'Ready Now',
             },
-            pickupDistance: `${distanceDisplay} to pickup`,
+            pickupDistance: distanceDisplay,
             dropoffDistance: order.address?.label ? (order.address.label.length > 18 ? order.address.label.slice(0, 16) + '...' : order.address.label) : 'Customer Address',
             packageSummary: {
               label: 'Items',
@@ -523,7 +543,7 @@ export const RiderDashboardScreen: React.FC = () => {
               isHighlight: false,
             },
             highlightDish: `🍲 ${foodName}${order.items?.length > 1 ? ` (+${order.items.length - 1} more)` : ''}`,
-            imageUrl: 'https://images.unsplash.com/photo-1541696432-82c6da8ce7bf?auto=format&fit=crop&w=400&q=80',
+            imageUrl: getDishImageFallback(foodName, order.items?.[0]?.imageUrl || order.imageUrl),
             lat: cookLat,
             lon: cookLon,
             distanceKm: distanceKm,
@@ -603,7 +623,7 @@ export const RiderDashboardScreen: React.FC = () => {
     return {
       ...job,
       distanceKm: liveDistKm,
-      pickupDistance: `${distStr} to pickup`,
+      pickupDistance: distStr,
       distancePickup: `${distStr} to pickup`,
     };
   });
@@ -762,7 +782,7 @@ export const RiderDashboardScreen: React.FC = () => {
           />
         }
       >
-        <View className="px-4 pt-14">
+        <View className="px-4" style={{ paddingTop: Math.max(insets.top, 16) + 12 }}>
           {/* ── 1. Top Header (Homely Rider | Ready Pill | Avatar) ── */}
           <View className="flex-row items-center justify-between mb-5">
             <View className="flex-row items-center">

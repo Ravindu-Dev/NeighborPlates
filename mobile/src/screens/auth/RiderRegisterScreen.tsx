@@ -8,6 +8,8 @@ import { DropdownPicker } from '../../components/common/DropdownPicker';
 import { DISTRICT_TOWN_DATA } from '../../constants/filterConstants';
 import { useAuthStore } from '../../store/authStore';
 import { AuthTopBar, AuthRoleTabs, UserRoleType } from '../../components/auth/AuthRoleSwitcher';
+import { getCoordinatesForTownAndDistrict } from '../../services/locationService';
+import { validateRiderRegisterFields, RiderRegisterValidationErrors } from '../../utils/validation';
 import { Feather } from '@expo/vector-icons';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'RiderRegister'>;
@@ -28,29 +30,78 @@ export const RiderRegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [town, setTown] = useState('');
   const [vehicleType, setVehicleType] = useState('E-Bike');
   const [vehiclePlate, setVehiclePlate] = useState('');
+  const [errors, setErrors] = useState<RiderRegisterValidationErrors>({});
 
-  const { register, isLoading, error } = useAuthStore();
+  const { register, isLoading, error, clearError } = useAuthStore();
 
   const handleRoleSwitch = (targetRole: UserRoleType) => {
     if (targetRole === 'CUSTOMER') navigation.navigate('CustomerRegister');
     else if (targetRole === 'COOK') navigation.navigate('CookRegister');
   };
 
+  const handleNameChange = (val: string) => {
+    setName(val);
+    if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }));
+    if (error) clearError();
+  };
+
+  const handleEmailChange = (val: string) => {
+    setEmail(val);
+    if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+    if (error) clearError();
+  };
+
+  const handlePhoneChange = (val: string) => {
+    setPhone(val);
+    if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
+    if (error) clearError();
+  };
+
+  const handlePasswordChange = (val: string) => {
+    setPassword(val);
+    if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
+    if (error) clearError();
+  };
+
+  const handlePlateChange = (val: string) => {
+    setVehiclePlate(val);
+    if (errors.vehiclePlate) setErrors((prev) => ({ ...prev, vehiclePlate: undefined }));
+    if (error) clearError();
+  };
+
+  const handleDistrictChange = (val: string) => {
+    setDistrict(val);
+    setTown('');
+    if (errors.district) setErrors((prev) => ({ ...prev, district: undefined, town: undefined }));
+    if (error) clearError();
+  };
+
+  const handleTownChange = (val: string) => {
+    setTown(val);
+    if (errors.town) setErrors((prev) => ({ ...prev, town: undefined }));
+    if (error) clearError();
+  };
+
   const handleRegister = async () => {
-    if (!name.trim() || !email.trim() || !password.trim() || !phone.trim()) {
-      Alert.alert('Validation Error', 'Please complete your name, email, phone, and password.');
-      return;
-    }
-    if (password.length < 6) {
-      Alert.alert('Validation Error', 'Password must be at least 6 characters.');
-      return;
-    }
-    if (!district || !town) {
-      Alert.alert('Validation Error', 'Please select your operating District and Town.');
+    const validation = validateRiderRegisterFields({
+      name,
+      email,
+      phone,
+      password,
+      district,
+      town,
+      vehicleType,
+      vehiclePlate,
+    });
+
+    if (!validation.isValid) {
+      setErrors(validation.errors);
       return;
     }
 
+    setErrors({});
     try {
+      const coords = getCoordinatesForTownAndDistrict(town, district);
       await register({
         name: name.trim(),
         email: email.trim(),
@@ -59,6 +110,7 @@ export const RiderRegisterScreen: React.FC<Props> = ({ navigation }) => {
         role: 'RIDER',
         district,
         town,
+        coordinates: [coords.longitude, coords.latitude],
       });
     } catch (err) {
       // Handled by store
@@ -105,7 +157,8 @@ export const RiderRegisterScreen: React.FC<Props> = ({ navigation }) => {
             label="FULL NAME *"
             placeholder="e.g. Kamal Silva"
             value={name}
-            onChangeText={setName}
+            onChangeText={handleNameChange}
+            error={errors.name}
             autoCapitalize="words"
           />
 
@@ -113,16 +166,19 @@ export const RiderRegisterScreen: React.FC<Props> = ({ navigation }) => {
             label="EMAIL ADDRESS *"
             placeholder="kamal@example.com"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={handleEmailChange}
+            error={errors.email}
             keyboardType="email-address"
             autoCapitalize="none"
+            autoCorrect={false}
           />
 
           <TextInput
             label="PHONE NUMBER *"
-            placeholder="+94 77 123 4567"
+            placeholder="e.g. 077 123 4567 or +94 77 123 4567"
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={handlePhoneChange}
+            error={errors.phone}
             keyboardType="phone-pad"
           />
 
@@ -130,7 +186,8 @@ export const RiderRegisterScreen: React.FC<Props> = ({ navigation }) => {
             label="PASSWORD *"
             placeholder="Min 6 characters"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={handlePasswordChange}
+            error={errors.password}
             secureTextEntry
           />
 
@@ -176,7 +233,8 @@ export const RiderRegisterScreen: React.FC<Props> = ({ navigation }) => {
             label="VEHICLE PLATE / REGISTRATION (OPTIONAL)"
             placeholder="e.g. WP-4092 or #EB-10"
             value={vehiclePlate}
-            onChangeText={setVehiclePlate}
+            onChangeText={handlePlateChange}
+            error={errors.vehiclePlate}
             autoCapitalize="characters"
           />
 
@@ -184,10 +242,8 @@ export const RiderRegisterScreen: React.FC<Props> = ({ navigation }) => {
             label="OPERATING DISTRICT *"
             placeholder="Select District..."
             selectedValue={district}
-            onValueChange={(val) => {
-              setDistrict(val);
-              setTown('');
-            }}
+            onValueChange={handleDistrictChange}
+            error={errors.district}
             options={Object.keys(DISTRICT_TOWN_DATA)}
             iconName="map-pin"
           />
@@ -196,14 +252,18 @@ export const RiderRegisterScreen: React.FC<Props> = ({ navigation }) => {
             label="OPERATING TOWN / HUB *"
             placeholder={district ? "Select Town..." : "Select District first..."}
             selectedValue={town}
-            onValueChange={setTown}
+            onValueChange={handleTownChange}
+            error={errors.town}
             options={district ? DISTRICT_TOWN_DATA[district] || [] : []}
             disabled={!district}
             iconName="navigation"
           />
 
           {error ? (
-            <Text className="text-red-500 text-xs mb-4 text-center font-medium">{error}</Text>
+            <View className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 flex-row items-center">
+              <Feather name="alert-circle" size={16} color="#DC2626" style={{ marginRight: 8 }} />
+              <Text className="text-red-600 text-xs font-semibold flex-1 leading-4">{error}</Text>
+            </View>
           ) : null}
 
           {/* Submit Button */}
