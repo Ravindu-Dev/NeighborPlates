@@ -43,15 +43,21 @@ export const RiderOrderCard: React.FC<RiderOrderCardProps> = ({
   const cookName = job?.cookName || order?.cookName || 'Home Kitchen';
   const orderNumber = job?.orderNumber || order?.orderNumber || '';
   
-  const payout = job?.payoutAmount !== undefined 
-    ? (typeof job.payoutAmount === 'number' ? job.payoutAmount.toFixed(job.payoutAmount % 1 === 0 ? 0 : 2) : job.payoutAmount)
-    : order?.riderEarnings 
-      ? order.riderEarnings.toFixed(2)
-      : order?.totalAmount
-        ? Math.max(150, Math.round(order.totalAmount * 0.15)).toFixed(2)
-        : '150.00';
+  let payoutDisplay = '150.00';
+  if (job?.payoutAmount !== undefined) {
+    const num = typeof job.payoutAmount === 'number' ? job.payoutAmount : parseFloat(String(job.payoutAmount));
+    payoutDisplay = isNaN(num) ? String(job.payoutAmount) : num.toFixed(2);
+  } else if (order?.riderEarnings) {
+    payoutDisplay = Number(order.riderEarnings).toFixed(2);
+  } else if (order?.totalAmount) {
+    payoutDisplay = Math.max(150, Math.round(order.totalAmount * 0.15)).toFixed(2);
+  }
 
-  const pickupDistance = job?.pickupDistance || job?.distancePickup || order?.pickupDistance || order?.distancePickup || (order?.cookAddressLabel ? 'Kitchen' : 'Pickup');
+  const rawPickup = job?.pickupDistance || job?.distancePickup || order?.pickupDistance || order?.distancePickup || (order?.cookAddressLabel ? 'Kitchen' : 'Pickup');
+  const cleanDistance = (rawPickup || '').replace(/\s*(to pickup|away)\s*/gi, '').trim();
+  const pickupPillValue = cleanDistance || rawPickup || 'Nearby';
+  const pickupSubtitle = cleanDistance ? `${cleanDistance} to pickup` : rawPickup;
+
   const dropoffDistance = job?.dropoffDistance || (order?.address?.label ? (order.address.label.length > 16 ? order.address.label.substring(0, 14) + '...' : order.address.label) : 'Destination');
   const estimatedTime = job?.estimatedTime || 'Ready Now';
   
@@ -97,7 +103,7 @@ export const RiderOrderCard: React.FC<RiderOrderCardProps> = ({
             </View>
 
             <Text className="text-textMuted text-xs mt-0.5" numberOfLines={1}>
-              {pickupDistance} to pickup • {estimatedTime}
+              {pickupSubtitle} • {estimatedTime}
             </Text>
           </View>
         </View>
@@ -105,7 +111,7 @@ export const RiderOrderCard: React.FC<RiderOrderCardProps> = ({
         {/* Payout & Status Tag */}
         <View className="items-end">
           <Text className="text-textPrimary font-black text-lg">
-            RS {payout}
+            RS {payoutDisplay}
           </Text>
 
           {payoutTag.type === 'ready_now' ? (
@@ -136,8 +142,8 @@ export const RiderOrderCard: React.FC<RiderOrderCardProps> = ({
           <Text className="text-textMuted text-[10px] uppercase font-bold tracking-wider mb-0.5">
             Pickup
           </Text>
-          <Text className="text-textPrimary font-black text-sm">
-            {pickupDistance}
+          <Text className="text-textPrimary font-black text-sm" numberOfLines={1}>
+            {pickupPillValue}
           </Text>
         </View>
 
@@ -145,7 +151,7 @@ export const RiderOrderCard: React.FC<RiderOrderCardProps> = ({
           <Text className="text-textMuted text-[10px] uppercase font-bold tracking-wider mb-0.5">
             Dropoff
           </Text>
-          <Text className="text-textPrimary font-black text-sm">
+          <Text className="text-textPrimary font-black text-sm" numberOfLines={1}>
             {dropoffDistance}
           </Text>
         </View>
@@ -158,6 +164,7 @@ export const RiderOrderCard: React.FC<RiderOrderCardProps> = ({
             className={`font-black text-sm ${
               isHighlightPackage ? 'text-[#C25E00]' : 'text-textPrimary'
             }`}
+            numberOfLines={1}
           >
             {packageValue}
           </Text>
@@ -178,13 +185,13 @@ export const RiderOrderCard: React.FC<RiderOrderCardProps> = ({
           activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel={`View and accept order from ${cookName}`}
-          className="bg-[#E0EAFF] px-4 py-2.5 rounded-xl flex-row items-center"
-          style={{ opacity: accepting ? 0.7 : 1 }}
+          className="bg-[#E0EAFF] px-3.5 py-2.5 rounded-xl flex-row items-center justify-center shrink-0"
+          style={{ opacity: accepting ? 0.7 : 1, flexShrink: 0 }}
         >
           {accepting ? (
             <ActivityIndicator size="small" color="#1D4ED8" />
           ) : (
-            <Text className="text-[#1D4ED8] font-black text-xs">
+            <Text className="text-[#1D4ED8] font-black text-xs" numberOfLines={1}>
               View & Accept
             </Text>
           )}

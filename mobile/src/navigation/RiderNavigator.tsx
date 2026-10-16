@@ -45,7 +45,7 @@ const TabIcon = ({
   focused: boolean; 
   showBadge?: boolean;
 }) => (
-  <View className="items-center justify-center pt-1.5 relative">
+  <View className="items-center justify-center pt-1.5 relative w-16">
     <View className="relative">
       <Feather 
         name={iconName} 
@@ -57,7 +57,10 @@ const TabIcon = ({
       )}
     </View>
     <Text
+      numberOfLines={1}
+      ellipsizeMode="clip"
       className={`text-[10px] mt-1 font-bold ${focused ? 'text-[#9A3412]' : 'text-textMuted'}`}
+      style={{ textAlign: 'center', width: '100%' }}
     >
       {label}
     </Text>

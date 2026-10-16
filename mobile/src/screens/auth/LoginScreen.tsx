@@ -7,6 +7,8 @@ import { Button } from '../../components/common/Button';
 import { useAuthStore } from '../../store/authStore';
 import { Feather } from '@expo/vector-icons';
 
+import { validateLoginFields, LoginValidationErrors } from '../../utils/validation';
+
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
 interface LoginScreenProps {
@@ -16,13 +18,32 @@ interface LoginScreenProps {
 export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, isLoading, error } = useAuthStore();
+  const [errors, setErrors] = useState<LoginValidationErrors>({});
+  const { login, isLoading, error, clearError } = useAuthStore();
+
+  const handleEmailChange = (val: string) => {
+    setEmail(val);
+    if (errors.email) {
+      setErrors((prev) => ({ ...prev, email: undefined }));
+    }
+    if (error) clearError();
+  };
+
+  const handlePasswordChange = (val: string) => {
+    setPassword(val);
+    if (errors.password) {
+      setErrors((prev) => ({ ...prev, password: undefined }));
+    }
+    if (error) clearError();
+  };
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Validation Error', 'Please complete email and password fields.');
+    const validation = validateLoginFields(email, password);
+    if (!validation.isValid) {
+      setErrors(validation.errors);
       return;
     }
+    setErrors({});
     try {
       await login({ email: email.trim(), password: password.trim() });
     } catch (err) {
@@ -57,23 +78,29 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
           <TextInput
             label="EMAIL ADDRESS"
-            placeholder="enter your email address"
+            placeholder="e.g. rider@neighborplates.com"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={handleEmailChange}
+            error={errors.email}
             keyboardType="email-address"
             autoCapitalize="none"
+            autoCorrect={false}
           />
 
           <TextInput
             label="PASSWORD"
-            placeholder="enter your password"
+            placeholder="Enter your password (min 6 characters)"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={handlePasswordChange}
+            error={errors.password}
             secureTextEntry
           />
 
           {error ? (
-            <Text className="text-red-500 text-xs mb-4 text-center font-medium">{error}</Text>
+            <View className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 flex-row items-center">
+              <Feather name="alert-circle" size={16} color="#DC2626" style={{ marginRight: 8 }} />
+              <Text className="text-red-600 text-xs font-semibold flex-1 leading-4">{error}</Text>
+            </View>
           ) : null}
 
           <Button
