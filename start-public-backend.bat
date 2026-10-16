@@ -1,6 +1,6 @@
 @echo off
 echo ===================================================
-echo   NeighborPlates - Public Cloudflare Tunnel & Backend
+echo   NeighborPlates - Public Cloudflare Tunnel and Backend
 echo ===================================================
 echo.
 echo Starting Spring Boot Backend and Cloudflare Public Tunnel...

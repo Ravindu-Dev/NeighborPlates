@@ -22,12 +22,42 @@ const extractIp = (str?: string): string | null => {
   return null;
 };
 
+let cachedCustomUrl: string | null = null;
+AsyncStorage.getItem('custom_backend_url').then(val => {
+  if (val) cachedCustomUrl = val;
+}).catch(() => {});
+
+export const setCustomBackendUrl = async (url: string | null): Promise<void> => {
+  if (url && url.trim()) {
+    const trimmed = url.trim().replace(/\/+$/, '');
+    await AsyncStorage.setItem('custom_backend_url', trimmed);
+    cachedCustomUrl = trimmed;
+    api.defaults.baseURL = trimmed;
+  } else {
+    await AsyncStorage.removeItem('custom_backend_url');
+    cachedCustomUrl = null;
+    api.defaults.baseURL = getBackendUrl();
+  }
+};
+
+export const getCustomBackendUrl = async (): Promise<string | null> => {
+  if (cachedCustomUrl) return cachedCustomUrl;
+  const stored = await AsyncStorage.getItem('custom_backend_url');
+  if (stored) cachedCustomUrl = stored;
+  return stored;
+};
+
 // Resolve backend API URL dynamically for any network:
-// 1. Explicit EXPO_PUBLIC_API_URL if set in environment
-// 2. Web: Connects to localhost (http://localhost:8081)
-// 3. Physical device (Expo Go): Dynamically extracts the host PC IP from Metro server across multiple Expo Constants sources
-// 4. Emulators/Simulators: Fallback to 10.0.2.2 (Android) or localhost (iOS)
+// 1. Explicit custom URL if configured by user
+// 2. Explicit EXPO_PUBLIC_API_URL if set in environment
+// 3. Web: Connects to localhost (http://localhost:8081)
+// 4. Physical device (Expo Go): Dynamically extracts the host PC IP from Metro server across multiple Expo Constants sources
+// 5. Emulators/Simulators: Fallback to 10.0.2.2 (Android) or localhost (iOS)
 export const getBackendUrl = (): string => {
+  if (cachedCustomUrl) {
+    return cachedCustomUrl;
+  }
+
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
@@ -62,7 +92,11 @@ export const api = axios.create({
 // Request interceptor to attach JWT token and set dynamic baseURL per request
 api.interceptors.request.use(
   async (config) => {
-    config.baseURL = getBackendUrl();
+    if (!cachedCustomUrl) {
+      const stored = await AsyncStorage.getItem('custom_backend_url');
+      if (stored) cachedCustomUrl = stored;
+    }
+    config.baseURL = cachedCustomUrl || getBackendUrl();
     const token = await AsyncStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

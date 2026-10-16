@@ -237,14 +237,6 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
     return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   });
 
-  useEffect(() => {
-    if (cartItems.length === 0) {
-      Alert.alert('Empty Cart', 'Your cart is empty. Please add items to proceed.', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
-    }
-  }, [cartItems, navigation]);
-
   if (cartItems.length === 0) {
     return (
       <View className="flex-1 bg-surface-elevated">

@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Image, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Image, Alert, TouchableOpacity, Platform } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { CustomerStackParamList } from '../../navigation/CustomerNavigator';
@@ -119,7 +119,11 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
 
   return (
     <View className="flex-1 bg-surface-elevated">
-      <ScrollView className="flex-1 pb-24" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: 160 }}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Banner Cover Image */}
         <View className="w-full h-80 bg-primary/10 relative">
           {meal.photos && meal.photos.length > 0 ? (
@@ -362,11 +366,17 @@ export const MealDetailScreen: React.FC<MealDetailScreenProps> = ({ route, navig
               </View>
             )}
           </View>
+
+          {/* Bottom spacing buffer to ensure reviews scroll well above sticky bar */}
+          <View className="h-10" />
         </View>
       </ScrollView>
 
       {/* Sticky Bottom Bar */}
-      <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-150 px-6 py-4 flex-row items-center justify-between shadow-2xl z-20">
+      <View
+        style={{ paddingBottom: Platform.OS === 'ios' ? 24 : 16 }}
+        className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-150 px-6 pt-3.5 flex-row items-center justify-between shadow-2xl z-20"
+      >
         <View>
           <Text className="text-textMuted text-[9px] font-black uppercase tracking-wider">TOTAL AMOUNT</Text>
           <Text className="text-textPrimary font-black text-xl">LKR {totalPrice}</Text>
