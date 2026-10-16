@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, Image, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Alert, Image, StyleSheet, Modal } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
 import { TextInput } from '../../components/common/TextInput';
 import { Button } from '../../components/common/Button';
 import { useAuthStore } from '../../store/authStore';
 import { Feather } from '@expo/vector-icons';
+import { getBackendUrl, setCustomBackendUrl, getCustomBackendUrl } from '../../services/api';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
@@ -16,7 +17,18 @@ interface LoginScreenProps {
 export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showServerModal, setShowServerModal] = useState(false);
+  const [currentServerUrl, setCurrentServerUrl] = useState(getBackendUrl());
+  const [serverInput, setServerInput] = useState(getBackendUrl());
   const { login, isLoading, error } = useAuthStore();
+
+  useEffect(() => {
+    getCustomBackendUrl().then(custom => {
+      const active = custom || getBackendUrl();
+      setCurrentServerUrl(active);
+      setServerInput(active);
+    });
+  }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -39,16 +51,29 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       <View style={styles.outerContainer}>
         {/* Brand Header */}
         <View className="mb-8 items-center">
-          <Image
-            source={require('../../../assets/Logo.png')}
-            style={styles.logoImage}
-            resizeMode="contain"
-            className="mb-2"
-          />
+          <TouchableOpacity onPress={() => setShowServerModal(true)} activeOpacity={0.8}>
+            <Image
+              source={require('../../../assets/Logo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+              className="mb-2"
+            />
+          </TouchableOpacity>
           <Text className="text-primary text-3xl font-extrabold tracking-tight">NeighborPlates</Text>
           <Text className="text-textSecondary text-xs mt-1 text-center max-w-[280px]">
             Fresh local home-cooked meals at your doorstep
           </Text>
+          <TouchableOpacity
+            onPress={() => setShowServerModal(true)}
+            className="mt-3 flex-row items-center bg-gray-100 px-3 py-1.5 rounded-full"
+            activeOpacity={0.7}
+          >
+            <Feather name="globe" size={12} color="#023c69" />
+            <Text className="text-[11px] text-gray-700 font-semibold ml-1.5" numberOfLines={1}>
+              Server: {currentServerUrl.replace(/^https?:\/\//, '')}
+            </Text>
+            <Feather name="edit-2" size={10} color="#9CA3AF" style={{ marginLeft: 6 }} />
+          </TouchableOpacity>
         </View>
 
         {/* Login Form Card */}
@@ -149,6 +174,64 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Server Config Modal */}
+      <Modal visible={showServerModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Backend Server Settings</Text>
+            <Text style={styles.modalSubtitle}>
+              Connect the app to your Cloudflare tunnel or backend URL.
+            </Text>
+
+            <TextInput
+              label="SERVER API URL"
+              placeholder="https://your-tunnel.trycloudflare.com"
+              value={serverInput}
+              onChangeText={setServerInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+              <Button
+                title="Reset Default"
+                variant="outline"
+                className="flex-1"
+                onPress={async () => {
+                  await setCustomBackendUrl(null);
+                  const def = getBackendUrl();
+                  setCurrentServerUrl(def);
+                  setServerInput(def);
+                  setShowServerModal(false);
+                  Alert.alert('Reset', 'Server URL reset to build default.');
+                }}
+              />
+              <Button
+                title="Save & Connect"
+                variant="primary"
+                className="flex-1"
+                onPress={async () => {
+                  if (!serverInput.trim()) {
+                    Alert.alert('Error', 'Please enter a valid URL');
+                    return;
+                  }
+                  await setCustomBackendUrl(serverInput.trim());
+                  setCurrentServerUrl(serverInput.trim());
+                  setShowServerModal(false);
+                  Alert.alert('Saved', 'Server URL updated successfully!');
+                }}
+              />
+            </View>
+            <TouchableOpacity
+              onPress={() => setShowServerModal(false)}
+              style={{ marginTop: 14, alignItems: 'center' }}
+            >
+              <Text style={{ color: '#6B7280', fontSize: 13, fontWeight: '600' }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -236,4 +319,36 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: 'center',
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 16,
+    lineHeight: 18,
+  },
 });
+
