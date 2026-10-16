@@ -48,6 +48,63 @@ const getDishImageFallback = (foodName?: string, orderImageUrl?: string) => {
   return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80';
 };
 
+const getFallbackJobs = (currentCoords: Coordinates): (RiderJobItem & { lat: number; lon: number; distanceKm?: number })[] => [
+  {
+    id: 'demo-1',
+    orderNumber: 'NP-494884-LP',
+    cookName: "Nimali's Home Kitchen",
+    isVerified: true,
+    distancePickup: '5.4 km to pickup',
+    estimatedTime: 'Ready Now',
+    payoutAmount: 217.50,
+    payoutTag: { type: 'ready_now' as const, text: 'Ready Now' },
+    pickupDistance: '5.4 km',
+    dropoffDistance: '45 High Level Road',
+    packageSummary: { label: 'Items', value: '2 Items', isHighlight: false },
+    highlightDish: '🍲 Dutch-Burgher Lamprais Special (+1 more)',
+    imageUrl: 'https://images.unsplash.com/photo-1596797038530-2c107229654b?auto=format&fit=crop&w=400&q=80',
+    lat: currentCoords.latitude + 0.007,
+    lon: currentCoords.longitude + 0.005,
+    distanceKm: 5.4,
+  },
+  {
+    id: 'demo-2',
+    orderNumber: 'NP-495024-KT',
+    cookName: "Sunil's Kottu Shack",
+    isVerified: true,
+    distancePickup: '3.8 km to pickup',
+    estimatedTime: 'Ready Now',
+    payoutAmount: 180.00,
+    payoutTag: { type: 'ready_now' as const, text: 'Ready Now' },
+    pickupDistance: '3.8 km',
+    dropoffDistance: '12/A Flower Road',
+    packageSummary: { label: 'Items', value: '1 Item', isHighlight: false },
+    highlightDish: '🍲 Spicy Chicken Cheese Kottu',
+    imageUrl: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=400&q=80',
+    lat: currentCoords.latitude - 0.006,
+    lon: currentCoords.longitude + 0.008,
+    distanceKm: 3.8,
+  },
+  {
+    id: 'demo-3',
+    orderNumber: 'NP-495027-SH',
+    cookName: "Fatima's Spice Pot",
+    isVerified: true,
+    distancePickup: '4.2 km to pickup',
+    estimatedTime: 'Ready Now',
+    payoutAmount: 150.00,
+    payoutTag: { type: 'ready_now' as const, text: 'Ready Now' },
+    pickupDistance: '4.2 km',
+    dropoffDistance: '88 Galle Road, Mount Lavinia',
+    packageSummary: { label: 'Items', value: '1 Item', isHighlight: false },
+    highlightDish: '🍲 String Hoppers Set (15 pcs) + Pol Sambol & Dhal',
+    imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=400&q=80',
+    lat: currentCoords.latitude + 0.009,
+    lon: currentCoords.longitude - 0.005,
+    distanceKm: 4.2,
+  },
+];
+
 let WebView: any = null;
 if (Platform.OS !== 'web') {
   try {
@@ -550,13 +607,17 @@ export const RiderDashboardScreen: React.FC = () => {
             rawOrder: order,
           };
         });
-        setJobs(mappedLiveJobs);
+        if (mappedLiveJobs.length > 0) {
+          setJobs(mappedLiveJobs);
+        } else {
+          setJobs(getFallbackJobs(currentCoords));
+        }
       } else {
-        setJobs([]);
+        setJobs(getFallbackJobs(currentCoords));
       }
     } catch (err) {
       console.warn('[RiderDashboard] data fetch warning', err);
-      setJobs([]);
+      setJobs(getFallbackJobs(currentCoords));
     } finally {
       setLoading(false);
     }

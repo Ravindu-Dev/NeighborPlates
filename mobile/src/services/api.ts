@@ -49,7 +49,7 @@ export const getBackendUrl = (): string => {
   const linkingIp = extractIp(Constants.linkingUri);
   if (linkingIp) return `http://${linkingIp}:8081`;
 
-  return Platform.OS === 'android' ? 'http://10.0.2.2:8081' : 'http://localhost:8081';
+  return Platform.OS === 'android' ? 'http://10.84.233.172:8081' : 'http://localhost:8081';
 };
 
 export const api = axios.create({
